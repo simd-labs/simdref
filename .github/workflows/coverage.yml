@@ -36,13 +36,13 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           activate-environment: true
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install LLVM toolchain
         # Version 22 is the current stable line on apt.llvm.org

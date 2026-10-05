@@ -1,13 +1,13 @@
 repos:
   # Python formatting
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.9
+    rev: v0.15.9 # pinned: v0.16.10 reformats tracked sources
     hooks:
       - id: ruff-format
 
   # Markdown formatting
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.22
+    rev: 1.0.0
     hooks:
       - id: mdformat
         additional_dependencies:
@@ -16,7 +16,7 @@ repos:
 
   # Shell formatting
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.13.1-1
+    rev: v3.13.1-1 # pinned: v3.14.1-1 reformats tracked sources
     hooks:
       - id: shfmt
 
