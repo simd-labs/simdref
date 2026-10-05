@@ -50,7 +50,7 @@ concurrency:
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.capture.outputs.sha }}
     steps:
@@ -111,7 +111,7 @@ jobs:
 
   build-wheel:
     needs: preflight
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -139,7 +139,7 @@ jobs:
 
   install-smoke:
     needs: build-wheel
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -169,7 +169,7 @@ jobs:
   publish-and-tag:
     needs: [preflight, install-smoke]
     if: ${{ !inputs.dry_run }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: pypi
       url: https://pypi.org/p/simdref
@@ -213,7 +213,7 @@ jobs:
   github-release:
     needs: [preflight, publish-and-tag]
     if: ${{ !inputs.dry_run }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -273,7 +273,7 @@ jobs:
   trigger-data-build:
     needs: [github-release]
     if: ${{ !inputs.dry_run }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: write
     steps:
