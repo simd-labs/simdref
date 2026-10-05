@@ -197,8 +197,10 @@ def _write_atomic(path, write_fn) -> None:
     # ponytail: keeps mode bits only; owner, group and ACLs are not copied
     # (a user cache file).
     target = Path(os.path.realpath(path))
-    old_mode = stat.S_IMODE(os.stat(target).st_mode) if target.exists() else None
-    fd = None
+    try:
+        old_mode = stat.S_IMODE(os.stat(target).st_mode)
+    except FileNotFoundError:
+        old_mode = None
     while True:
         tmp = f"{target}.{secrets.token_hex(8)}.tmp"
         try:
