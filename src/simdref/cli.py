@@ -9,6 +9,7 @@ Display and formatting logic lives in :mod:`simdref.display`.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -56,7 +57,6 @@ from simdref.display import (
     display_isa,
     instruction_query_text,
     instruction_variant_items,
-    isa_sort_key,
     isa_visible,
     normalize_instruction_query,
     render_intrinsic,
@@ -92,6 +92,7 @@ from simdref.storage import (
     DEFAULT_MAN_DIR,
     SQLITE_PATH,
     WEB_DIR,
+    _write_atomic,
     build_sqlite,
     load_catalog,
     load_catalog_from_db,
@@ -230,6 +231,10 @@ def _release_asset_url(tag: str, asset_name: str) -> str:
     return f"https://github.com/{GITHUB_REPO}/releases/download/{tag}/{asset_name}"
 
 
+class _ReleaseAssetMissing(Exception):
+    """The release carries no compatible asset for this name."""
+
+
 def _download_from_release() -> None:
     """Download pre-built catalog and database from GitHub Release.
 
@@ -313,12 +318,21 @@ def _download_from_release() -> None:
 
     for asset in ("catalog.msgpack", "catalog.db"):
         dest = DATA_DIR / asset
-        if not _fetch_into(asset, dest):
+
+        def write(fh, asset=asset):
+            # _fetch_into streams with httpx into its own "wb" handle on
+            # the same temp path; fh itself is unused.
+            if not _fetch_into(asset, fh.atomic_path):
+                raise _ReleaseAssetMissing(asset)
+
+        try:
+            _write_atomic(dest, write)
+        except _ReleaseAssetMissing:
             err_console.print(
                 f"failed to download {asset}: no compatible release asset found", style="red"
             )
             err_console.print("try 'simdref build' to build locally", style="yellow")
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from None
     err_console.print("download complete", style="green")
 
 
@@ -458,9 +472,7 @@ def _build_runtime_locally(*, man_dir: Path, include_sdm: bool = False) -> None:
 
         web_task = count_progress.add_task("Exporting site data", total=1)
         export_site_data(catalog, WEB_DIR)
-        count_progress.update(
-            web_task, completed=1, description="Exporting site data \u2713"
-        )
+        count_progress.update(web_task, completed=1, description="Exporting site data \u2713")
 
     err_console.print(
         f"updated catalog with {len(catalog.intrinsics)} intrinsics and {len(catalog.instructions)} instructions",
@@ -972,7 +984,11 @@ def _payload_source_kinds(arch_details) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _print_search_results_runtime(conn, query: str, limit: int = 20) -> None:
+def _print_search_results_runtime(conn, query: str, limit: int = 20, as_json: bool = False) -> int:
+    """Render the ranked search table (or JSON) in the search's own
+    relevance order. Returns the number of rows actually printed — callers
+    use 0 to fall through to the no-match branch instead of printing an
+    empty table."""
     results, intrinsic_map, instruction_map = _search_runtime(conn, query, limit=limit)
     prepared_rows = []
     for result in results:
@@ -980,7 +996,6 @@ def _print_search_results_runtime(conn, query: str, limit: int = 20) -> None:
         isa = "-"
         lat = "-"
         cpi = "-"
-        isa_sort = (99, "-")
         if result.kind == "instruction":
             item = instruction_map.get(result.key)
             if item is not None:
@@ -988,7 +1003,6 @@ def _print_search_results_runtime(conn, query: str, limit: int = 20) -> None:
                     continue
                 arch = display_architecture(item.architecture)
                 isa = display_isa(item.isa)
-                isa_sort = isa_sort_key(item.isa)
                 lat, cpi = variant_perf_summary(item.arch_details)
         elif result.kind == "intrinsic":
             item = intrinsic_map.get(result.key)
@@ -997,18 +1011,37 @@ def _print_search_results_runtime(conn, query: str, limit: int = 20) -> None:
                     continue
                 arch = display_architecture(item.architecture)
                 isa = display_isa(item.isa)
-                isa_sort = isa_sort_key(item.isa)
                 lat, cpi = intrinsic_perf_summary_runtime(conn, item, instruction_map)
-        prepared_rows.append((result, arch, isa, lat, cpi, isa_sort))
-    prepared_rows.sort(
-        key=lambda row: (
-            row[0].kind != "instruction",
-            row[5],
-            row[0].title.casefold(),
-            row[0].key.casefold(),
+        prepared_rows.append((result, arch, isa, lat, cpi))
+    if not prepared_rows:
+        return 0
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "query": query,
+                    "mode": "search",
+                    "results": [
+                        {
+                            "kind": r.kind,
+                            "key": r.key,
+                            "title": r.title,
+                            "subtitle": r.subtitle,
+                            "arch": arch,
+                            "isa": isa,
+                            "latency_cycles": lat,
+                            "tput_cpi": cpi,
+                        }
+                        for r, arch, isa, lat, cpi in prepared_rows
+                    ],
+                },
+                indent=2,
+                default=str,
+            )
         )
-    )
-    render_search_results([(r, arch, isa, lat, cpi) for r, arch, isa, lat, cpi, _ in prepared_rows])
+        return len(prepared_rows)
+    render_search_results(prepared_rows)
+    return len(prepared_rows)
 
 
 # ---------------------------------------------------------------------------
@@ -1024,21 +1057,41 @@ def _smart_lookup(
 ) -> int:
     """Dispatch a bare query.
 
-    If ``query`` resolves to known instruction records, print a plain-text
-    (or JSON) summary to stdout and exit — never blocks on a TUI. Only
-    open the TUI when the query is unknown and stdio is a TTY, so the user
-    can explore; in non-TTY contexts an unknown query exits with code 2.
+    Exact intrinsic match prints the intrinsic detail and exits 0. Exact
+    instruction match prints a plain-text (or JSON) summary and exits 0;
+    ``--arch`` applies to this branch only. Fuzzy hits print the ranked
+    search list (or JSON) and exit 0, on a TTY or not. Nothing found opens
+    the TUI on a TTY (never under ``--json``) or exits 2 non-interactively.
     """
     ensure_runtime()
-    records = _find_instructions_fast(query)
-    if records:
-        return _print_non_interactive_summary(query, records=records, arch=arch, as_json=as_json)
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        err_console.print(
-            f"no instruction match for {query!r} (non-interactive; run in a TTY to search).",
-            style="yellow",
-        )
-        return 2
+    with contextlib.closing(open_db()) as conn:
+        intrinsic = load_intrinsic_from_db(conn, query)
+        if intrinsic is not None and arch is not None:
+            err_console.print("--arch applies to instruction queries only", style="red")
+            return 2
+        if intrinsic is not None:
+            if as_json:
+                typer.echo(json.dumps(asdict(intrinsic), indent=2, default=str))
+            else:
+                render_intrinsic(None, intrinsic, conn=conn)
+            return 0
+        records = _find_instructions_fast(query)
+        if records:
+            return _print_non_interactive_summary(
+                query, records=records, arch=arch, as_json=as_json
+            )
+        if arch is not None:
+            err_console.print("--arch applies to instruction queries only", style="red")
+            return 2
+        printed = _print_search_results_runtime(conn, query, as_json=as_json)
+        if printed:
+            return 0
+        if as_json or not (sys.stdin.isatty() and sys.stdout.isatty()):
+            err_console.print(
+                f"no match for {query!r} (non-interactive; run in a TTY to search).",
+                style="yellow",
+            )
+            return 2
     return _run_tui(initial_query=query, initial_preset=preset)
 
 

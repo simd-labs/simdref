@@ -130,6 +130,8 @@ def test_smart_lookup_does_not_launch_tui_on_non_tty(monkeypatch, capsys):
     monkeypatch.setattr(cli, "ensure_runtime", lambda: None)
     monkeypatch.setattr(cli, "_find_instructions_fast", lambda q: [])
 
+    monkeypatch.setattr(cli, "_search_runtime", lambda *a, **kw: ([], {}, {}))
+
     def _boom(*a, **kw):
         raise AssertionError("TUI must not launch in non-TTY context")
 
