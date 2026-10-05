@@ -135,7 +135,7 @@ Fully local alternative to step 1: `python scripts/bump-version.py X.Y.Z && git 
 ## Configured environments
 
 - `pypi` — manual-approval gate for PyPI trusted-publisher OIDC.
-- `testpypi` — used by `nightly-testpypi.yml` for pre-release smoke.
+- `testpypi` — the `testpypi` job in `ci.yml` publishes each tested main commit as a dev build.
 
 ## Recovery playbook
 
