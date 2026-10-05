@@ -64,7 +64,9 @@ Intel CDN / uops.info / Arm ACLE / Arm A64 docs / vendor archives / fixtures
 ## Storage strategy
 
 - **Msgpack** (`catalog.msgpack`): complete serialised catalog snapshot for
-  portability and offline use.
+  portability and offline use. `_write_atomic` (storage.py) writes a random
+  sibling temp file, sets the existing file's mode on it before the first
+  byte, and replaces the published file atomically with `os.replace`.
 - **SQLite** (`catalog.db`): FTS5 full-text search with BM25 ranking for fast
   CLI `search`, `show`, `complete`, and `llm` queries. Schema is versioned;
   rebuilt automatically when stale. `build_sqlite` builds into a sibling

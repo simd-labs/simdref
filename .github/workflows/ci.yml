@@ -325,6 +325,86 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  testpypi:
+    # Publish the commit CI just tested to TestPyPI as a dev build. The
+    # default checkout of a push run is the pushed commit, and `needs:`
+    # matrix green. Versions order by committer time, not publish time, so
+    # out-of-order completion never makes an older commit the newest dev.
+    needs: [test, package]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && github.repository == 'simd-labs/simdref'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # PyPI OIDC trusted publishing
+      contents: read
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/simdref
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          activate-environment: true
+          python-version: "3.12"
+
+      - name: Compute dev stamp
+        id: stamp
+        # PEP 440 only accepts a single non-negative integer after `.dev`,
+        # so we concatenate the tested commit's UTC committer minute with
+        # the zero-padded run number: versions then order by commit order,
+        # not by which push happened to finish its tests first. Squash
+        # merges set committer time at merge.
+        run: |
+          ts="$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y%m%d%H%M HEAD)"
+          # ponytail: order follows committer time; a skewed clock or
+          # force-push can misorder dev builds.
+          run_padded="$(printf '%05d' "${GITHUB_RUN_NUMBER}")"
+          stamp="${ts}${run_padded}"
+          echo "value=${stamp}" >> "$GITHUB_OUTPUT"
+          echo "dev stamp: ${stamp}"
+
+      - name: Stamp dev version
+        env:
+          STAMP: ${{ steps.stamp.outputs.value }}
+        run: |
+          python - <<PY
+          import os, pathlib, re
+          stamp = os.environ["STAMP"]
+          # PEP 440 wants one non-negative integer after .dev; the run
+          # number is unique per workflow (per repo), so rerun-safe with
+          # skip-existing below.
+          DEV_SUFFIX_RE = re.compile(r'(?:[-.]dev\d*)+$')
+          pyproject = pathlib.Path("pyproject.toml")
+          text = pyproject.read_text()
+          new_text, n = re.subn(
+              r'^version = "([^"]+)"',
+              lambda m: f'version = "{DEV_SUFFIX_RE.sub("", m.group(1))}.dev{stamp}"',
+              text,
+              count=1,
+              flags=re.M,
+          )
+          if n != 1:
+              raise SystemExit("failed to stamp version in pyproject.toml")
+          pyproject.write_text(new_text)
+          PY
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
   validate-release:
     needs: publish-data
     if: >-

@@ -6,9 +6,12 @@ FTS5 virtual tables for fast full-text search with BM25 ranking.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
+import secrets
 import sqlite3
+import stat
 import sys
 import zlib
 from itertools import islice
@@ -115,9 +118,7 @@ def read_installed_version_stamp() -> str | None:
     try:
         conn = sqlite3.connect(SQLITE_PATH)
         try:
-            row = conn.execute(
-                "SELECT value FROM meta WHERE key = 'installed_version'"
-            ).fetchone()
+            row = conn.execute("SELECT value FROM meta WHERE key = 'installed_version'").fetchone()
         finally:
             conn.close()
     except sqlite3.DatabaseError:
@@ -183,10 +184,63 @@ def load_catalog_from_db(path: Path = SQLITE_PATH) -> Catalog:
     )
 
 
+def _write_atomic(path, write_fn) -> None:
+    """Publish ``path`` atomically.
+
+    Writes via ``write_fn(fh)`` to a random sibling temp file, then
+    ``os.replace``. A symlinked destination keeps its link; the real file
+    is replaced. An existing target's mode is set on the temp before the
+    first byte is written; a new file gets ``0o666 & ~umask``, the same
+    mode as ``path.open("wb")``. Any failure unlinks the temp and
+    re-raises.
+    """
+    # ponytail: keeps mode bits only; owner, group and ACLs are not copied
+    # (a user cache file).
+    target = Path(os.path.realpath(path))
+    try:
+        old_mode = stat.S_IMODE(os.stat(target).st_mode)
+    except FileNotFoundError:
+        old_mode = None
+    while True:
+        tmp = f"{target}.{secrets.token_hex(8)}.tmp"
+        try:
+            fd = os.open(
+                tmp,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                old_mode if old_mode is not None else 0o666,
+            )
+            break
+        except FileExistsError:
+            continue
+    try:
+        # fchmod must run (when needed) while the raw fd is the only handle,
+        # so a failure here never looks for a file object that does not exist.
+        if old_mode is not None:
+            os.fchmod(fd, old_mode)  # tighten before any byte
+        fh = os.fdopen(fd, "wb")
+    except BaseException:
+        # One cleanup for a pre-fdopen failure: close the fd, drop the temp.
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+    try:
+        with fh:
+            write_fn(fh)
+        os.replace(tmp, target)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            fh.close()
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
 def save_catalog(catalog: Catalog, path: Path = CATALOG_PATH) -> None:
     ensure_dir(path.parent)
     packer = msgpack.Packer(use_bin_type=True)
-    with path.open("wb") as fh:
+
+    def write(fh) -> None:
         fh.write(packer.pack_map_header(4))
         fh.write(packer.pack("intrinsics"))
         fh.write(packer.pack_array_header(len(catalog.intrinsics)))
@@ -202,6 +256,8 @@ def save_catalog(catalog: Catalog, path: Path = CATALOG_PATH) -> None:
             fh.write(packer.pack(source.to_dict()))
         fh.write(packer.pack("generated_at"))
         fh.write(packer.pack(catalog.generated_at))
+
+    _write_atomic(path, write)
 
 
 def open_db(path: Path = SQLITE_PATH) -> sqlite3.Connection:
