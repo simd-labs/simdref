@@ -166,3 +166,84 @@ def test_smart_lookup_prints_summary_on_non_tty_match(monkeypatch, capsys):
     assert rc == 0
     assert "vaddps" in out
     assert "lat=" in out
+
+
+def _patch_db(monkeypatch, cli):
+    monkeypatch.setattr(cli, "ensure_runtime", lambda: None)
+    monkeypatch.setattr(cli, "open_db", lambda: _FakeConn())
+    monkeypatch.setattr(cli, "load_intrinsic_from_db", lambda conn, name: None)
+
+
+def test_smart_lookup_fuzzy_match_on_tty_opens_tui_with_preset(monkeypatch):
+    """A fuzzy hit on a TTY opens the TUI with the given preset (as on
+    origin/main); the passed preset wins over the default."""
+    from simdref import cli
+
+    seen = {}
+
+    class _Result:
+        kind = "instruction"
+        key = "vaddps"
+        title = "vaddps"
+        subtitle = "Add packed single-precision floats."
+
+    rec = _make_record(arch_details={"SKX": _arch_entry("3", "0.5")})
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: True)
+    _patch_db(monkeypatch, cli)
+    monkeypatch.setattr(cli, "_find_instructions_fast", lambda q: [])
+    monkeypatch.setattr(cli, "_search_runtime", lambda *a, **kw: ([_Result()], {}, {"vaddps": rec}))
+    monkeypatch.setattr(cli, "_run_tui", lambda **kw: seen.update(kw) or 0)
+
+    rc = cli._smart_lookup("vaddp", preset="arm64")
+    assert rc == 0
+    assert seen == {"initial_query": "vaddp", "initial_preset": "arm64"}
+
+
+def test_smart_lookup_fuzzy_match_non_tty_prints_and_skips_tui(monkeypatch):
+    """Non-TTY keeps printing the search list and never opens the TUI,
+    even with a non-default preset."""
+    from simdref import cli
+
+    class _Result:
+        kind = "instruction"
+        key = "vaddps"
+        title = "vaddps"
+        subtitle = "Add packed single-precision floats."
+
+    rec = _make_record(arch_details={"SKX": _arch_entry("3", "0.5")})
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: False)
+    _patch_db(monkeypatch, cli)
+    monkeypatch.setattr(cli, "_find_instructions_fast", lambda q: [])
+    monkeypatch.setattr(cli, "_search_runtime", lambda *a, **kw: ([_Result()], {}, {"vaddps": rec}))
+    monkeypatch.setattr(
+        cli, "_run_tui", lambda **kw: (_ for _ in ()).throw(AssertionError("no TUI"))
+    )
+
+    rc = cli._smart_lookup("vaddp", preset="arm64")
+    assert rc == 0
+
+
+def test_smart_lookup_fuzzy_match_json_tty_prints_and_skips_tui(monkeypatch):
+    """--json prints even on a TTY (no interactive UI under --json)."""
+    from simdref import cli
+
+    class _Result:
+        kind = "instruction"
+        key = "vaddps"
+        title = "vaddps"
+        subtitle = "Add packed single-precision floats."
+
+    rec = _make_record(arch_details={"SKX": _arch_entry("3", "0.5")})
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: True)
+    _patch_db(monkeypatch, cli)
+    monkeypatch.setattr(cli, "_find_instructions_fast", lambda q: [])
+    monkeypatch.setattr(cli, "_search_runtime", lambda *a, **kw: ([_Result()], {}, {"vaddps": rec}))
+    monkeypatch.setattr(
+        cli, "_run_tui", lambda **kw: (_ for _ in ()).throw(AssertionError("no TUI"))
+    )
+
+    rc = cli._smart_lookup("vaddp", preset="arm64", as_json=True)
+    assert rc == 0

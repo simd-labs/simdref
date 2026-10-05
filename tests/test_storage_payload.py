@@ -239,7 +239,6 @@ def test_download_from_release_replaces_readonly_target(tmp_path: Path, monkeypa
     """A download writes through the file object ``_write_atomic`` gives
     ``write_fn`` and replaces an existing 0400 target."""
     import httpx
-    import typer
 
     from simdref import cli
 
@@ -266,9 +265,9 @@ def test_download_from_release_replaces_readonly_target(tmp_path: Path, monkeypa
     dest = tmp_path / "catalog.msgpack"
     dest.write_bytes(b"old")
     dest.chmod(0o400)
-    try:
-        cli._download_from_release()
-    except typer.Exit:
-        pass  # second asset (catalog.db) may exit on progress/console; content check stands
+    db = tmp_path / "catalog.db"
+    cli._download_from_release()
     assert dest.read_bytes() == b"new-payload"
     assert (dest.stat().st_mode & 0o777) == 0o400
+    assert db.read_bytes() == b"new-payload"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["catalog.db", "catalog.msgpack"]
