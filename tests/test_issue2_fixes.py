@@ -48,7 +48,8 @@ def _arch_entry(lat: str, cpi: str, *, kind: str = "measured", ports: str | None
 
 
 class _FakeConn:
-    pass
+    def close(self):
+        pass
 
 
 def _fake_lookup(mapping):
@@ -128,6 +129,9 @@ def test_smart_lookup_does_not_launch_tui_on_non_tty(monkeypatch, capsys):
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
     monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: False)
     monkeypatch.setattr(cli, "ensure_runtime", lambda: None)
+    fake_conn = _FakeConn()
+    monkeypatch.setattr(cli, "open_db", lambda: fake_conn)
+    monkeypatch.setattr(cli, "load_intrinsic_from_db", lambda conn, name: None)
     monkeypatch.setattr(cli, "_find_instructions_fast", lambda q: [])
 
     monkeypatch.setattr(cli, "_search_runtime", lambda *a, **kw: ([], {}, {}))
@@ -147,6 +151,9 @@ def test_smart_lookup_prints_summary_on_non_tty_match(monkeypatch, capsys):
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
     monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: False)
     monkeypatch.setattr(cli, "ensure_runtime", lambda: None)
+    fake_conn = _FakeConn()
+    monkeypatch.setattr(cli, "open_db", lambda: fake_conn)
+    monkeypatch.setattr(cli, "load_intrinsic_from_db", lambda conn, name: None)
 
     rec = _make_record(arch_details={"cortex-a72": _arch_entry("3", "0.5")})
     monkeypatch.setattr(cli, "_find_instructions_fast", lambda q: [rec])
