@@ -249,7 +249,7 @@ def _download_from_release() -> None:
 
     is_tty = err_console.is_terminal and os.environ.get("GITHUB_ACTIONS") != "true"
 
-    def _fetch_into(asset: str, dest: Path) -> bool:
+    def _fetch_into(asset: str, fh) -> bool:
         for tag in _release_tag_candidates():
             url = _release_asset_url(tag, asset)
             try:
@@ -273,17 +273,15 @@ def _download_from_release() -> None:
                         )
                         with progress:
                             task = progress.add_task(f"downloading {asset} ({tag})", total=total)
-                            with open(dest, "wb") as f:
-                                for chunk in resp.iter_bytes(chunk_size=1024 * 64):
-                                    f.write(chunk)
-                                    progress.update(task, advance=len(chunk))
+                            for chunk in resp.iter_bytes(chunk_size=1024 * 64):
+                                fh.write(chunk)
+                                progress.update(task, advance=len(chunk))
                     else:
                         err_console.print(f"downloading {asset} from {tag}...", style="dim")
                         written = 0
-                        with open(dest, "wb") as f:
-                            for chunk in resp.iter_bytes(chunk_size=1024 * 64):
-                                f.write(chunk)
-                                written += len(chunk)
+                        for chunk in resp.iter_bytes(chunk_size=1024 * 64):
+                            fh.write(chunk)
+                            written += len(chunk)
                         if total:
                             err_console.print(
                                 f"downloaded {asset}: {written / 1_048_576:.1f} MB "
@@ -320,9 +318,7 @@ def _download_from_release() -> None:
         dest = DATA_DIR / asset
 
         def write(fh, asset=asset):
-            # _fetch_into streams with httpx into its own "wb" handle on
-            # the same temp path; fh itself is unused.
-            if not _fetch_into(asset, fh.atomic_path):
+            if not _fetch_into(asset, fh):
                 raise _ReleaseAssetMissing(asset)
 
         try:
