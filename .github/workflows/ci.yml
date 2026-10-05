@@ -42,7 +42,7 @@ jobs:
   # Phase 1 — data creation
   # ───────────────────────────────────────────────────────────────────
   build-catalog:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PYTHONUNBUFFERED: "1"
     outputs:
@@ -149,7 +149,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────────
   test:
     needs: build-catalog
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       # Every non-EOL CPython. The interior versions are not redundant: 3.11 alone
@@ -240,7 +240,7 @@ jobs:
           PY
 
   package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -285,7 +285,7 @@ jobs:
         || github.event_name == 'schedule'
         || github.event_name == 'workflow_dispatch'
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
@@ -335,7 +335,7 @@ jobs:
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && github.repository == 'simd-labs/simdref'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write  # PyPI OIDC trusted publishing
       contents: read
@@ -415,7 +415,7 @@ jobs:
         || github.event_name == 'schedule'
         || github.event_name == 'workflow_dispatch'
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
