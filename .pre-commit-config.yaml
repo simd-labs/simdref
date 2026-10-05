@@ -1,7 +1,7 @@
 repos:
   # Python formatting
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.9 # pinned: v0.16.10 reformats tracked sources
+    rev: v0.16.10
     hooks:
       - id: ruff-format
 
@@ -16,7 +16,7 @@ repos:
 
   # Shell formatting
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.13.1-1 # pinned: v3.14.1-1 reformats tracked sources
+    rev: v3.14.1-1
     hooks:
       - id: shfmt
 
