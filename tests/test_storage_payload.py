@@ -81,18 +81,6 @@ def test_save_catalog_failed_write_leaves_old_snapshot(tmp_path: Path):
     assert [p for p in tmp_path.iterdir() if p.name != path.name] == []  # no temp left
 
 
-def test_write_atomic_chmod_failure_leaves_no_temp(tmp_path: Path, monkeypatch):
-    from simdref import storage
-
-    path = tmp_path / "out.bin"
-    path.write_bytes(b"old")
-    monkeypatch.setattr(os, "fchmod", lambda *a: (_ for _ in ()).throw(OSError("fchmod")))
-    with pytest.raises(OSError):
-        storage._write_atomic(path, lambda fh: fh.write(b"new"))
-    assert path.read_bytes() == b"old"
-    assert [p.name for p in tmp_path.iterdir()] == [path.name]
-
-
 def test_write_atomic_fchmod_failure_leaves_no_fd_and_no_temp(tmp_path: Path, monkeypatch):
     from simdref import storage
 
@@ -150,6 +138,18 @@ def test_write_atomic_keeps_private_mode(tmp_path: Path):
     path.chmod(0o600)
     storage._write_atomic(path, lambda fh: fh.write(b"new"))
     assert (path.stat().st_mode & 0o777) == 0o600
+
+
+def test_write_atomic_keeps_mode_zero(tmp_path: Path):
+    """An existing 0000 file stays 0000: mode zero must survive the
+    ``old_mode is not None`` path, not collapse to a falsy default."""
+    from simdref import storage
+
+    path = tmp_path / "out.bin"
+    path.write_bytes(b"old")
+    path.chmod(0o000)
+    storage._write_atomic(path, lambda fh: fh.write(b"new"))
+    assert (path.stat().st_mode & 0o777) == 0o000
 
 
 def test_write_atomic_new_file_respects_umask(tmp_path: Path):
@@ -233,3 +233,42 @@ def test_save_catalog_through_symlink_replaces_target_keeps_link(tmp_path: Path)
     loaded = load_catalog(real)
     assert len(loaded.intrinsics) == len(catalog.intrinsics)
     assert sorted(p.name for p in tmp_path.iterdir()) == ["catalog.msgpack", "real.msgpack"]
+
+
+def test_download_from_release_replaces_readonly_target(tmp_path: Path, monkeypatch):
+    """A download writes through the file object ``_write_atomic`` gives
+    ``write_fn`` and replaces an existing 0400 target."""
+    import httpx
+    import typer
+
+    from simdref import cli
+
+    monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
+
+    class _Resp:
+        status_code = 200
+        headers: dict = {}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_bytes(self, chunk_size=1024 * 64):
+            yield b"new-payload"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(httpx, "stream", lambda *a, **kw: _Resp())
+
+    dest = tmp_path / "catalog.msgpack"
+    dest.write_bytes(b"old")
+    dest.chmod(0o400)
+    try:
+        cli._download_from_release()
+    except typer.Exit:
+        pass  # second asset (catalog.db) may exit on progress/console; content check stands
+    assert dest.read_bytes() == b"new-payload"
+    assert (dest.stat().st_mode & 0o777) == 0o400

@@ -198,20 +198,32 @@ def _write_atomic(path, write_fn) -> None:
     # (a user cache file).
     target = Path(os.path.realpath(path))
     old_mode = stat.S_IMODE(os.stat(target).st_mode) if target.exists() else None
+    fd = None
     while True:
         tmp = f"{target}.{secrets.token_hex(8)}.tmp"
         try:
-            fh = os.fdopen(
-                os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, old_mode or 0o666), "wb"
+            fd = os.open(
+                tmp,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                old_mode if old_mode is not None else 0o666,
             )
             break
         except FileExistsError:
             continue
     try:
+        # fchmod must run (when needed) while the raw fd is the only handle,
+        # so a failure here never looks for a file object that does not exist.
+        if old_mode is not None:
+            os.fchmod(fd, old_mode)  # tighten before any byte
+        fh = os.fdopen(fd, "wb")
+    except BaseException:
+        # One cleanup for a pre-fdopen failure: close the fd, drop the temp.
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+    try:
         with fh:
-            fh.atomic_path = Path(tmp)
-            if old_mode is not None:
-                os.fchmod(fh.fileno(), old_mode)  # tighten before any byte
             write_fn(fh)
         os.replace(tmp, target)
     except BaseException:
