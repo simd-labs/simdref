@@ -1081,6 +1081,10 @@ def _smart_lookup(
             return 2
         printed = _print_search_results_runtime(conn, query, as_json=as_json)
         if printed:
+            if not as_json and sys.stdin.isatty() and sys.stdout.isatty():
+                # A fuzzy match on a TTY opens the TUI (preset as passed, like
+                # origin/main); non-TTY and --json keep printing the list.
+                return _run_tui(initial_query=query, initial_preset=preset)
             return 0
         if as_json or not (sys.stdin.isatty() and sys.stdout.isatty()):
             err_console.print(
