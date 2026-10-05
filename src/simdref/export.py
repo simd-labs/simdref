@@ -313,12 +313,20 @@ def _columnar_instructions(entries: list[dict]) -> dict:
         cols["form"].append(0 if e["form"] == e["display_form"] else e["form"])
         cols["dmn"].append(e["display_mnemonic"])
         cols["mn"].append(0 if e["mnemonic"] == e["display_mnemonic"] else e["mnemonic"])
-        cols["key"].append(0 if e["key"] == e["architecture"] + ":" + e["form"].lower() else e["key"])
+        cols["key"].append(
+            0 if e["key"] == e["architecture"] + ":" + e["form"].lower() else e["key"]
+        )
         cols["sum"].append(f[3])
         cols["isa"].append(isa([e["isa"], e["display_isa"], e["isa_families"], e["isa_subs"]]))
         cols["arch"].append(arch([e["architecture"], e["display_architecture"]]))
         cols["perf"].append(perf([e["lat"], e["cpi"]]))
-        if f != [e["display_mnemonic"], e["display_key"], e["display_form"], f[3], e["display_isa"]]:
+        if f != [
+            e["display_mnemonic"],
+            e["display_key"],
+            e["display_form"],
+            f[3],
+            e["display_isa"],
+        ]:
             fields[i] = f
         if _truncate(f[3], 80) != e["summary"]:
             summaries[i] = e["summary"]

@@ -20,6 +20,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PYPROJECT = ROOT / "pyproject.toml"
+
+
 def _rewrite_pyproject(version: str) -> None:
     text = PYPROJECT.read_text()
     new_text, n = re.subn(
