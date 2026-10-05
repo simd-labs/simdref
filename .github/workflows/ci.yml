@@ -52,13 +52,13 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           activate-environment: true
-          python-version: "3.12"
+          python-version: "3.14"
 
       # No catalog cache: every run rebuilds from current upstream
       # sources. Trades ~10 min of runtime for guaranteed freshness and
@@ -246,13 +246,13 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           activate-environment: true
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Build distributables
         run: uv build
@@ -341,13 +341,13 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           activate-environment: true
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install package and test dependencies
         run: uv pip install -e . pytest
