@@ -46,15 +46,15 @@ source's natural granularity and carries provenance:
 ```python
 @dataclass(frozen=True)
 class PerfEntry:
-    source: str            # "llvm-mca", "osaca", "rvv-bench"
-    source_kind: str       # "measured" | "modeled"
-    source_version: str    # e.g. "llvm-21.1.0", "osaca@<sha>"
-    core: str              # canonical core id: "neoverse-v2", "cortex-a72", "sifive-p670", ...
-    applies_to: str        # "encoding" | "form" | "class" | "lmul"
-    latency: dict[str, str]      # {"cycles": "3", "cycles_mem": "5", ...}
+    source: str  # "llvm-mca", "osaca", "rvv-bench"
+    source_kind: str  # "measured" | "modeled"
+    source_version: str  # e.g. "llvm-21.1.0", "osaca@<sha>"
+    core: str  # canonical core id: "neoverse-v2", "cortex-a72", "sifive-p670", ...
+    applies_to: str  # "encoding" | "form" | "class" | "lmul"
+    latency: dict[str, str]  # {"cycles": "3", "cycles_mem": "5", ...}
     measurement: dict[str, str]  # {"TP": "0.5", "TP_ports": "1*p01", ...}
-    ports: list[str] | None      # canonicalized port labels
-    citation_url: str | None     # back-link to authoritative source
+    ports: list[str] | None  # canonicalized port labels
+    citation_url: str | None  # back-link to authoritative source
 ```
 
 Existing x86 rows (from uops.info) are migrated into the same `perf[]` shape

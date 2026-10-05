@@ -10,7 +10,7 @@ WORK=$(mktemp -d /tmp/simdref-footprint-check.XXXXXX)
 trap 'rm -rf "$WORK"' EXIT
 
 echo "== build wheel =="
-( cd "$CORE" && nice -n19 uv build --wheel --out-dir "$WORK/dist" ) >"$WORK/build.log" 2>&1
+(cd "$CORE" && nice -n19 uv build --wheel --out-dir "$WORK/dist") >"$WORK/build.log" 2>&1
 echo "exit=$?"
 WHEEL=$(ls "$WORK"/dist/*.whl)
 
@@ -65,11 +65,11 @@ mapfile -t files < <(find "$HOME" -type f | sort)
 echo "found ${#files[*]} file(s):"
 printf '  %s\n' "${files[@]}"
 if [ "${#files[@]}" -eq 0 ]; then
-    echo "FAIL: find returned an empty list (positive control: this must fail, not pass silently)"
-    exit 1
+	echo "FAIL: find returned an empty list (positive control: this must fail, not pass silently)"
+	exit 1
 fi
 if [ "${#files[@]}" -ne 1 ] || [ "$(basename "${files[0]}")" != "catalog.db" ]; then
-    echo "FAIL: expected exactly one file named catalog.db"
-    exit 1
+	echo "FAIL: expected exactly one file named catalog.db"
+	exit 1
 fi
 echo "PASS: HOME contains exactly one file: catalog.db"

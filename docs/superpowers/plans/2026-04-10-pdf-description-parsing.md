@@ -24,11 +24,11 @@ In `pyproject.toml`, add pdfplumber to the dependencies list:
 
 ```python
 dependencies = [
-  "httpx>=0.28,<1",
-  "pdfplumber>=0.11,<1",
-  "rapidfuzz>=3.9,<4",
-  "rich>=13,<15",
-  "typer>=0.19,<1",
+    "httpx>=0.28,<1",
+    "pdfplumber>=0.11,<1",
+    "rapidfuzz>=3.9,<4",
+    "rich>=13,<15",
+    "typer>=0.19,<1",
 ]
 ```
 
@@ -79,7 +79,10 @@ def test_instruction_record_has_description_field():
         summary="Add packed single precision floating-point values.",
         description={"Description": "Adds four packed...", "Operation": "DEST[31:0] := ..."},
     )
-    assert record.description == {"Description": "Adds four packed...", "Operation": "DEST[31:0] := ..."}
+    assert record.description == {
+        "Description": "Adds four packed...",
+        "Operation": "DEST[31:0] := ...",
+    }
 
 
 def test_instruction_record_description_defaults_empty():
@@ -94,30 +97,37 @@ def test_catalog_roundtrip_with_description():
         summary="Add packed single precision floating-point values.",
         description={"Description": "Adds four packed...", "Operation": "DEST[31:0] := ..."},
     )
-    catalog = Catalog(intrinsics=[], instructions=[record], sources=[], generated_at="2026-01-01T00:00:00Z")
+    catalog = Catalog(
+        intrinsics=[], instructions=[record], sources=[], generated_at="2026-01-01T00:00:00Z"
+    )
     payload = catalog.to_dict()
     roundtripped = Catalog.from_dict(payload)
-    assert roundtripped.instructions[0].description == {"Description": "Adds four packed...", "Operation": "DEST[31:0] := ..."}
+    assert roundtripped.instructions[0].description == {
+        "Description": "Adds four packed...",
+        "Operation": "DEST[31:0] := ...",
+    }
 
 
 def test_catalog_from_dict_without_description():
     """Old catalogs without description field should still load."""
     payload = {
         "intrinsics": [],
-        "instructions": [{
-            "mnemonic": "NOP",
-            "form": "NOP",
-            "summary": "No operation.",
-            "isa": [],
-            "operands": [],
-            "operand_details": [],
-            "metadata": {},
-            "arch_details": {},
-            "linked_intrinsics": [],
-            "metrics": {},
-            "aliases": [],
-            "source": "uops.info",
-        }],
+        "instructions": [
+            {
+                "mnemonic": "NOP",
+                "form": "NOP",
+                "summary": "No operation.",
+                "isa": [],
+                "operands": [],
+                "operand_details": [],
+                "metadata": {},
+                "arch_details": {},
+                "linked_intrinsics": [],
+                "metrics": {},
+                "aliases": [],
+                "source": "uops.info",
+            }
+        ],
         "sources": [],
         "generated_at": "2026-01-01T00:00:00Z",
     }
@@ -369,11 +379,16 @@ from simdref.pdfparse.intel import (
 
 
 def test_parse_instruction_title_basic():
-    assert parse_instruction_title("ADDPS—Add Packed Single Precision Floating-Point Values") == ("ADDPS", "Add Packed Single Precision Floating-Point Values")
+    assert parse_instruction_title("ADDPS—Add Packed Single Precision Floating-Point Values") == (
+        "ADDPS",
+        "Add Packed Single Precision Floating-Point Values",
+    )
 
 
 def test_parse_instruction_title_with_slash():
-    result = parse_instruction_title("MOVDQA/VMOVDQA32/VMOVDQA64—Move Aligned Packed Integer Values")
+    result = parse_instruction_title(
+        "MOVDQA/VMOVDQA32/VMOVDQA64—Move Aligned Packed Integer Values"
+    )
     assert result == ("MOVDQA/VMOVDQA32/VMOVDQA64", "Move Aligned Packed Integer Values")
 
 
@@ -387,9 +402,17 @@ def test_parse_instruction_title_lowercase_rejected():
 
 def test_normalize_section_name():
     assert normalize_section_name("Description") == "Description"
-    assert normalize_section_name("Intel C/C++ Compiler Intrinsic Equivalent") == "Intrinsic Equivalents"
-    assert normalize_section_name("Intel C/C++Compiler Intrinsic Equivalent") == "Intrinsic Equivalents"
-    assert normalize_section_name("SIMD Floating-Point Exceptions") == "SIMD Floating-Point Exceptions"
+    assert (
+        normalize_section_name("Intel C/C++ Compiler Intrinsic Equivalent")
+        == "Intrinsic Equivalents"
+    )
+    assert (
+        normalize_section_name("Intel C/C++Compiler Intrinsic Equivalent")
+        == "Intrinsic Equivalents"
+    )
+    assert (
+        normalize_section_name("SIMD Floating-Point Exceptions") == "SIMD Floating-Point Exceptions"
+    )
     assert normalize_section_name("Numeric Exceptions") == "Numeric Exceptions"
     assert normalize_section_name("Other Exceptions") == "Other Exceptions"
     assert normalize_section_name("Flags Affected") == "Flags Affected"
@@ -544,7 +567,9 @@ def parse_intel_sdm(pdf_path: Path) -> dict[str, dict[str, str]]:
     # Phase 2: extract sections for each instruction
     result: dict[str, dict[str, str]] = {}
     for idx, (page_start, mnemonic, _summary) in enumerate(title_pages):
-        page_end = title_pages[idx + 1][0] if idx + 1 < len(title_pages) else min(page_start + 10, total)
+        page_end = (
+            title_pages[idx + 1][0] if idx + 1 < len(title_pages) else min(page_start + 10, total)
+        )
 
         # Collect all chars across the instruction's pages, excluding title font
         all_chars: list[dict] = []
@@ -753,7 +778,20 @@ def main() -> int:
         sys.argv = [sys.argv[0], *argv]
     else:
         sys.argv = [sys.argv[0], *argv]
-    commands = {"update", "search", "show", "man", "doctor", "tui", "export-web", "llm", "complete", "shell-init", "--help", "-h"}
+    commands = {
+        "update",
+        "search",
+        "show",
+        "man",
+        "doctor",
+        "tui",
+        "export-web",
+        "llm",
+        "complete",
+        "shell-init",
+        "--help",
+        "-h",
+    }
     if argv and argv[0] not in commands and not argv[0].startswith("-"):
         return _smart_lookup(" ".join(argv))
     app()
@@ -771,11 +809,18 @@ def print_description_sections(description: dict[str, str]) -> None:
         return
     # Preferred display order
     order = [
-        "Description", "Operation", "Intrinsic Equivalents",
-        "Flags Affected", "Exceptions", "SIMD Floating-Point Exceptions",
-        "Numeric Exceptions", "Other Exceptions",
-        "Protected Mode Exceptions", "Real-Address Mode Exceptions",
-        "Virtual-8086 Mode Exceptions", "Compatibility Mode Exceptions",
+        "Description",
+        "Operation",
+        "Intrinsic Equivalents",
+        "Flags Affected",
+        "Exceptions",
+        "SIMD Floating-Point Exceptions",
+        "Numeric Exceptions",
+        "Other Exceptions",
+        "Protected Mode Exceptions",
+        "Real-Address Mode Exceptions",
+        "Virtual-8086 Mode Exceptions",
+        "Compatibility Mode Exceptions",
         "64-Bit Mode Exceptions",
     ]
     shown = set()
@@ -814,7 +859,9 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False) -> None:
     if linked:
         console.print(Rule("intrinsic to instruction mapping", style="cyan"))
         print_instruction_mapping(catalog, item, conn=conn)
-        console.print(Rule(f"instruction details: {display_instruction_title(primary)}", style="magenta"))
+        console.print(
+            Rule(f"instruction details: {display_instruction_title(primary)}", style="magenta")
+        )
         print_operand_block(primary)
         print_generic_table(
             measurement_rows(primary),
@@ -829,7 +876,9 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False) -> None:
 Modify `render_instruction_sections` similarly:
 
 ```python
-def render_instruction_sections(catalog, item, include_title: bool = True, conn=None, short: bool = False) -> None:
+def render_instruction_sections(
+    catalog, item, include_title: bool = True, conn=None, short: bool = False
+) -> None:
     """Render instruction detail with optional title panel."""
     if include_title:
         table = Table(show_header=False, box=None)
@@ -846,7 +895,13 @@ def render_instruction_sections(catalog, item, include_title: bool = True, conn=
             table.add_row("category", item.metadata["category"])
         if item.metadata.get("cpl"):
             table.add_row("cpl", item.metadata["cpl"])
-        console.print(Panel(table, title=f"instruction: {display_instruction_title(item)}", border_style="magenta"))
+        console.print(
+            Panel(
+                table,
+                title=f"instruction: {display_instruction_title(item)}",
+                border_style="magenta",
+            )
+        )
     else:
         print_instruction_metadata(item)
     if not short and item.description:
@@ -881,7 +936,11 @@ def _smart_lookup(query: str) -> int:
     ensure_runtime()
     short = SHORT_MODE
 
-    family_query = " ".join(query.split()[:-1]).strip() if query.split() and query.split()[-1].isdigit() else query
+    family_query = (
+        " ".join(query.split()[:-1]).strip()
+        if query.split() and query.split()[-1].isdigit()
+        else query
+    )
     family_items = _find_instruction_family_fast(family_query)
     if family_items:
         indexed_family_variant = _select_instruction_variant(None, query, family_items)
@@ -899,14 +958,22 @@ def _smart_lookup(query: str) -> int:
             with console.pager(styles=not short) if not short else _nullcontext():
                 render_intrinsic(None, intrinsic, conn=conn, short=short)
             return 0
-        indexed_variant = _select_instruction_variant(None, query, _find_instructions_fast(" ".join(query.split()[:-1])) if query.split() and query.split()[-1].isdigit() else [])
+        indexed_variant = _select_instruction_variant(
+            None,
+            query,
+            _find_instructions_fast(" ".join(query.split()[:-1]))
+            if query.split() and query.split()[-1].isdigit()
+            else [],
+        )
         if indexed_variant is not None:
             with console.pager(styles=not short) if not short else _nullcontext():
                 render_instruction(None, indexed_variant, conn=conn, short=short)
             return 0
         instructions = _find_instructions_fast(query)
         if instructions:
-            exact_form = next((item for item in instructions if item.key.casefold() == query.casefold()), None)
+            exact_form = next(
+                (item for item in instructions if item.key.casefold() == query.casefold()), None
+            )
             if exact_form is not None:
                 with console.pager(styles=not short) if not short else _nullcontext():
                     render_instruction(None, exact_form, conn=conn, short=short)
@@ -1136,14 +1203,32 @@ def instruction_page(record: InstructionRecord) -> str:
     else:
         parts.append(_section("DESCRIPTION", _roff_escape(record.summary)))
     if record.description.get("Operation"):
-        parts.append(_section("OPERATION", f".nf\n{_roff_escape(record.description['Operation'])}\n.fi"))
+        parts.append(
+            _section("OPERATION", f".nf\n{_roff_escape(record.description['Operation'])}\n.fi")
+        )
     parts.append(_section("ISA", _roff_escape(", ".join(record.isa) or "Unknown")))
-    parts.append(_section("OPERANDS", _roff_escape("\n".join(record.operands) or "No operand details available.")))
-    parts.append(_section("INTRINSICS", _roff_escape(", ".join(record.linked_intrinsics) or "None linked")))
-    parts.append(_section("PERFORMANCE DETAILS", _roff_escape("\n".join(_metric_lines(record)) or "No performance metrics available.")))
+    parts.append(
+        _section(
+            "OPERANDS", _roff_escape("\n".join(record.operands) or "No operand details available.")
+        )
+    )
+    parts.append(
+        _section("INTRINSICS", _roff_escape(", ".join(record.linked_intrinsics) or "None linked"))
+    )
+    parts.append(
+        _section(
+            "PERFORMANCE DETAILS",
+            _roff_escape("\n".join(_metric_lines(record)) or "No performance metrics available."),
+        )
+    )
     if record.description.get("Flags Affected"):
         parts.append(_section("FLAGS AFFECTED", _roff_escape(record.description["Flags Affected"])))
-    for exc_key in ("Exceptions", "SIMD Floating-Point Exceptions", "Numeric Exceptions", "Other Exceptions"):
+    for exc_key in (
+        "Exceptions",
+        "SIMD Floating-Point Exceptions",
+        "Numeric Exceptions",
+        "Other Exceptions",
+    ):
         if record.description.get(exc_key):
             parts.append(_section(exc_key.upper(), _roff_escape(record.description[exc_key])))
     return "".join(parts)
