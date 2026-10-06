@@ -17,11 +17,11 @@ structured JSON interface for LLM skills.
 [GitHub](https://github.com/simd-labs/simdref) ·
 [Contributing](CONTRIBUTING.md)
 
-<!-- Screenshots are hosted on the `docs-assets` branch so the main
+<!-- Screenshots are hosted on the `assets/docs` ref so the main
      branch stays lightweight to clone. -->
 
 <p align="center">
-  <img alt="simdref TUI" src="https://raw.githubusercontent.com/simd-labs/simdref/docs-assets/img/tui.svg" width="720">
+  <img alt="simdref TUI" src="https://raw.githubusercontent.com/simd-labs/simdref/refs/assets/docs/img/tui.svg" width="720">
   <br><em>Interactive TUI with ISA filters, ranked results, and measured/modeled performance tables.</em>
 </p>
 
