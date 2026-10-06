@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: bump-version
@@ -77,3 +78,10 @@ jobs:
           else
             echo "::notice::version bumped and pushed. Wait for CI to go green, then dispatch the Release workflow with version=${{ inputs.version }} and dry_run=false — it atomically publishes to PyPI and pushes v${{ inputs.version }}."
           fi
+
+      # GITHUB_TOKEN pushes start no workflows, but a workflow_dispatch call does.
+      - name: Start CI on the bump commit
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
