@@ -78,7 +78,16 @@ isa build                 # download + parse, rebuild from scratch (includes Int
 
 ## Releasing
 
-Tagging `v*.*.*` fires `.github/workflows/release.yml`, which builds the
-wheel + sdist, publishes to PyPI via OIDC trusted publishing, and creates
-a GitHub Release attaching the built artifacts. See `CHANGELOG.md` for the
-entry that should land *before* the tag is pushed.
+Release is manual; there is no tag-triggered workflow. To cut a release:
+
+1. Add the `CHANGELOG.md` entry for the new version on main.
+1. Run the Bump Version workflow (`bump-version.yml`) with the new
+   `version`, first with `dry_run: true` to check the diff, then with
+   `dry_run: false`. The workflow commits the `pyproject.toml` bump to
+   main and starts CI on the bump commit.
+1. Wait for CI to go green on the bump commit.
+1. Run the Release workflow (`release-candidate.yml`) with the same
+   `version`, first with `dry_run: true` to prove every gate, then with
+   `dry_run: false`. The workflow builds the wheel and sdist, publishes to
+   PyPI via OIDC trusted publishing, pushes the `v<version>` tag, and
+   creates the GitHub Release with the built artifacts.
