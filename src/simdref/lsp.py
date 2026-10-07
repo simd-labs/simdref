@@ -9,6 +9,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from simdref.display import canonical_url, instruction_markdown, web_deep_link
 from simdref.perf import best_cpi, best_latency
 from simdref.queries import linked_instruction_records
 from simdref.search import search_records
@@ -97,7 +98,40 @@ def _line_prefix(text: str, line: int, character: int) -> str:
     return match.group(0) if match else ""
 
 
-def _hover_markdown(conn, word: str, allow_instruction: bool = True) -> str | None:
+def _match_form(matches, operand_count: int | None = None, operand_text: str = ""):
+    """Pick the same form the line names: exact operand count, then width, then smallest."""
+    if operand_count is None:
+        return matches[0] if matches else None
+    # ponytail: a line has no architecture, so take the first form with the same operand count.
+    # The fallback takes the first form with fewest operands, never a form with more
+    # operands than the line: a zero-operand "movsd" must not get the MOVSD_XMM hint.
+    same_count = [m for m in matches if len(_operands_of_key(m.key)) == operand_count]
+    if not same_count:
+        return min(matches, key=lambda m: len(_operands_of_key(m.key)), default=None)
+    # Score candidates by how many operands agree with the register width the
+    # line names ("ymm0" vs "YMM, YMM, M128"). Skip the tiebreak on a tie.
+    tokens = re.findall(r"\b(zmm|ymm|xmm|m512|m256|m128|m64|m32)\d*\b", operand_text.casefold())
+    if tokens:
+        width = tokens[0].rstrip("0123456789")
+        if width.startswith(("x", "y", "z")):
+
+            def _score(item):
+                operands = [op.casefold().rstrip("0123456789") for op in _operands_of_key(item.key)]
+                return sum(1 for op in operands if op == width)
+
+            scored = sorted(same_count, key=lambda m: (-_score(m), m.key))
+            if _score(scored[0]) > _score(scored[-1]):
+                return scored[0]
+    return same_count[0]
+
+
+def _hover_markdown(
+    conn,
+    word: str,
+    allow_instruction: bool = True,
+    operand_count: int | None = None,
+    operand_text: str = "",
+) -> str | None:
     intrinsic = load_intrinsic_from_db(conn, word)
     if intrinsic is not None:
         lines = [f"```c\n{intrinsic.signature}\n```"]
@@ -139,32 +173,18 @@ def _hover_markdown(conn, word: str, allow_instruction: bool = True) -> str | No
         return None
     instruction = load_instruction_from_db(conn, word)
     if instruction is None:
-        # Catalog keys look like "VADDPS (XMM, XMM, XMM)", so a bare mnemonic needs this lookup.
         matches = load_instructions_by_mnemonic_from_db(conn, word)
-        instruction = matches[0] if matches else None
+        # Match the form on the source line like _hint_label does, so
+        # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
+        instruction = _match_form(matches, operand_count, operand_text)
     if instruction is not None:
-        lines = [f"```asm\n{instruction.key}\n```"]
-        if instruction.summary:
-            lines.append(instruction.summary)
-        meta = []
-        if instruction.isa:
-            meta.append(f"ISA {', '.join(instruction.isa)}")
-        if instruction.metadata.get("category"):
-            meta.append(f"category {instruction.metadata['category']}")
-        if meta:
-            lines.append(" | ".join(meta))
-        if instruction.linked_intrinsics:
-            lines.append(f"Intrinsics: {', '.join(instruction.linked_intrinsics[:6])}")
-        perf = []
-        lat = best_latency(instruction.arch_details)
-        cpi = best_cpi(instruction.arch_details)
-        if lat != "-":
-            perf.append(f"best latency {lat} cycles")
-        if cpi != "-":
-            perf.append(f"best cycle/instr {cpi}")
-        if perf:
-            lines.append("Performance: " + ", ".join(perf))
-        return "\n\n".join(lines)
+        body = instruction_markdown(instruction, conn=conn)
+        links = [f"Full page: {web_deep_link('instruction', instruction.key)}"]
+        if instruction.metadata.get("url"):
+            links.append(canonical_url(instruction.metadata["url"]))
+        if instruction.metadata.get("url-ref"):
+            links.append(canonical_url(instruction.metadata["url-ref"]))
+        return body + "\n\n" + "\n".join(links)
     return None
 
 
@@ -275,13 +295,7 @@ def _hint_label(db_path: str, mnemonic: str, operand_count: int) -> str | None:
     matches = _mnemonic_matches(db_path, mnemonic)
     if not matches:
         return None
-    # ponytail: a line has no architecture, so take the first form with the same operand count.
-    # The fallback takes the first form with fewest operands, never a form with more
-    # operands than the line: a zero-operand "movsd" must not get the MOVSD_XMM hint.
-    chosen = next(
-        (m for m in matches if len(_operands_of_key(m.key)) == operand_count),
-        min(matches, key=lambda m: len(_operands_of_key(m.key))),
-    )
+    chosen = _match_form(matches, operand_count)
     return _cut_label(chosen.summary or "")
 
 
@@ -392,10 +406,28 @@ def main() -> int:
             line, character = params["position"]["line"], params["position"]["character"]
             word = _word_at(text, line, character)
             # In C/C++ only the asm strings hold instructions; intrinsics hover everywhere.
-            allow_instruction = not _is_c_doc(session.languages.get(uri, ""), uri) or (
-                _in_asm_string(text, line, character)
+            is_c_doc = _is_c_doc(session.languages.get(uri, ""), uri)
+            allow_instruction = not is_c_doc or (_in_asm_string(text, line, character))
+            operand_count = None
+            operand_text = ""
+            if word and allow_instruction:
+                source_lines = text.split("\n")
+                source_line = source_lines[line] if line < len(source_lines) else ""
+                operand_text = source_line
+                parsed = _mnemonic_from_asm_line(source_line)
+                if parsed and parsed[0].casefold() == word.casefold():
+                    operand_count = parsed[1]
+            body = (
+                _hover_markdown(
+                    conn,
+                    word,
+                    allow_instruction,
+                    operand_count=operand_count,
+                    operand_text=operand_text,
+                )
+                if conn and word
+                else None
             )
-            body = _hover_markdown(conn, word, allow_instruction) if conn and word else None
             _jsonrpc_write(
                 {
                     "jsonrpc": "2.0",

@@ -36,7 +36,7 @@ class LspWebTests(unittest.TestCase):
         markdown = _hover_markdown(self._conn, "vadd.vv")
         self.assertIsNotNone(markdown)
         self.assertIn("vadd.vv", markdown)
-        self.assertIn("ISA V", markdown)
+        self.assertIn("**isa.** V", markdown)
 
     def test_sqlite_runtime_preserves_riscv_counts_sections_and_policy_metadata(self):
         intrinsic_count = self._conn.execute(

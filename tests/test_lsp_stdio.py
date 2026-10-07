@@ -79,14 +79,14 @@ def _read_msg(proc, timeout_s=10):
 
 
 class _Server:
-    def __init__(self, catalog):
+    def __init__(self, catalog, extra_env=None):
         self.proc = subprocess.Popen(
             [sys.executable, "-m", "simdref.lsp"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             bufsize=0,
-            env={**os.environ, "SIMDREF_CATALOG": str(catalog)},
+            env={**os.environ, "SIMDREF_CATALOG": str(catalog), **(extra_env or {})},
         )
         self.next_id = 0
         self.notifications = []
@@ -197,6 +197,49 @@ class LspEndToEndTests(unittest.TestCase):
         result = self.server.hover(ASM_URI, 4, 6)
         self.assertIsNotNone(result, "hover on vfmadd231ps returned null")
         self.assertIn("VFMADD231PS", result["contents"]["value"])
+
+    def test_hover_instruction_full_page_operand_matched(self):
+        self.server.open(ASM_URI, "asm", ASM_TEXT)
+        result = self.server.hover(ASM_URI, 5, 6)
+        self.assertIsNotNone(result, "hover on vaddps returned null")
+        value = result["contents"]["value"]
+        # The 3-operand YMM form, not the first masked (XMM, K, ...) row.
+        self.assertIn("VADDPS (YMM, YMM, YMM)", value)
+        self.assertNotIn("VADDPS (XMM, K, XMM, M128)", value)
+        self.assertIn("## Description", value)
+        self.assertIn("Add Packed Single Precision Floating-Point Values", value)
+        self.assertIn("## SIMD Floating-Point Exceptions", value)
+        self.assertIn("## instruction to intrinsic mapping", value)
+        self.assertIn("_mm256_add_ps", value)
+        # The per-uarch perf table as a Markdown table.
+        self.assertIn("| microarch |", value)
+        self.assertIn("| ZEN5 |", value)
+        # Links at the end: web deep link, uops.info, felixcloutier.
+        self.assertIn("https://simdref.diamondinoia.com/#VADDPS%20(YMM%2C%20YMM%2C%20YMM)", value)
+        self.assertIn("https://www.uops.info/html-instr/VADDPS_YMM_YMM_YMM.html", value)
+        self.assertIn("https://www.felixcloutier.com/x86/addps", value)
+
+    def test_hover_makes_no_network_call(self):
+        # The server is a subprocess, so block sockets there via sitecustomize.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as sitepkg:
+            Path(sitepkg, "sitecustomize.py").write_text(
+                "import socket\n"
+                "def _blocked(*a, **k): raise OSError('network blocked in test')\n"
+                "socket.socket = _blocked\n"
+                "socket.create_connection = _blocked\n"
+            )
+            server = _Server(
+                CATALOG,
+                {"PYTHONPATH": sitepkg + os.pathsep + os.environ.get("PYTHONPATH", "")},
+            )
+            self.addCleanup(server.stop)
+            server.start()
+            server.open(ASM_URI, "asm", ASM_TEXT)
+            result = server.hover(ASM_URI, 5, 6)
+        self.assertIsNotNone(result)
+        self.assertIn("VADDPS (YMM, YMM, YMM)", result["contents"]["value"])
 
     def test_cpp_two_instructions_on_one_source_line_get_one_joined_hint(self):
         text = 'asm volatile("vaddps %ymm1, %ymm2, %ymm0\\n\\tvmulps %ymm0, %ymm0, %ymm3");\n'

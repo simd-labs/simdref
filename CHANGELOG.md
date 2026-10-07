@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- The LSP hover on an instruction now shows the full `isa` page for the
+  operand-matched form: metadata, every description section, the intrinsic
+  mapping and the per-microarchitecture performance table, plus the web deep
+  link and the uops.info and felixcloutier.com reference URLs. The hover picks
+  the same form the inlay hint names, so `vaddps ymm0, ymm1, ymm2` shows the
+  YMM form instead of the first masked row.
+
 ## [0.0.6] — 2026-09-29
 
 Validation release for the 3-repo split (core/web/skill), cut on a temporary

@@ -9,6 +9,7 @@ delegate to these functions for all Rich-based output.
 from __future__ import annotations
 
 import re
+import urllib.parse
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -478,6 +479,68 @@ def isa_visible(values: list[str], show_fp16: bool = False) -> bool:
 # ---------------------------------------------------------------------------
 # Instruction text helpers
 # ---------------------------------------------------------------------------
+
+
+_WEB_APP_URL = "https://simdref.diamondinoia.com"
+
+
+def web_deep_link(kind: str, key: str) -> str:
+    """Deep link into the simdref web app for a record key."""
+    # Match the web app's encodeURIComponent(entry.key): parens stay literal.
+    return f"{_WEB_APP_URL}/#{urllib.parse.quote(str(key), safe='()')}"
+
+
+def instruction_markdown(item, conn=None) -> str:
+    """Render the full instruction page as Markdown (hover docs, exports).
+
+    Carries the same data as :func:`render_instruction` prints to the
+    terminal: metadata, every description section, the intrinsic mapping
+    and the per-microarchitecture performance table, plus reference URLs.
+    """
+    lines = [f"```asm\n{item.key}\n```"]
+    lines.append(f"**isa.** {display_isa(item.isa)}")
+    for key, value in instruction_metadata_rows(item):
+        lines.append(f"**{key}.** {value}")
+    if item.description:
+        shown: set[str] = set()
+        for section in _DESCRIPTION_ORDER:
+            if section in item.description:
+                lines.append(f"## {section}\n\n{item.description[section].strip()}")
+                shown.add(section)
+        for section, body in item.description.items():
+            if section not in shown:
+                lines.append(f"## {section}\n\n{body.strip()}")
+    if item.linked_intrinsics:
+        lines.append(
+            "## instruction to intrinsic mapping\n\n"
+            + "\n".join(f"- `{name}`" for name in item.linked_intrinsics)
+        )
+    lines.extend(_perf_markdown_lines(measurement_rows(item)))
+    return "\n\n".join(lines)
+
+
+def _perf_markdown_lines(rows: list[dict]) -> list[str]:
+    """Markdown table for measurement rows, one section per source kind."""
+    sections: list[str] = []
+    for kind, group in split_perf_rows(rows):
+        group = [row for row in group if row]
+        columns = [
+            column
+            for column in _MEASUREMENT_PREFERRED_ORDER
+            if column not in _MEASUREMENT_EXCLUDE_KEYS and any(column in row for row in group)
+        ]
+        if not columns:
+            continue
+        header = [_GENERIC_TABLE_LABEL_MAP.get(column, column) for column in columns]
+        table = ["| " + " | ".join(header) + " |", "|" + "---|" * len(columns)]
+        for row in sorted(group, key=lambda r: uarch_sort_key(r.get("uarch", ""))):
+            cells = []
+            for column in columns:
+                value = row.get(column, "-")
+                cells.append(display_uarch(str(value)) if column == "uarch" else str(value))
+            table.append("| " + " | ".join(cells) + " |")
+        sections.append(f"## {perf_panel_title(kind)}\n\n" + "\n".join(table))
+    return sections
 
 
 def canonical_url(path: str) -> str:
