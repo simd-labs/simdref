@@ -1,12 +1,12 @@
-# PDF Description Parsing Implementation Plan
+# PDF description parsing implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Status:** historical implementation plan. The shipped code has moved; `src/simdref/pdfparse/registry.py` and `ingest_pdf.py` supersede the inline merge sketched here. Kept for history.
 
-**Goal:** Parse rich instruction descriptions from the Intel SDM PDF and display them as expandable sections in CLI (with pager) and web UI.
+**Goal:** parse rich instruction descriptions from the Intel SDM PDF and show them as expandable sections in CLI (with pager) and web UI.
 
-**Architecture:** Add a `pdfparse` package that extracts per-instruction sections from the Intel SDM PDF using pdfplumber's font-based heading detection. Merge extracted descriptions into existing `InstructionRecord`s during `simdref update`. CLI wraps detail views in a pager; web UI uses collapsible `<details>` elements.
+**Architecture:** add a `pdfparse` package that extracts per-instruction sections from the Intel SDM PDF using pdfplumber's font-based heading detection. Merge extracted descriptions into existing `InstructionRecord`s during `simdref update`. CLI wraps detail views in a pager; web UI uses collapsible `<details>` elements.
 
-**Tech Stack:** pdfplumber (PDF parsing), Rich console.pager() (CLI pager), HTML `<details>` (web UI)
+**Tech stack:** pdfplumber, Rich console.pager(), HTML `<details>`
 
 ______________________________________________________________________
 

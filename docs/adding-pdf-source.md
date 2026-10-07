@@ -1,46 +1,34 @@
-# Adding a PDF Source
+# Adding a PDF source
 
-This refactor treats PDF enrichment as a source-pluggable subsystem under `simdref.pdfparse`.
+PDF enrichment is source-pluggable under `simdref.pdfparse`. Add one module that defines and registers a `PdfSourceSpec`.
 
-## Required source spec fields
-
-Create one module that defines and registers a `PdfSourceSpec`:
+## Required `PdfSourceSpec` fields
 
 - `source_id`: stable internal id, also used in cache keys and `InstructionRecord.pdf_refs`
-- `display_name`: human-facing label shown in exported metadata
+- `display_name`: human-facing label
 - `source_url`: canonical upstream PDF URL
 - `local_candidates`: preferred local/vendor cache paths
-- `cache_path`: derived cache file for parsed descriptions
-- `cache_version`: bump when the serialized result shape changes
-- `signature_paths`: source files whose contents should invalidate the cache when edited
-- `parser`: callable returning `PdfEnrichmentResult`
-- `find_source`: callable that locates or downloads the PDF and returns a local path
+- `cache_path`: cache file for parsed descriptions
+- `cache_version`: bump when the serialized shape changes
+- `signature_paths`: source files whose contents invalidate the cache
+- `parser`: returns `PdfEnrichmentResult`
+- `find_source`: locates or downloads the PDF and returns a local path
 
 ## Parser responsibilities
 
-The parser should return `PdfEnrichmentResult` with:
+Return `PdfEnrichmentResult` with:
 
-- `descriptions`: mnemonic -> `PdfDescriptionPayload`
-- `fallback_page_count`: pages that needed a slower fallback path, if relevant
-- `stats`: optional counters for status output and tests
+- `descriptions`: mnemonic → `PdfDescriptionPayload`
+- `fallback_page_count`: pages that needed a slower fallback, if relevant
+- `stats`: optional counters
 
-Each `PdfDescriptionPayload` should include:
+Each `PdfDescriptionPayload` has `sections` (merged section text keyed by canonical name), `source_url`, `page_start`, `page_end`.
 
-- `sections`: merged section text keyed by canonical section name
-- `source_url`
-- `page_start`
-- `page_end`
-
-The parser module should own all source-specific constants, heuristics, and fallback logic. Generic ingest code should not need to know about page-title patterns, section aliases, or parser internals.
+The parser module owns all source-specific constants, heuristics, and fallback logic. Generic ingest stays free of page-title patterns, section aliases, and parser internals.
 
 ## Cache invalidation
 
-`ingest_pdf.load_or_parse_pdf_source()` invalidates cached results when any of these change:
-
-- `cache_version`
-- parser signature derived from `signature_paths`
-- canonical `source_url`
-- PDF file SHA-256
+`ingest_pdf.load_or_parse_pdf_source()` invalidates when any of these change: `cache_version`, parser signature from `signature_paths`, canonical `source_url`, PDF SHA-256.
 
 Use `cache_version` for serialized payload shape changes. Use `signature_paths` for parser behavior changes.
 
@@ -48,7 +36,7 @@ Use `cache_version` for serialized payload shape changes. Use `signature_paths` 
 
 - Attach references through `InstructionRecord.pdf_refs`, not source-specific metadata keys.
 - Keep parsed section text in `InstructionRecord.description`.
-- If a source needs compatibility metadata during migration, add that in a shared helper rather than in UI code.
+- If a source needs compatibility metadata during migration, put it in a shared helper, not in UI code.
 
 ## Expected tests
 
@@ -56,11 +44,10 @@ Use `cache_version` for serialized payload shape changes. Use `signature_paths` 
 - cache hit/miss behavior for parser signature or PDF checksum changes
 - parser unit tests for source-specific extraction rules
 - metadata normalization tests for `pdf_refs`
-- UI/export tests showing normalized refs render without source-specific formatting logic in CLI/TUI/web
-- integration path proving the source can participate in a local build
+- CLI/TUI/web export tests showing normalized refs render without source-specific logic
+- an integration path proving the source can join a local build
 
-## CI validation path
+## CI
 
-- Keep GitHub Actions workflow logic generic
-- Add source-specific smoke checks through a shared validation script or shared Python entrypoint
-- Avoid embedding new source-specific inline workflow snippets when a reusable validation hook can cover them
+- Keep GitHub Actions workflow logic generic.
+- Add source-specific smoke checks through a shared validation script or shared Python entrypoint.

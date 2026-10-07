@@ -1,7 +1,7 @@
-# ARM + RISC-V Performance Data Integration
+# ARM + RISC-V performance data integration
 
 **Date:** 2026-04-20
-**Status:** Approved design, pending implementation plan
+**Status:** historical design. The shipped pipeline differs: `simdref/perf_sources/llvm_scheduling.py` drives a three-stage `llvm-exegesis` → `llvm-mc` → `llvm-mca` pipeline per canonical core (see `docs/SOURCES.md`). OSACA and rvv-bench ingestion did not land. This file is kept for design history.
 
 ## Goal
 
@@ -19,24 +19,21 @@ misleading users about measurement provenance.
 
 ## Data sources
 
-All sources are fetched at build-time by `simdref update --build-local`. Only
-the derived catalog ships in wheels and GitHub Release artifacts. License
-compatibility is enforced at the ingest boundary — no AGPL or
-redistribution-restricted bytes enter the release.
+All sources are fetched at build time by `simdref build`. Only the derived catalog ships in wheels and GitHub Release artifacts. License compatibility is enforced at the ingest boundary: no AGPL or redistribution-restricted bytes enter the release.
 
-| Source                                   | Kind     | ISA             | Coverage                                                                                                                                                                                     | License                      | Boundary                                                                     |
-| ---------------------------------------- | -------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------- |
-| LLVM sched models via `llvm-mca --json`  | modeled  | AArch64, RISC-V | ~20 AArch64 cores (Neoverse N1/N2/V1/V2, Cortex-A76/A78/X1-X4, Ampere1, A510/520, M1-via-Cyclone, …), ~7 RISC-V cores (SiFive-7/P400/P600, SpacemiT-X60, XiangShan-KunMingHu, MIPS-P8700, …) | Apache-2.0 w/ LLVM exception | system `llvm-mca` on builder PATH                                            |
-| OSACA YAML (`github.com/RRZE-HPC/OSACA`) | measured | AArch64         | A64FX, Cortex-A72, Apple M1-Firestorm, TSV110, ThunderX2                                                                                                                                     | AGPL-3.0                     | fetched at build-time, parsed into our own rows; AGPL never vendored/shipped |
-| `camel-cdr/rvv-bench-results` JSON       | measured | RISC-V RVV      | C908, C910, SpacemiT-X60/X100, BananaPi                                                                                                                                                      | MIT                          | fetched at build-time                                                        |
+Shipped:
 
-Deferred to a later revision:
+| Source                                  | Kind    | ISA             | Coverage                                          | License                        | Boundary                          |
+| --------------------------------------- | ------- | --------------- | ------------------------------------------------- | ------------------------------ | --------------------------------- |
+| LLVM sched models via `llvm-mca --json` | modeled | AArch64, RISC-V | 13 AArch64 cores, 7 RISC-V cores (see `cores.py`) | Apache-2.0 with LLVM exception | system `llvm-mca` on builder PATH |
 
-- **dougallj/applecpu** — no LICENSE file; treat as human-facing citation link
-  only until licensing is clarified.
-- **Arm SWOGs** — redistribution-restricted PDFs; cite via `pdf_refs` for users,
-  do not ingest.
-- **ARM uops.info equivalent** — does not exist publicly as of 2026-04.
+Deferred (not shipped):
+
+- OSACA YAML (`github.com/RRZE-HPC/OSACA`). Measured rows for AArch64. License AGPL-3.0 upstream, parsed rows only.
+- `camel-cdr/rvv-bench-results` JSON. Kernel-level, not per-mnemonic.
+- dougallj/applecpu. No LICENSE file; human-facing citation link only until licensing is clarified.
+- Arm SWOGs. Redistribution-restricted PDFs; cite via `pdf_refs`, do not ingest.
+- ARM uops.info equivalent. Does not exist publicly as of 2026-04.
 
 ## Data model
 
@@ -86,71 +83,44 @@ LLM JSON output exposes the full `perf[]` list plus pre-computed
 
 ## Build pipeline
 
-`simdref update --build-local` adds three ingesters, composed into the existing
-catalog build:
+The build adds three ingesters, composed into the existing catalog build:
 
-1. **LLVM sched ingester** (`simdref/perf/llvm_mca.py`)
+1. LLVM sched ingester (`simdref/perf_sources/llvm_scheduling.py`).
 
-   - Reads a pinned list of `(triple, cpu)` pairs covering all sched-modeled
-     AArch64 + RISC-V cores.
-   - For each instruction mnemonic we care about, invokes
-     `llvm-mca --json --mcpu=<cpu> --mtriple=<triple>` and parses the JSON.
+   - Reads a pinned list of `(triple, cpu)` pairs covering all sched-modeled AArch64 and RISC-V cores.
+   - For each instruction mnemonic, invokes `llvm-mca --json --mcpu=<cpu> --mtriple=<triple>` and parses the JSON.
    - Emits `PerfEntry(source="llvm-mca", source_kind="modeled", applies_to="class")`.
-   - Records actual LLVM version in `source_version`.
-   - Fails build if `llvm-mca` not on PATH, with an install hint (apt/brew/conda).
+   - Records the actual LLVM version in `source_version`.
+   - Fails the build if `llvm-mca` is not on PATH, with an install hint.
 
-1. **OSACA ingester** (`simdref/perf/osaca.py`)
+1. OSACA ingester. Not shipped.
 
-   - Fetches OSACA YAML data files from upstream (pinned commit SHA).
-   - Parses into `PerfEntry(source="osaca", source_kind="measured", applies_to="form")`.
-   - Never vendors the YAML into the repo; each build re-fetches.
+1. rvv-bench ingester. Not shipped.
 
-1. **rvv-bench ingester** (`simdref/perf/rvv_bench.py`)
-
-   - Fetches `rvv-bench-results` JSON (pinned commit SHA).
-   - Parses into `PerfEntry(source="rvv-bench", source_kind="measured", applies_to="lmul")`.
-
-Each ingester is independent and can fail gracefully (warn, continue) — the
-catalog build never hard-fails because one source is down. Missing sources are
-logged in `docs/coverage/summary.json` so users can see why a core's data is
-absent.
+Each ingester is independent and can fail gracefully (warn, continue). The catalog build never hard-fails because one source is down. Missing sources are logged in `docs/coverage/summary.json` so users can see why a core's data is absent.
 
 ## Fixture retirement
 
-The bundled fixture corpus (`src/simdref/fixtures/uops_sample.xml`, Arm
-samples) is removed along with `simdref update --offline`:
+The bundled fixture corpus and `simdref update --offline` are gone:
 
-- Users who cannot build locally use `simdref update` to fetch the pre-built
-  release artifact — this is the realistic "offline" path.
-- `simdref update --build-local` requires network + `llvm-mca` + upstream
-  sources; errors clearly when any is missing.
-- Tests replace shared fixtures with **inline per-test data** (short strings in
-  the test file, `tmp_path` files for I/O tests). Each parser gets direct unit
-  tests against a representative row of its real source format.
-- CI runs two jobs: a smoke test that downloads the current release artifact
-  and exercises the CLI, plus a full `--build-local` job on a runner with
-  `llvm-mca` installed.
+- Users who cannot build locally use `simdref update` to fetch the pre-built release artifact.
+- `simdref build` needs network, `llvm-mca`, and upstream sources. It errors when any is missing.
+- Tests use inline per-test data (short strings, `tmp_path` files for I/O). Each parser gets direct unit tests against a representative row of its real source format.
+- CI runs a smoke test that downloads the current release artifact and exercises the CLI, plus a full `simdref build` job on a runner with `llvm-mca` installed.
 
 This removes the "tiny fake catalog" failure mode where users searched the
 offline build and got near-empty results.
 
 ## Interfaces affected
 
-- `simdref/models.py` — add `PerfEntry`, migrate `arch_details` → `perf[]`.
-- `simdref/perf.py` — `best_latency`/`best_cpi` become prefer-measured;
-  introduce `best_*_measured` / `best_*_modeled` variants.
-- `simdref/perf/` (new package) — `llvm_mca.py`, `osaca.py`, `rvv_bench.py`,
-  `cores.py`.
-- `simdref/ingest_sources.py` — register the three new ingesters.
-- `simdref/cli.py`, `simdref/tui.py`, `simdref/lsp.py`, `simdref/display.py`,
-  `simdref/web.py`, `simdref/manpages.py`, `simdref/templates/app.js` — render
-  source-kind labels and per-core tables.
-- `simdref/queries.py` — allow `--core` filtering across ISAs; `--source-kind measured|modeled|any`.
+- `simdref/models.py`: add `PerfEntry`, migrate `arch_details` to `perf[]`.
+- `simdref/perf.py`: `best_latency`/`best_cpi` become prefer-measured; add `best_*_measured` and `best_*_modeled` variants.
+- `simdref/perf_sources/`: `llvm_scheduling.py`, `cores.py`, `merge.py`. (The original `simdref/perf/` package idea became `perf_sources/`.)
+- `simdref/ingest_sources.py`: register the new ingesters.
+- `simdref/cli.py`, `simdref/tui.py`, `simdref/lsp.py`, `simdref/display.py`, `simdref/manpages.py`: render source-kind labels and per-core tables.
+- `simdref/queries.py`: allow `--core` filtering across ISAs; expose `--source-kind measured|modeled|any`.
 - Drop `src/simdref/fixtures/` and the `--offline` branch in `simdref/cli.py`.
-- `docs/SOURCES.md` — document new sources, license boundaries, and the fact
-  that SWOGs and dougallj are intentionally not ingested.
-- README — update "data sources" table, document measured-vs-modeled semantics,
-  document `llvm-mca` build-time requirement.
+- `docs/SOURCES.md`: document new sources, license boundaries, and the fact that SWOGs and dougallj are intentionally not ingested.
 
 ## Testing
 
