@@ -265,6 +265,28 @@ class LspEndToEndTests(unittest.TestCase):
         self.server.open("file:///tmp/x.hxx", "", "int x;\n")
         self.assertEqual(self.server.hints("file:///tmp/x.hxx"), [])  # "int" is an x86 mnemonic
 
+    def test_cpp_hover_inside_asm_literal_matches_the_ymm_form(self):
+        text = 'asm volatile("vaddps %ymm2, %ymm1, %ymm0");\n'
+        self.server.open(CPP_URI, "cpp", text)
+        result = self.server.hover(CPP_URI, 0, 16)
+        self.assertIsNotNone(result, "hover on vaddps inside the asm literal returned null")
+        value = result["contents"]["value"]
+        self.assertIn("VADDPS (YMM, YMM, YMM)", value)
+        self.assertNotIn("VADDPS (XMM, K, XMM, M128)", value)
+
+    def test_asm_hover_and_hint_agree_on_semicolon_comment(self):
+        uri = "file:///tmp/simdref_lsp_test_hover.asm"
+        self.server.open(uri, "nasm", "adc eax, ebx ; j, k\n")
+        hint = self.server.hints(uri)[0]["label"]
+        result = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(result, "hover on adc returned null")
+        value = result["contents"]["value"]
+        # The hover must pick the same form as the hint on the same line. The
+        # 4-operand parse lands on an ARM adc page, the 2-operand parse on the
+        # x86 "Add With Carry." form the hint names.
+        self.assertIn("Add With Carry.", value)
+        self.assertEqual(hint, "Add With Carry.")
+
     def test_asm_semicolon_comment_in_dot_asm_file(self):
         uri = "file:///tmp/simdref_lsp_test.asm"
         self.server.open(uri, "nasm", "vaddps ymm0, ymm1, ymm2 ; add, then, more\n")

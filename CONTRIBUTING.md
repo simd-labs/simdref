@@ -81,6 +81,8 @@ isa build                 # download + parse, rebuild from scratch (includes Int
 Release is manual; there is no tag-triggered workflow. To cut a release:
 
 1. Add the `CHANGELOG.md` entry for the new version on main.
+1. Move every `## Unreleased` entry in `CHANGELOG.md` under a
+   `## [<version>] — <date>` heading for the release.
 1. Run the Bump Version workflow (`bump-version.yml`) with the new
    `version`, first with `dry_run: true` to check the diff, then with
    `dry_run: false`. The workflow commits the `pyproject.toml` bump to

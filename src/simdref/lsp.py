@@ -216,6 +216,43 @@ def _is_c_doc(language_id: str, uri: str) -> bool:
     return language_id in ("c", "cpp") or uri.lower().endswith(C_EXTENSIONS)
 
 
+def _semicolon_is_comment(language_id: str, uri: str) -> bool:
+    # A .s/.S extension means GAS syntax: ";" stays a statement separator there
+    # even if the client tags the buffer with an assembly languageId.
+    if _is_c_doc(language_id, uri):
+        return False
+    if uri.lower().endswith(".s"):
+        return False
+    return language_id in ("asm", "nasm", "masm") or uri.lower().endswith((".asm", ".nasm"))
+
+
+def _asm_line_at(text: str, language_id: str, uri: str, offset: int) -> str | None:
+    """Return the assembler segment that holds the text offset, or None.
+
+    C/C++ documents hold assembler in string literals in asm(...) calls, so the
+    segment comes from _asm_literals. In every other document the whole source
+    line is the segment. Hover and inlay hints must call this one function so
+    both parse the same text.
+    """
+    if _is_c_doc(language_id, uri):
+        spaced = text.replace("\\t", " ")
+        for start, body in _asm_literals(spaced):
+            if start <= offset <= start + len(body):
+                cut = 0
+                for split in ASM_SPLIT_RE.finditer(body):
+                    if cut <= offset - start < split.start():
+                        return body[cut : split.start()]
+                    cut = split.end()
+                return body[cut:]
+        return None
+    lines = text.split("\n")
+    for line, source_line in enumerate(lines):
+        end = offset - sum(len(item) + 1 for item in lines[:line])
+        if 0 <= end <= len(source_line):
+            return source_line
+    return None
+
+
 def _asm_literals(text: str) -> list[tuple[int, str]]:
     """Return (offset, body) for each string literal inside an asm(...) call in C source."""
     masked = C_TOKEN_RE.sub(
@@ -303,13 +340,7 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
     db_path = conn.execute("PRAGMA database_list").fetchone()[2]
     source_lines = [line.rstrip("\r") for line in text.split("\n")]
     is_c_doc = _is_c_doc(language_id, uri)
-    # A .s/.S extension means GAS syntax: ";" stays a statement separator there
-    # even if the client tags the buffer with an assembly languageId.
-    semicolon_is_comment = (
-        not is_c_doc
-        and not uri.lower().endswith(".s")
-        and (language_id in ("asm", "nasm", "masm") or uri.lower().endswith((".asm", ".nasm")))
-    )
+    semicolon_is_comment = _semicolon_is_comment(language_id, uri)
     if is_c_doc:
         candidates = [
             (text.count("\n", 0, offset), segment)
@@ -411,12 +442,16 @@ def main() -> int:
             operand_count = None
             operand_text = ""
             if word and allow_instruction:
-                source_lines = text.split("\n")
-                source_line = source_lines[line] if line < len(source_lines) else ""
-                operand_text = source_line
-                parsed = _mnemonic_from_asm_line(source_line)
-                if parsed and parsed[0].casefold() == word.casefold():
-                    operand_count = parsed[1]
+                offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + character
+                language_id = session.languages.get(uri, "")
+                segment = _asm_line_at(text, language_id, uri, offset)
+                if segment:
+                    operand_text = segment
+                    parsed = _mnemonic_from_asm_line(
+                        segment, _semicolon_is_comment(language_id, uri)
+                    )
+                    if parsed and parsed[0].casefold() == word.casefold():
+                        operand_count = parsed[1]
             body = (
                 _hover_markdown(
                     conn,
