@@ -4,7 +4,7 @@ All numbers captured with:
 
 - commit `15b514a` (pre-perf work)
 - catalog ≈ 117 K intrinsics + 25 K instructions
-- Python 3.13, Linux x86_64, Chromium via Playwright 1.x (headless)
+- Python 3.13, Linux x86_64, Chromium through Playwright 1.x (headless)
 - server: bare `python -m http.server 8765` (no gzip, no cache)
 - profiler: `tools/profile_web.py --query add`
 - TUI profiler: `SIMDREF_PROFILE=1 python -m simdref.tui`
@@ -26,7 +26,7 @@ PYTHONPATH=src SIMDREF_PROFILE=1 python -c "from simdref.tui import _fts_search;
 | Metric                         | Value                                       |
 | ------------------------------ | ------------------------------------------- |
 | `search-index.json` raw        | 182 MB (189 874 420 B)                      |
-| `search-index.json` gz (ideal) | ~6.0 MB (6 267 558 B); server does not emit |
+| `search-index.json` gz (ideal) | ~6.0 MB (6 267 558 B), server does not send |
 | `intrinsic-details.json` raw   | 118 MB (122 971 686 B), lazy-loaded         |
 | `filter_spec.json`             | 44 KB                                       |
 | `index.html`                   | 76 KB (inlined CSS + JS)                    |
@@ -72,7 +72,7 @@ About 75 % of per-keystroke cost is Python-side ISA filtering of SQL candidates.
 
 ## After phase 1.1 + 1.2 (2026-04-17)
 
-`_search_payload` slimmed (dropped `signature`/`header`/`url`/`metadata`/`notes`/`instruction_refs`/`search_tokens`/`display_isa_tokens`, promoted `arm_arch`, `category`, `primary_instr` to top level, `subtitle` shortened to 80 chars). Emitted `*.json.gz` sidecars; the client uses `DecompressionStream` to read gz directly on vanilla GitHub Pages. New `simdref serve` handler sets `Content-Encoding: gzip` when `Accept-Encoding: gzip` is present.
+`_search_payload` slimmed (dropped `signature`/`header`/`url`/`metadata`/`notes`/`instruction_refs`/`search_tokens`/`display_isa_tokens`, promoted `arm_arch`, `category`, `primary_instr` to top level, `subtitle` cut to 80 chars). Sends `*.json.gz` sidecars. The client uses `DecompressionStream` to read gz on vanilla GitHub Pages. New `simdref serve` handler sets `Content-Encoding: gzip` when `Accept-Encoding: gzip` shows.
 
 | Metric                        | Baseline | Now     | Delta |
 | ----------------------------- | -------- | ------- | ----- |
@@ -86,11 +86,11 @@ About 75 % of per-keystroke cost is Python-side ISA filtering of SQL candidates.
 | Keystroke 'd'                 | 135 ms   | 67 ms   | −50 % |
 | Keystroke 'd' (3rd)           | 684 ms   | 30 ms   | −96 % |
 
-Targets met: cold load under 2 s, keystroke p95 under 100 ms, search-index on-wire under 3 MB.
+Targets met: cold load below 2 s, keystroke p95 below 100 ms, search-index on-wire below 3 MB.
 
 ## After phase 2.1 (TUI SQL pushdown, 2026-04-17)
 
-Sub-ISA and family filters moved into the FTS query as an extra `AND REPLACE(isa, '-', '') LIKE '%…%'` clause. SQLite drops filtered-out rows before handing them to Python, cutting `_fts_search` wall time about 4×.
+Sub-ISA and family filters moved into the FTS query as an `AND REPLACE(isa, '-', '') LIKE '%…%'` clause. SQLite drops filtered-out rows before handing them to Python, cutting `_fts_search` wall time 4×.
 
 | Metric               | Baseline | Now    | Delta |
 | -------------------- | -------- | ------ | ----- |
@@ -98,11 +98,11 @@ Sub-ISA and family filters moved into the FTS query as an extra `AND REPLACE(isa
 | `_fts_search('mul')` | ~130 ms  | 28 ms  | −78 % |
 | `_fts_search('vec')` | ~300 ms  | 198 ms | −34 % |
 
-TUI target (under 40 ms p95 for common queries) holds for short prefixes. Broad queries like `vec` stay slower because many rows match the FTS expression.
+TUI target (below 40 ms p95 for typical queries) holds for short prefixes. Broad queries like `vec` stay slower because many rows agree with the FTS expression.
 
 ## After phase 1.4 + 1.5 (web virtualisation + rAF batching, 2026-04-17)
 
-Viewport virtualisation replaces the progressive-append result list (up to 5 000 DOM rows) with absolute-positioned rows in a fixed-height (88 px) wrapper, keeping about 60 rows in the DOM. Filter toggles and preset clicks now coalesce into a single `requestAnimationFrame` via `scheduleFilterRender()`; no flash between `rebuildVisibleSet`, `renderIsaFilters`, and `renderResults`.
+Viewport virtualisation replaces the progressive-append result list (maximum 5 000 DOM rows). Rows sit in a fixed-height (88 px) wrapper, holding ~60 rows in the DOM. Filter toggles and preset clicks coalesce into one `requestAnimationFrame` through `scheduleFilterRender()`. No flash between `rebuildVisibleSet`, `renderIsaFilters`, `renderResults`.
 
 | Metric              | After 1.1-1.3 | After 1.4+1.5                           |
 | ------------------- | ------------- | --------------------------------------- |
@@ -116,18 +116,18 @@ Biggest non-harness win: DOM node count at 5k-result scroll went from ~30k to ~6
 
 ## After phase 2.2 + 2.4 (TUI incremental refresh + detail cache, 2026-04-17)
 
-TUI sub-ISA bar short-circuits to in-place `set_enabled()` updates when only sub-ISA selection changes, removing the per-keystroke remount flash. Detail-pane record fetch is wrapped in an in-session LRU (16 slots); re-visits are free.
+TUI sub-ISA bar short-circuits to in-place `set_enabled()` updates when only sub-ISA selection changes, removing the per-keystroke remount flash. Detail-pane record fetch uses an in-session LRU (16 slots). Re-visits are free.
 
-Micro-bench (detail lookup, 50 iterations): raw `load_intrinsic_from_db` 1.1 ms; cached is ~0 ms.
+Micro-bench (detail lookup, 50 iterations): raw `load_intrinsic_from_db` 1.1 ms, cached ~0 ms.
 
 ## Targets (from plan)
 
 | Metric                  | Baseline      | Target                            |
 | ----------------------- | ------------- | --------------------------------- |
-| Web cold load           | 2.6 s         | under 2 s cold, under 500 ms warm |
-| Web per-keystroke p95   | ~680 ms       | under 100 ms                      |
-| Web JS heap             | 703 MB        | under 200 MB                      |
-| `search-index.json` raw | 182 MB        | under 15 MB                       |
-| `search-index.json` gz  | n/a           | under 3 MB on-wire                |
-| TUI `_fts_search` p95   | 127 ms        | under 40 ms                       |
-| TUI preset click        | visible flash | under 50 ms, no flash             |
+| Web cold load           | 2.6 s         | below 2 s cold, below 500 ms warm |
+| Web per-keystroke p95   | ~680 ms       | below 100 ms                      |
+| Web JS heap             | 703 MB        | below 200 MB                      |
+| `search-index.json` raw | 182 MB        | below 15 MB                       |
+| `search-index.json` gz  | n/a           | below 3 MB on-wire                |
+| TUI `_fts_search` p95   | 127 ms        | below 40 ms                       |
+| TUI preset click        | visible flash | below 50 ms, no flash             |
