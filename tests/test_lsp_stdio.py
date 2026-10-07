@@ -10,6 +10,7 @@ import time
 import unittest
 from pathlib import Path
 
+from simdref import lsp
 from simdref.lsp import _mnemonic_from_asm_line
 from simdref.storage import SQLITE_PATH
 
@@ -191,6 +192,27 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertEqual(len(hints[4]["label"]), 60)
         self.assertTrue(hints[4]["label"].endswith("..."))
         self.assertFalse(hints[5]["label"].endswith("..."))
+
+    def test_inlay_hint_after_astral_characters_gets_utf16_column(self):
+        # LSP columns count UTF-16 code units: each emoji adds 2 units to the
+        # end-of-line column the hint returns.
+        prefix = "".join("\U0001f600" for _ in range(10))
+        text = f"# {prefix}\n    vaddps ymm0, ymm1, ymm2 # {prefix}\n"
+        self.server.open(ASM_URI, "asm", text)
+        hints = {h["position"]["line"]: h for h in self.server.hints(ASM_URI)}
+        self.assertEqual(sorted(hints), [1])
+        line = text.split("\n")[1]
+        self.assertEqual(
+            hints[1]["position"]["character"],
+            lsp._utf16_column(line, len(line)),
+        )
+        self.assertEqual(hints[1]["label"], "Add Packed Single Precision Floating-Point Values.")
+
+    def test_utf16_column_is_the_reverse_of_code_point_index(self):
+        line = "a \U0001f600 b"
+        for index in range(len(line) + 1):
+            with self.subTest(index=index):
+                self.assertEqual(lsp._code_point_index(line, lsp._utf16_column(line, index)), index)
 
     def test_range_limits_hints(self):
         self.server.open(ASM_URI, "asm", ASM_TEXT)

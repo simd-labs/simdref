@@ -99,6 +99,11 @@ def _code_point_index(line: str, character: int) -> int:
     return index
 
 
+def _utf16_column(line: str, index: int) -> int:
+    # The reverse of _code_point_index: a code-point index to a UTF-16 column.
+    return sum(2 if ord(c) > 0xFFFF else 1 for c in line[:index])
+
+
 def _line_prefix(text: str, line: int, character: int) -> str:
     lines = text.splitlines()
     if line >= len(lines):
@@ -374,7 +379,7 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
             # LSP columns count UTF-16 code units.
             "position": {
                 "line": line,
-                "character": len(source_lines[line].encode("utf-16-le")) // 2,
+                "character": _utf16_column(source_lines[line], len(source_lines[line])),
             },
             "label": _cut_label("; ".join(hints[line])),
             "paddingLeft": True,

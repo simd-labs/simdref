@@ -67,7 +67,7 @@ isa build
 There is no tag-triggered workflow. To cut a release:
 
 1. Move the `## Unreleased` entries in `CHANGELOG.md` under a
-   `## [<version>] — <date>` heading on main.
+   `## [<version>], <date>` heading on main.
 1. Run the `bump-version.yml` workflow with the new `version`, first with
    `dry_run: true`, then `dry_run: false`. This commits the
    `pyproject.toml` bump to main and starts CI.

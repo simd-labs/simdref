@@ -5,7 +5,14 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.11] — 2026-10-07
+## [0.0.12], 2026-10-07
+
+### Fixed
+
+- The LSP converts inlay-hint columns from code points to UTF-16 code units
+  through one helper.
+
+## [0.0.11], 2026-10-07
 
 ### Fixed
 
@@ -14,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one `asm("...\n\t...")` literal and a mnemonic after an astral character now
   get their page.
 
-## [0.0.10] — 2026-10-07
+## [0.0.10], 2026-10-07
 
 ### Fixed
 
@@ -22,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   C/C++ documents the hover reads the asm string literal under the cursor, and
   in .asm and .nasm documents the hover knows `;` starts a comment.
 
-## [0.0.9] — 2026-10-07
+## [0.0.9], 2026-10-07
 
 ### Changed
 
@@ -33,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same form the inlay hint names, so `vaddps ymm0, ymm1, ymm2` shows the
   YMM form instead of the first masked row.
 
-## [0.0.6] — 2026-09-29
+## [0.0.6], 2026-09-29
 
 Validation release for the 3-repo split (core/web/skill), cut on a temporary
 test fork. Not for general use.
@@ -85,7 +92,7 @@ test fork. Not for general use.
   (`github-actions` and `uv`), and every workflow action is on its current
   major, so no job runs on the deprecated Node 20 runtime.
 
-## [0.0.5] — 2026-07-31
+## [0.0.5], 2026-07-31
 
 ### Fixed
 
@@ -128,7 +135,7 @@ test fork. Not for general use.
   lookups; the string-method fast paths in the parsers add a further ~1.3×
   on a 935k-line objdump disassembly.
 
-## [0.0.4] — 2026-06-05
+## [0.0.4], 2026-06-05
 
 - **deps:** declare `click` as a direct dependency so a clean install can run
   the CLI without relying on it being pulled in transitively.
@@ -145,7 +152,7 @@ test fork. Not for general use.
 - **catalog:** auto-update on version change; capture Intel Operation pseudocode
   and source URL.
 
-## [0.0.3] — 2026-04-29
+## [0.0.3], 2026-04-29
 
 - **`simdref annotate`** — annotate a `.s` assembly file with per-instruction
   summaries and latency/CPI figures, emitting a `.sa` file that still
@@ -158,7 +165,7 @@ test fork. Not for general use.
 - **TUI:** respect kind toggles inside `_fts_search`; show no-sub-family
   instructions and bias ranking by query kind.
 
-## [0.0.1] — 2026-04-28
+## [0.0.1], 2026-04-28
 
 - **`simdref profile`** documented alongside the bare-query CLI form in the
   README.
@@ -170,7 +177,7 @@ test fork. Not for general use.
   dispatch resolves `--arch` and skips the TUI on an exact match.
 - **packaging:** drop the stray `simdref-build-skills` console script.
 
-## [0.0.0] — 2026-04-22 — initial public release
+## [0.0.0], 2026-04-22 — initial public release
 
 First tagged release. The baseline set of interfaces the project aims to
 support is in place:
