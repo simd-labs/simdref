@@ -83,17 +83,27 @@ def _word_at(text: str, line: int, character: int) -> str | None:
     if line >= len(lines):
         return None
     current = lines[line]
+    character = _code_point_index(current, character)
     for match in WORD_RE.finditer(current):
         if match.start() <= character <= match.end():
             return match.group(0)
     return None
 
 
+def _code_point_index(line: str, character: int) -> int:
+    # LSP columns count UTF-16 code units; Python indexes code points.
+    units, index = 0, 0
+    while index < len(line) and units < character:
+        units += 2 if ord(line[index]) > 0xFFFF else 1
+        index += 1
+    return index
+
+
 def _line_prefix(text: str, line: int, character: int) -> str:
     lines = text.splitlines()
     if line >= len(lines):
         return ""
-    current = lines[line][:character]
+    current = lines[line][: _code_point_index(lines[line], character)]
     match = re.search(WORD_RE.pattern + r"$", current)
     return match.group(0) if match else ""
 
@@ -267,7 +277,9 @@ def _asm_literals(text: str) -> list[tuple[int, str]]:
 
 
 def _in_asm_string(text: str, line: int, character: int) -> bool:
-    offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + character
+    offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
+        text.split("\n")[line], character
+    )
     return any(start <= offset <= start + len(body) for start, body in _asm_literals(text))
 
 
@@ -442,16 +454,27 @@ def main() -> int:
             operand_count = None
             operand_text = ""
             if word and allow_instruction:
-                offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + character
+                offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
+                    text.split("\n")[line], character
+                )
                 language_id = session.languages.get(uri, "")
                 segment = _asm_line_at(text, language_id, uri, offset)
                 if segment:
                     operand_text = segment
+                    # The C-escape pair "\t" starts a segment in asm("...\n\t...").
+                    # Strip the backslash so the mnemonic survives.
                     parsed = _mnemonic_from_asm_line(
-                        segment, _semicolon_is_comment(language_id, uri)
+                        segment.lstrip("\\"), _semicolon_is_comment(language_id, uri)
                     )
-                    if parsed and parsed[0].casefold() == word.casefold():
-                        operand_count = parsed[1]
+                    if parsed:
+                        if parsed[0].casefold() == word.casefold():
+                            operand_count = parsed[1]
+                        elif word.casefold().endswith(parsed[0].casefold()):
+                            # The raw word can swallow a preceding escape character:
+                            # on "\tvmulps" _word_at reads "tvmulps", but the parsed
+                            # segment names the real mnemonic.
+                            word = parsed[0]
+                            operand_count = parsed[1]
             body = (
                 _hover_markdown(
                     conn,

@@ -152,6 +152,33 @@ class LspEndToEndTests(unittest.TestCase):
         caps = self.server.start()
         self.assertTrue(caps.get("inlayHintProvider"), "inlayHintProvider not advertised")
 
+    def test_hover_matches_hint_on_second_instruction_of_asm_literal(self):
+        # After the "\n\t" escape split, the raw line word is "tvmulps" but the
+        # hover must name the same YMM form the inlay hint gives.
+        text = 'asm("vaddps %ymm2, %ymm1, %ymm0\\n\\tvmulps %ymm3, %ymm0, %ymm0");\n'
+        self.server.open(CPP_URI, "cpp", text)
+        hints = self.server.hints(CPP_URI)
+        self.assertEqual(len(hints), 1)
+        self.assertEqual(
+            hints[0]["label"],
+            "Add Packed Single Precision Floating-Point Values.; Multi...",
+        )
+        col = text.index("vmulps")
+        result = self.server.hover(CPP_URI, 0, col)
+        self.assertIsNotNone(result, "hover on vmulps after the escape split returned null")
+        self.assertIn("VMULPS (YMM, YMM, YMM)", result["contents"]["value"])
+
+    def test_hover_after_astral_characters_in_comment(self):
+        # LSP columns count UTF-16 code units: each emoji before "lfence" moves
+        # the column by 2, so the hover must convert before indexing the line.
+        prefix = "".join("\U0001f600" for _ in range(10))
+        text = f"# {prefix} lfence\n"
+        self.server.open(ASM_URI, "asm", text)
+        col_lfence = len(("# " + prefix + " ").encode("utf-16-le")) // 2
+        result = self.server.hover(ASM_URI, 0, col_lfence)
+        self.assertIsNotNone(result, "hover on lfence after emoji returned null")
+        self.assertIn("LFENCE", result["contents"]["value"])
+
     def test_asm_hints_one_per_instruction_line(self):
         self.server.open(ASM_URI, "asm", ASM_TEXT)
         hints = {h["position"]["line"]: h for h in self.server.hints(ASM_URI)}

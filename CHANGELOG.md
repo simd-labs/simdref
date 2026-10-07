@@ -5,6 +5,15 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.11] — 2026-10-07
+
+### Fixed
+
+- The LSP hover takes the mnemonic from the parsed assembler segment and
+  converts the UTF-16 column to a code-point index. A second instruction in
+  one `asm("...\n\t...")` literal and a mnemonic after an astral character now
+  get their page.
+
 ## [0.0.10] — 2026-10-07
 
 ### Fixed
