@@ -289,7 +289,13 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
     db_path = conn.execute("PRAGMA database_list").fetchone()[2]
     source_lines = [line.rstrip("\r") for line in text.split("\n")]
     is_c_doc = _is_c_doc(language_id, uri)
-    semicolon_is_comment = not is_c_doc and uri.lower().endswith(".asm")
+    # A .s/.S extension means GAS syntax: ";" stays a statement separator there
+    # even if the client tags the buffer with an assembly languageId.
+    semicolon_is_comment = (
+        not is_c_doc
+        and not uri.lower().endswith(".s")
+        and (language_id in ("asm", "nasm", "masm") or uri.lower().endswith((".asm", ".nasm")))
+    )
     if is_c_doc:
         candidates = [
             (text.count("\n", 0, offset), segment)

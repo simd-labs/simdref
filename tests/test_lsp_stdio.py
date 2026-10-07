@@ -240,6 +240,25 @@ class LspEndToEndTests(unittest.TestCase):
             [h["label"] for h in hints],
             ["Add Packed Single Precision Floating-Point Values."],
         )
+        # "adc eax, ebx ; j, k" parses as 4 operands in a .s file even when the client
+        # sends languageId "nasm": the 4-operand form label differs from the 2-operand one.
+        self.server.open(uri, "nasm", "adc eax, ebx ; j, k\n")
+        self.assertEqual(self.server.hints(uri)[0]["label"], "Adc instruction.")
+
+    def test_asm_semicolon_comment_in_dot_nasm_file(self):
+        uri = "file:///tmp/simdref_lsp_test.nasm"
+        self.server.open(uri, "asm", "adc eax, ebx ; j, k\n")
+        hints = self.server.hints(uri)
+        self.assertEqual([h["position"]["line"] for h in hints], [0])
+        # With ";" a comment the line is the 2-operand form, not the 4-operand parse.
+        self.assertEqual(hints[0]["label"], "Add With Carry.")
+
+    def test_asm_semicolon_comment_from_language_id_masm(self):
+        uri = "file:///tmp/simdref_lsp_test.txt"
+        self.server.open(uri, "masm", "adc eax, ebx ; j, k\n")
+        hints = self.server.hints(uri)
+        self.assertEqual([h["position"]["line"] for h in hints], [0])
+        self.assertEqual(hints[0]["label"], "Add With Carry.")
 
     def test_hint_avx512_mask_and_broadcast_operands(self):
         uri = "file:///tmp/simdref_lsp_test_zmm.s"
