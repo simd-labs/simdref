@@ -33,7 +33,7 @@ isa            # open the TUI
 ```
 
 The package installs two equivalent executables, `isa` and `simdref`. The
-catalog download does not need `llvm-mca`. Only `isa build` needs
+catalog download does not use `llvm-mca`. Only `isa build` uses
 `llvm-mca` 18+ on `PATH`.
 
 Pre-release builds live on TestPyPI:
@@ -64,7 +64,7 @@ reads the JSON site data this repo exports:
 isa export --out-dir ./site-data
 ```
 
-The LSP server speaks JSON-RPC over stdio:
+The LSP server speaks JSON-RPC on stdio:
 
 ```bash
 simdref-lsp
@@ -80,7 +80,7 @@ Editor clients, one for each editor:
 Each client shows a one-line brief at the end of each instruction line and
 the full manpage on hover, from the local catalog.
 
-The LLM interface emits JSON and NDJSON with exit codes 0 (match), 1 (bad
+The LLM interface writes JSON and NDJSON with exit codes 0 (match), 1 (bad
 flag), 2 (no match), 3 (ambiguous):
 
 ```bash
@@ -114,11 +114,11 @@ Commands
 | `isa doctor`            | Check the install, non-zero exit on failure                               |
 | `isa update`            | Download the pre-built catalog, `--from-release` for the GitHub Release   |
 | `isa annotate <file.s>` | Annotate a `.s` file with summaries and latency/CPI, writes `<file>.sa`   |
-| `isa man <name>`        | Show a manpage, rendered on demand                                        |
+| `isa man <name>`        | Show a manpage, made on demand                                            |
 | `isa install-manpages`  | Pre-generate man7 pages so plain `man vpaddd` works                       |
 | `isa llm query <q>`     | Strict lookup to JSON, NDJSON, or Markdown                                |
 | `isa llm batch`         | Resolve many queries from stdin in one invocation                         |
-| `isa llm list`          | Emit the FilterSpec or stream matching catalog entries                    |
+| `isa llm list`          | Write the FilterSpec or stream matching catalog entries                   |
 | `isa llm schema`        | Print the JSON schema for `llm` payloads                                  |
 
 Dev commands

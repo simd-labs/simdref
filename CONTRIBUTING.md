@@ -25,16 +25,16 @@ pytest tests/test_cli_llm.py -v
 pytest --cov=src --cov-report=term-missing
 ```
 
-`tests/test_tui.py` needs `textual` (a runtime dep). The tests skip without
+`tests/test_tui.py` uses `textual` (a runtime dep). The tests skip without
 a catalog. Run `isa update` first.
 
 ## Full local rebuild
 
-`isa build` rebuilds the catalog from upstream. It needs:
+`isa build` rebuilds the catalog from upstream. It uses:
 
 - `llvm-mca` 18+ on `PATH`. On Debian or Ubuntu: `sudo apt install llvm`.
 - About 4 GB of free RAM.
-- Optional: a local `AARCHMRS_BSD*.tar.gz` under `vendor/arm/` to skip the
+- Optional: a local `AARCHMRS_BSD*.tar.gz` in `vendor/arm/` to skip the
   download.
 
 ```bash
@@ -48,7 +48,7 @@ isa build
 1. Write an ingestor in `src/simdref/ingest_sources.py` that returns
    `simdref.models.IntrinsicRecord` or `InstructionRecord`. Tag each perf
    row with `source_kind` (`measured` or `modeled`).
-1. Wire the ingestor into `simdref.ingest.build_catalog`.
+1. Add the ingestor to `simdref.ingest.build_catalog`.
 1. Add a fixture under `tests/fixtures/` and extend `tests/conftest.py` so
    the offline tests cover the new source.
 1. Add a row to `docs/coverage/summary.json`. Run

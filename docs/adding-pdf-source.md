@@ -1,16 +1,16 @@
 # Adding a PDF source
 
-PDF enrichment plugs into `simdref.pdfparse`. Add one module that registers a `PdfSourceSpec`.
+PDF enrichment uses `simdref.pdfparse`. Add one module that registers a `PdfSourceSpec`.
 
 ## Fields of `PdfSourceSpec`
 
 - `source_id`: stable internal id, used in cache keys and `InstructionRecord.pdf_refs`
 - `display_name`: human-facing label
 - `source_url`: canonical upstream PDF URL
-- `local_candidates`: local/vendor cache path order
+- `local_candidates`: local/vendor cache path sequence
 - `cache_path`: cache file for parsed descriptions
 - `cache_version`: increment when the shape changes
-- `signature_paths`: source files whose contents invalidate the cache
+- `signature_paths`: source files with contents that invalidate the cache
 - `parser`: returns `PdfEnrichmentResult`
 - `find_source`: finds or downloads the PDF, gives a local path
 
@@ -19,7 +19,7 @@ PDF enrichment plugs into `simdref.pdfparse`. Add one module that registers a `P
 Return `PdfEnrichmentResult` with:
 
 - `descriptions`: mnemonic → `PdfDescriptionPayload`
-- `fallback_page_count`: pages needing a slower fallback, if any
+- `fallback_page_count`: pages with a slower fallback, if any
 - `stats`: optional counters
 
 Each `PdfDescriptionPayload` has `sections` (merged text keyed by canonical name), `source_url`, `page_start`, `page_end`.

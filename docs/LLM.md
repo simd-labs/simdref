@@ -18,7 +18,7 @@ Resolve one query (intrinsic name, mnemonic, free-form search) and give one payl
 | `--limit N`                            | `8`     | Search-results cap when the query falls through to search mode.              |
 | `--isa FAM` (repeatable)               | all     | Filter by ISA family (`Intel`, `Arm`, `RISC-V`, …).                          |
 | `--preset NAME`                        | none    | Preset name (`default`, `intel`, `arm32`, `arm64`, `riscv`, `none`, `all`).  |
-| `--source-kind measured\|modeled\|any` | `any`   | Perf-row provenance. `measured` = uops.info rows; `modeled` = llvm-mca rows. |
+| `--source-kind measured\|modeled\|any` | `any`   | Perf-row provenance. `measured` = uops.info rows. `modeled` = llvm-mca rows. |
 | `--arch CORE`                          | none    | Pin lat/cpi/ports to one core (`znver4`, `skylake-x`).                       |
 
 Payload shape (abridged):
@@ -41,11 +41,11 @@ Payload shape (abridged):
 }
 ```
 
-Free-form search yields `{"mode": "search", "results": [...]}`; each entry has the `result` shape.
+Free-form search yields `{"mode": "search", "results": [...]}`. Each entry has the `result` shape.
 
 ### `isa llm batch`
 
-Reads queries one per line from stdin, gives one NDJSON record per line. Spreads catalog load. Skips blanks, `#` comments.
+Reads queries one per line from stdin, gives one NDJSON record per line. Loads the catalog one time. Skips empty lines, `#` comments.
 
 ```bash
 echo -e "_mm_add_ps\nVPADDD\n_does_not_exist" | isa llm batch
@@ -64,7 +64,7 @@ isa llm list --format json
 isa llm list --format markdown
 ```
 
-With `--pattern GLOB [--isa FAM]`, streams NDJSON `{name, kind, isa, category}` for entries whose name agrees with the glob. `fnmatch` semantics (`*`, `?`, `[...]`), case-insensitive, on the entry name and `db_key`.
+With `--pattern GLOB [--isa FAM]`, streams NDJSON `{name, kind, isa, category}` for each entry name that agrees with the glob. `fnmatch` semantics (`*`, `?`, `[...]`), case-insensitive, on the entry name and `db_key`.
 
 ```bash
 isa llm list --pattern "*gather*" --isa "Intel"
@@ -72,7 +72,7 @@ isa llm list --pattern "*gather*" --isa "Intel"
 
 ### `isa llm schema`
 
-JSON Schema for the `query` and `batch` payload shape, with `generated_at`, `source_versions`, nested `instruction_refs`. Use it to generate client-side types.
+JSON Schema for the `query` and `batch` payload shape, with `generated_at`, `source_versions`, nested `instruction_refs`. Use it to make client-side types.
 
 ## Exit codes
 

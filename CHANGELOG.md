@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The LSP converts inlay-hint columns from code points to UTF-16 code units
-  through one helper.
+- Add tests for UTF-16 inlay hint columns.
 
 ## [0.0.11], 2026-10-07
 

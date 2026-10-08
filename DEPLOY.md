@@ -14,13 +14,13 @@ Single workflow, single DAG, hard `needs:` edges.
                            testpypi (push to main only)
 ```
 
-Edges: `test` and `package` need `build-catalog`. `publish-data` needs all three. `validate-release` needs `publish-data`. `testpypi` needs `test`, `package`.
+Edges: `test` and `package` follow `build-catalog`. `publish-data` follows all three. `validate-release` follows `publish-data`. `testpypi` follows `test`, `package`.
 
 ### Phase 1: data creation
 
 - `build-catalog` installs LLVM 22, vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact.
 
-### Phase 2: data usage (parallel)
+### Phase 2: data use (parallel)
 
 - `test` (`needs: build-catalog`). Matrix 3.10 to 3.14. Downloads the artifact, installs the package, asserts schema current, runs pytest, syntax-checks Python sources, runs `simdref doctor`, checks catalog structural invariants.
 - `package` (`needs: build-catalog`). `uv build`, `twine check`, uploads the wheel artifact.
@@ -59,7 +59,7 @@ Job sequence:
 
 ## Cutting a release
 
-1. Bump. `gh workflow run bump-version.yml -f version=X.Y.Z -f dry_run=false` runs `scripts/bump-version.py X.Y.Z` on a clean main checkout and pushes the version commit to main. Refuses if the tag exists or the version is on PyPI.
+1. Bump. `gh workflow run bump-version.yml -f version=X.Y.Z -f dry_run=false` runs `scripts/bump-version.py X.Y.Z` on a clean main checkout and pushes the version commit to main. Refuses if the tag or the PyPI version is there.
 1. Wait for CI on the bump commit to go green.
 1. Dry-run. `gh workflow run release-candidate.yml -f version=X.Y.Z -f dry_run=true` proves each gate without side effects.
 1. If green, re-run with `dry_run=false`. The `pypi` environment gates `publish-and-tag` on manual approval. The workflow pushes the tag, publishes to PyPI, cuts the GitHub Release.
@@ -74,8 +74,8 @@ Local step 1 alternative: `python scripts/bump-version.py X.Y.Z && git commit -a
 
 ## Recovery playbook
 
-- `build-catalog` fails. Upstream source moved. Check the validation steps. Pin or patch the ingester.
-- `publish-data` fails. GitHub Releases API flake. Re-run the job.
-- `validate-release` fails. Published `data-latest` broken. Examine the catalog bundle in the previous `build-catalog` artifact. Do not tag a release until green.
-- `release-candidate / preflight` fails. One of: pyproject mismatch, tag exists, version on PyPI. Repair upstream state. Do not force a tag.
+- `build-catalog` is red. Upstream source moved. Check the validation steps. Pin or patch the ingester.
+- `publish-data` is red. GitHub Releases API flake. Re-run the job.
+- `validate-release` is red. Published `data-latest` broken. Examine the catalog bundle in the previous `build-catalog` artifact. Do not tag a release until green.
+- `release-candidate / preflight` is red. One of: pyproject mismatch, pushed tag, version on PyPI. Repair the cause. Do not force a tag.
 - `release-candidate / publish-and-tag` stuck. The `pypi` environment waits on manual approval.

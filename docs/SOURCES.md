@@ -1,6 +1,6 @@
 # Upstream sources
 
-simdref builds its catalog from upstream feeds. Each entry gives URL, license, refresh cadence, and gaps measured by `tools/audit_coverage.py` against a local catalog build.
+simdref builds its catalog from upstream sources. Each entry gives URL, license, refresh cadence, and gaps measured by `tools/audit_coverage.py` against a local catalog build.
 
 Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs/coverage/summary.json`.
 
@@ -29,7 +29,7 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 - URL: <https://developer.arm.com/architectures/instruction-sets/intrinsics/data/intrinsics.json> plus the ACLE spec at <https://arm-software.github.io/acle/>.
 - Format: JSON, the canonical compiler-consumed version.
 - License: Arm Developer site terms. ACLE spec: Apache-2.0.
-- Refresh: aligned with ACLE releases.
+- Refresh: follows ACLE releases.
 - Gaps: about 30% of upstream entries missing. The audit normalizes upstream names by stripping bracketed alternatives (`[__arm_]vddupq[_n]_u8` → `vddupq_u8`), so this is a real ingestion shortfall, probably on the SVE or MVE side. Repair: extend `parse_arm_intrinsics_payload` in `ingest_catalog.py`.
 
 ### Arm AARCHMRS (A64 instructions)
@@ -47,7 +47,7 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 - URL: <https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc>, `auto-generated/intrinsics.json` and fallbacks.
 - Format: JSON, ~75k entries per release.
 - License: Apache-2.0.
-- Refresh: RVV spec revisions drive it.
+- Refresh: follows RVV spec revisions.
 - Gaps: none against the vendored snapshot.
 
 ### RISC-V unified DB (instructions)
@@ -60,7 +60,7 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 
 ## Microarchitectural perf data
 
-Each perf row carries a `source_kind` so users do not confuse modeled numbers with measurements.
+Each perf row has a `source_kind` so users do not confuse modeled numbers with measurements.
 
 ### uops.info (x86, measured)
 
@@ -71,7 +71,7 @@ See above. All rows carry `source_kind="measured"`.
 - Binaries: `llvm-exegesis`, `llvm-mc`, `llvm-mca`, LLVM 18+.
 - Driver: `src/simdref/perf_sources/llvm_scheduling.py`, three steps per canonical core:
   1. `llvm-exegesis --benchmark-phase=prepare-and-assemble-snippet` walks LLVM's target-instruction table, gives one YAML document per schedulable opcode with an `assembled_snippet` hex stream.
-  1. Frequency-counting fixed-width chunks at natural ISA alignment recovers the repeated instruction bytes. No regex, no asm synthesis.
+  1. Frequency-counting fixed-width chunks at natural ISA alignment finds the instruction bytes. No regex, no asm synthesis.
   1. `llvm-mc --disassemble` turns bytes into canonical assembly. `llvm-mca --instruction-tables=full --json` measures `Latency`, `RThroughput` per line. Join key: the assembly mnemonic.
 - Runtime: ~3 subprocess calls per core (60 total) instead of tens of thousands of one-snippet calls.
 - Cache: intermediate artifacts in `vendor/perf-cache/<triple>/<cpu>/{exegesis.yaml, disassembly.s, mca.json}`. Same-host reruns short-circuit.

@@ -118,16 +118,16 @@ Biggest non-harness win: DOM node count at 5k-result scroll went from ~30k to ~6
 
 TUI sub-ISA bar short-circuits to in-place `set_enabled()` updates when only sub-ISA selection changes, removing the per-keystroke remount flash. Detail-pane record fetch uses an in-session LRU (16 slots). Re-visits are free.
 
-Micro-bench (detail lookup, 50 iterations): raw `load_intrinsic_from_db` 1.1 ms, cached ~0 ms.
+Micro-bench (record lookup, 50 iterations): raw `load_intrinsic_from_db` 1.1 ms, cached ~0 ms.
 
-## Targets (from plan)
+## Targets
 
-| Metric                  | Baseline      | Target                            |
-| ----------------------- | ------------- | --------------------------------- |
-| Web cold load           | 2.6 s         | below 2 s cold, below 500 ms warm |
-| Web per-keystroke p95   | ~680 ms       | below 100 ms                      |
-| Web JS heap             | 703 MB        | below 200 MB                      |
-| `search-index.json` raw | 182 MB        | below 15 MB                       |
-| `search-index.json` gz  | n/a           | below 3 MB on-wire                |
-| TUI `_fts_search` p95   | 127 ms        | below 40 ms                       |
-| TUI preset click        | visible flash | below 50 ms, no flash             |
+| Metric                  | Baseline | Target                            |
+| ----------------------- | -------- | --------------------------------- |
+| Web cold load           | 2.6 s    | below 2 s cold, below 500 ms warm |
+| Web per-keystroke p95   | ~680 ms  | below 100 ms                      |
+| Web JS heap             | 703 MB   | below 200 MB                      |
+| `search-index.json` raw | 182 MB   | below 15 MB                       |
+| `search-index.json` gz  | n/a      | below 3 MB on-wire                |
+| TUI `_fts_search` p95   | 127 ms   | below 40 ms                       |
+| TUI preset click        | flash    | below 50 ms, no flash             |

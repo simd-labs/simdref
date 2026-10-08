@@ -59,17 +59,17 @@ export.py   cli.py / lsp.py
 ## Storage strategy
 
 - `catalog.msgpack` holds the full catalog snapshot for portability and offline use. `_write_atomic` writes a random sibling temp file, copies the file mode to it, then replaces the published file with `os.replace`.
-- `catalog.db` holds FTS5 search with BM25 ranking for CLI `search`, `show`, `complete`, `llm`. The schema is versioned and automatically rebuilt when stale. `build_sqlite` writes a sibling `.tmp` and replaces the published file atomically.
+- `catalog.db` holds FTS5 search with BM25 ranking for CLI `search`, `show`, `complete`, `llm`. simdref rebuilds the database when `schema_version` is stale. `build_sqlite` writes a sibling `.tmp` and replaces the published file atomically.
 
 ## Search algorithm
 
 `search.py` scores candidates in this sequence:
 
 1. Intent detection. `_mm`-prefixed queries bias to intrinsics. Mnemonic-like queries (`add`, `vmov`) bias to instructions.
-1. Exact, prefix, substring hits add 220/175/135 points.
-1. Normalized token match on splits of `_`, `,`, `{}`.
+1. Equal, prefix, substring hits add 220/175/135 points.
+1. Normalized token overlap on splits of `_`, `,`, `{}`.
 1. Fuzzy match uses rapidfuzz `token_set_ratio`, `partial_ratio`, `ratio`.
-1. Width family bonus: +22 for a matching SIMD width (`mm256`, `ymm`), −22 for a mismatch.
+1. Width family bonus: +22 for the same SIMD width (`mm256`, `ymm`), −22 for a mismatch.
 1. Results below 35 points drop out.
 
 In the CLI path, FTS5 gives the candidate set (`max(limit * 6, 60)` rows per table) and the scoring pipeline re-ranks them.
@@ -88,7 +88,7 @@ Status meanings:
 
 - `complete`: the pytest path plus the upstream rebuild path cover it, with blocking validation.
 - `strong`: good coverage, representative not complete for some subfamilies.
-- `partial`: ingest or presentation support. Validation or semantic coverage is incomplete.
+- `partial`: ingest or presentation support. Validation or semantic coverage is not full.
 
 | Area          | Source authority                         | Status   | Validation gate                                                 |
 | ------------- | ---------------------------------------- | -------- | --------------------------------------------------------------- |
