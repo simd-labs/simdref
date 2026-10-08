@@ -202,10 +202,11 @@ class LspEndToEndTests(unittest.TestCase):
         hints = {h["position"]["line"]: h for h in self.server.hints(ASM_URI)}
         self.assertEqual(sorted(hints), [1])
         line = text.split("\n")[1]
-        self.assertEqual(
-            hints[1]["position"]["character"],
-            lsp._utf16_column(line, len(line)),
-        )
+        # The expected column comes from the codec, not from _utf16_column.
+        # A wrong helper would otherwise agree with itself.
+        utf16_length = len(line.encode("utf-16-le")) // 2
+        self.assertNotEqual(utf16_length, len(line), "the line needs astral characters")
+        self.assertEqual(hints[1]["position"]["character"], utf16_length)
         self.assertEqual(hints[1]["label"], "Add Packed Single Precision Floating-Point Values.")
 
     def test_utf16_column_is_the_reverse_of_code_point_index(self):
