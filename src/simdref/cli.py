@@ -659,9 +659,7 @@ def _maybe_auto_update_for_version_change() -> None:
             "[bold yellow]warning:[/bold yellow] auto-update failed; continuing with the existing catalog. "
             "Some features may not work correctly until `simdref update` succeeds.",
         )
-        # Stamp anyway so we don't retry on every invocation; the user has
-        # been warned and can re-run `simdref update` once back online.
-        write_installed_version_stamp(__version__)
+        # Keep the old stamp so the next invocation retries the download.
 
 
 def _catalog_meta(catalog) -> dict:

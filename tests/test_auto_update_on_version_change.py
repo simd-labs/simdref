@@ -122,9 +122,10 @@ class AutoUpdateOnVersionChangeTests(unittest.TestCase):
             dl.assert_not_called()
             self.assertEqual(fx._read(), "1.2.3")
 
-    def test_failed_auto_update_still_stamps_and_warns(self):
-        """If the download fails (offline) we warn but stamp anyway, so we
-        don't loop on every invocation."""
+    def test_failed_auto_update_keeps_old_stamp_and_warns(self):
+        """If the download fails (offline) we warn and keep the old stamp, so
+        the next invocation retries the download instead of staying stuck on
+        the old catalog until the next release."""
         import typer
         from simdref import cli
 
@@ -142,7 +143,7 @@ class AutoUpdateOnVersionChangeTests(unittest.TestCase):
                     cli._maybe_auto_update_for_version_change()
                 output = buf.getvalue()
             self.assertIn("auto-update failed", output)
-            self.assertEqual(fx._read(), "9.9.9")
+            self.assertEqual(fx._read(), "0.0.1")
 
 
 class OfflineWarningTests(unittest.TestCase):

@@ -5,6 +5,14 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- A failed catalog auto-update (for example when offline) no longer stamps the
+  new version. The next command retries the download instead of keeping the
+  old catalog until the next release.
+
 ## [0.0.12], 2026-10-07
 
 ### Fixed
