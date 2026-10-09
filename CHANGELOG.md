@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A failed catalog auto-update (for example when offline) no longer stamps the
   new version. The next command retries the download instead of keeping the
   old catalog until the next release.
+- Hover and inlay hints now resolve AT&T size-suffixed mnemonics such as
+  `xorl`, `addq` and `cmpq` to the base instruction. They use the suffix and
+  the line operands to pick the form, so `add $8, %rax` no longer shows the
+  8-bit form and `jmp .L2` no longer shows the memory form.
 
 ## [0.0.12], 2026-10-07
 

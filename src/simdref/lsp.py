@@ -113,8 +113,94 @@ def _line_prefix(text: str, line: int, character: int) -> str:
     return match.group(0) if match else ""
 
 
-def _match_form(matches, operand_count: int | None = None, operand_text: str = ""):
-    """Pick the same form the line names: exact operand count, then width, then smallest."""
+_ATT_SUFFIX_WIDTH = {"b": 8, "w": 16, "l": 32, "q": 64}
+_ACCUMULATOR = {"al": "r8", "ax": "r16", "eax": "r32", "rax": "r64"}
+# x86 numbers only r8-r15; r0-r7 are ARM registers.
+_GPR_PATTERNS = (
+    (64, r"r(ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5])"),
+    (32, r"e(ax|bx|cx|dx|si|di|bp|sp)|r(8|9|1[0-5])d"),
+    (16, r"(ax|bx|cx|dx|si|di|bp|sp)|r(8|9|1[0-5])w"),
+    (8, r"[a-d][lh]|(si|di|bp|sp)l|r(8|9|1[0-5])b"),
+)
+_STRING_OP_RE = re.compile(r"(movs|cmps|scas|lods|stos|ins|outs)[bwdq]", re.IGNORECASE)
+
+
+def _lookup_mnemonic(conn, mnemonic: str):
+    """Return (forms, width). The exact mnemonic wins, else drop an AT&T size suffix (addq -> add)."""
+    forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
+    width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
+    # movsbl is a sign-extend, not the string op movsb.
+    if forms or not width or _STRING_OP_RE.fullmatch(mnemonic[:-1]):
+        return forms, None
+    # Only x86 has AT&T suffixes: "bl" on ARM must not become "b".
+    # shortcut: RISC-V addw/subw also get the x86 rows because the catalog has no
+    # RISC-V scalar rows, filter them out when the catalog adds those rows.
+    stripped = load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
+    return [form for form in stripped if form.architecture == "x86"], width
+
+
+def _operand_classes(operands: str, intel: bool = False) -> set[str]:
+    """Name each source operand like a catalog form does: i, m, r8..r64, rel.
+
+    In AT&T (.s) a bare symbol is a memory reference: "mov symbol, %eax" reads
+    memory, "jmp *sym" jumps indirect through memory, and ".L2" is a symbol too.
+    In Intel (.asm) a bare ID names a target that may still be a register alias
+    the catalog spells as rel, so it keeps the rel class.
+    """
+    classes = set()
+    for op in re.split(r",(?![^(\[{]*[)\]}])", operands):
+        op = op.strip()
+        name = op.lstrip("*%").casefold()
+        reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
+        if name in ("sp", "bp", "si", "di"):
+            # a bare "sp" is the ARM stack pointer, "%sp" is the 64-bit x86 GPR
+            reg = 64 if op.startswith("%") else None
+        if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
+            classes.add("i")
+        elif "(" in op or "[" in op:
+            classes.add("m")
+        elif reg:
+            classes.add(f"r{reg}")
+        elif op.startswith("*"):
+            # "*sym" and "*target" are the indirect (memory) jump form.
+            classes.add("m")
+        elif name and re.fullmatch(r"r\d{1,2}|lr|pc", name):
+            # ARM scalar registers: r0-r15 (x86 only has r8-r15), lr, pc.
+            # Keep them out of x86 operand classes so the ARM form matches.
+            pass
+        elif name and not op.startswith("%") and not re.match(r"[xyz]mm\d|k\d", name):
+            classes.add("rel" if intel else "m")
+    return classes
+
+
+def _form_score(key: str, classes: set[str], width: int | None) -> int:
+    # shortcut: operand order is ignored (AT&T reverses it), upgrade if a catalog form needs it.
+    score = 0
+    for op in _operands_of_key(key):
+        op = _ACCUMULATOR.get(op.casefold(), op.casefold())
+        if re.fullmatch(r"i\d+|[01]", op):
+            op = "i"
+        elif re.fullmatch(r"rel\d+", op):
+            op = "rel"
+        op = re.sub(r"(?<=\d)[lh]$", "", op)  # r8l and r8h are both r8
+        if op in classes or (re.fullmatch(r"m\d+", op) and "m" in classes):
+            score += 1 + (op[1:] == str(width))
+        else:
+            score -= 1
+    return score
+
+
+def _match_form(
+    matches,
+    operand_count: int | None = None,
+    operand_text: str = "",
+    suffix_bits: int | None = None,
+    intel: bool = False,
+):
+    """Pick the same form the line names: exact operand count, then width, then smallest.
+
+    operand_text holds the operands of the line. suffix_bits is the AT&T size suffix width.
+    """
     if operand_count is None:
         return matches[0] if matches else None
     # ponytail: a line has no architecture, so take the first form with the same operand count.
@@ -137,7 +223,11 @@ def _match_form(matches, operand_count: int | None = None, operand_text: str = "
             scored = sorted(same_count, key=lambda m: (-_score(m), m.key))
             if _score(scored[0]) > _score(scored[-1]):
                 return scored[0]
-    return same_count[0]
+    # ASM_COMMENT_RE cuts an ARM "#16" operand and leaves a trailing comma.
+    if operand_text.rstrip().endswith(","):
+        same_count = [m for m in same_count if m.architecture != "x86"] or same_count
+    classes = _operand_classes(operand_text, intel=intel)
+    return max(same_count, key=lambda m: _form_score(m.key, classes, suffix_bits))
 
 
 def _hover_markdown(
@@ -146,6 +236,7 @@ def _hover_markdown(
     allow_instruction: bool = True,
     operand_count: int | None = None,
     operand_text: str = "",
+    intel: bool = False,
 ) -> str | None:
     intrinsic = load_intrinsic_from_db(conn, word)
     if intrinsic is not None:
@@ -188,10 +279,10 @@ def _hover_markdown(
         return None
     instruction = load_instruction_from_db(conn, word)
     if instruction is None:
-        matches = load_instructions_by_mnemonic_from_db(conn, word)
+        matches, width = _lookup_mnemonic(conn, word)
         # Match the form on the source line like _hint_label does, so
         # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-        instruction = _match_form(matches, operand_count, operand_text)
+        instruction = _match_form(matches, operand_count, operand_text, width, intel)
     if instruction is not None:
         body = instruction_markdown(instruction, conn=conn)
         links = [f"Full page: {web_deep_link('instruction', instruction.key)}"]
@@ -304,7 +395,7 @@ def _operand_count(operands: str) -> int:
 
 
 def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
-    """Return (mnemonic, operand_count) for an asm line, or None."""
+    """Return (mnemonic, operand_count, operands) for an asm line, or None."""
     line = ASM_COMMENT_RE.sub("", line)
     if semicolon_is_comment:
         line = ASM_SEMICOLON_COMMENT_RE.sub("", line)
@@ -319,7 +410,8 @@ def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
         parts = line.split(None, 1)
     if not MNEMONIC_RE.match(parts[0]):
         return None
-    return parts[0], _operand_count(parts[1] if len(parts) > 1 else "")
+    operands = parts[1] if len(parts) > 1 else ""
+    return parts[0], _operand_count(operands), operands
 
 
 def _operands_of_key(key: str) -> list[str]:
@@ -340,16 +432,23 @@ def _mnemonic_matches(db_path: str, mnemonic: str) -> tuple:
     # clear the cache if catalog reload lands.
     conn = open_db(path=Path(db_path))
     try:
-        return tuple(load_instructions_by_mnemonic_from_db(conn, mnemonic))
+        forms, width = _lookup_mnemonic(conn, mnemonic)
+        return tuple(forms), width
     finally:
         conn.close()
 
 
-def _hint_label(db_path: str, mnemonic: str, operand_count: int) -> str | None:
-    matches = _mnemonic_matches(db_path, mnemonic)
+def _hint_label(
+    db_path: str,
+    mnemonic: str,
+    operand_count: int,
+    operands: str = "",
+    intel: bool = False,
+) -> str | None:
+    matches, width = _mnemonic_matches(db_path, mnemonic)
     if not matches:
         return None
-    chosen = _match_form(matches, operand_count)
+    chosen = _match_form(matches, operand_count, operands, width, intel)
     return _cut_label(chosen.summary or "")
 
 
@@ -371,7 +470,7 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
         if not start <= line <= end:
             continue
         parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
-        label = _hint_label(db_path, *parsed) if parsed else None
+        label = _hint_label(db_path, *parsed, intel=semicolon_is_comment) if parsed else None
         if label is not None:
             hints.setdefault(line, []).append(label)
     return [
@@ -454,7 +553,8 @@ def main() -> int:
             line, character = params["position"]["line"], params["position"]["character"]
             word = _word_at(text, line, character)
             # In C/C++ only the asm strings hold instructions; intrinsics hover everywhere.
-            is_c_doc = _is_c_doc(session.languages.get(uri, ""), uri)
+            language_id = session.languages.get(uri, "")
+            is_c_doc = _is_c_doc(language_id, uri)
             allow_instruction = not is_c_doc or (_in_asm_string(text, line, character))
             operand_count = None
             operand_text = ""
@@ -462,16 +562,15 @@ def main() -> int:
                 offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
                     text.split("\n")[line], character
                 )
-                language_id = session.languages.get(uri, "")
                 segment = _asm_line_at(text, language_id, uri, offset)
                 if segment:
-                    operand_text = segment
                     # The C-escape pair "\t" starts a segment in asm("...\n\t...").
                     # Strip the backslash so the mnemonic survives.
                     parsed = _mnemonic_from_asm_line(
                         segment.lstrip("\\"), _semicolon_is_comment(language_id, uri)
                     )
                     if parsed:
+                        operand_text = parsed[2]
                         if parsed[0].casefold() == word.casefold():
                             operand_count = parsed[1]
                         elif word.casefold().endswith(parsed[0].casefold()):
@@ -487,6 +586,7 @@ def main() -> int:
                     allow_instruction,
                     operand_count=operand_count,
                     operand_text=operand_text,
+                    intel=_semicolon_is_comment(language_id, uri),
                 )
                 if conn and word
                 else None

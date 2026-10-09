@@ -355,10 +355,13 @@ class LspEndToEndTests(unittest.TestCase):
             [h["label"] for h in hints],
             ["Add Packed Single Precision Floating-Point Values."],
         )
-        # "adc eax, ebx ; j, k" parses as 4 operands in a .s file even when the client
-        # sends languageId "nasm": the 4-operand form label differs from the 2-operand one.
+        # "adc eax, ebx ; j, k" parses as 3 operands in a .s file even when the client
+        # sends languageId "nasm": the 3-operand form label differs from the 2-operand one.
         self.server.open(uri, "nasm", "adc eax, ebx ; j, k\n")
-        self.assertEqual(self.server.hints(uri)[0]["label"], "Adc instruction.")
+        # The 3-operand x86 form that names a 32-bit register, not the first ARM row.
+        self.assertEqual(
+            self.server.hints(uri)[0]["label"], "Add with carry 32-bit integer operands."
+        )
 
     def test_asm_semicolon_comment_in_dot_nasm_file(self):
         uri = "file:///tmp/simdref_lsp_test.nasm"
@@ -394,6 +397,96 @@ class LspEndToEndTests(unittest.TestCase):
         hints = self.server.hints(uri)
         self.assertEqual([h["position"]["line"] for h in hints], [0])
         self.assertEqual(hints[0]["label"], "Move Data From String to String.")
+
+    ATT_TEXT = (
+        "xorl %eax, %eax\naddq $8, %rax\ncmpq %rsi, %rax\nadd $8, %rax\njmp .L2\n"
+        "vpsrlq $1, %xmm0, %xmm1\nmovsb\nshl $1, %rax\nxor %eax, %eax\ncmp %rsi, %rax\n"
+    )
+
+    def _att_hover_and_hints(self):
+        self.server.open(ASM_URI, "asm", self.ATT_TEXT)
+        hints = {h["position"]["line"]: h["label"] for h in self.server.hints(ASM_URI)}
+        return hints, lambda line: self.server.hover(ASM_URI, line, 1)["contents"]["value"]
+
+    def test_att_size_suffixed_mnemonics_resolve_to_the_base_instruction(self):
+        hints, hover = self._att_hover_and_hints()
+        for line, base, key, hint_line in ((0, "XOR", "XOR (", 8), (1, "ADD", "ADD (R64", 3)):
+            with self.subTest(base=base):
+                self.assertIn(key, hover(line))
+                self.assertEqual(hints[line], hints[hint_line])
+        self.assertIn("CMP (", hover(2))
+        self.assertEqual(hints[2], hints[9])
+        self.assertEqual(hints[2], "Compare Two Operands.")
+
+    def test_att_suffix_in_cpp_asm_string(self):
+        self.server.open(CPP_URI, "cpp", 'asm("xorl %eax, %eax\\n\\taddq $8, %rax");\n')
+        self.assertEqual(
+            self.server.hints(CPP_URI)[0]["label"],
+            "Logical Exclusive OR.; Add register and immediate operands.",
+        )
+
+    def test_real_mnemonics_ending_in_size_letters_keep_their_own_entry(self):
+        _, hover = self._att_hover_and_hints()
+        for line, name in ((5, "VPSRLQ ("), (6, "MOVSB"), (7, "SHL (")):
+            with self.subTest(name=name):
+                self.assertIn(name, hover(line))
+
+    def test_percent_sp_is_the_64_bit_register_form(self):
+        # "%sp" is the 64-bit x86 GPR, not the 16-bit "sp" of the ARM fix at
+        # test_arm_scalar_lines_keep_the_arm_form.
+        self.server.open(ASM_URI, "asm", "mov %rax, %sp\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("MOV (M64, R64)", hover)
+        self.assertNotIn("Moffs16", hover)
+
+    def test_add_with_64_bit_register_is_not_the_8_bit_form(self):
+        hints, hover = self._att_hover_and_hints()
+        for line in (1, 3):
+            self.assertNotEqual(hints[line], "Add 8-bit operands.")
+            self.assertNotIn("ADD (AL", hover(line))
+            self.assertNotIn("ADD (R8", hover(line))
+
+    def test_jmp_to_a_label_picks_the_memory_form(self):
+        # In AT&T a bare ".L2" is a symbol: a memory reference, not a rel8 immediate.
+        _, hover = self._att_hover_and_hints()
+        self.assertNotIn("Rel8", hover(4))
+        self.assertIn("JMP (M64)", hover(4))
+
+    def test_mov_of_a_bare_symbol_picks_a_memory_form(self):
+        # "mov symbol, %eax" reads memory: the picked form has an M slot, not rel.
+        self.server.open(ASM_URI, "asm", "mov symbol, %eax\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("MOV (M32, R32)", hover)
+
+    def test_jmp_star_register_picks_the_indirect_form(self):
+        # "jmp *%rax" is the indirect jump, not the direct rel8 form.
+        self.server.open(ASM_URI, "asm", "jmp *%rax\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertNotIn("Rel8", hover)
+        self.assertIn("JMP (R64)", hover)
+
+    def test_jmp_star_symbol_picks_the_indirect_memory_form(self):
+        # "jmp *handler" reads the target through memory, not a rel8 immediate.
+        self.server.open(ASM_URI, "asm", "jmp *handler\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertNotIn("Rel8", hover)
+        self.assertIn("JMP (M64)", hover)
+
+    def test_arm_scalar_lines_keep_the_arm_form(self):
+        # The labels are the ones the base commit 94d7a53 gives. "r0" and a bare "sp"
+        # are not x86 registers, and a "#16" immediate excludes x86 forms.
+        lines = ("sub sp, sp, #16", "add sp, sp, #16", "add r0, r1, r2", "add r8, r9, #16")
+        self.server.open(ASM_URI, "asm", "\n".join(lines) + "\n")
+        self.assertEqual(
+            [h["label"] for h in self.server.hints(ASM_URI)],
+            ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
+        )
+
+    def test_movsbl_is_not_the_string_move(self):
+        # movsbl is a sign-extend. The suffix strip must not land on the string op movsb.
+        self.server.open(ASM_URI, "asm", "movsbl %al, %eax\n")
+        self.assertEqual(self.server.hints(ASM_URI), [])
+        self.assertIsNone(self.server.hover(ASM_URI, 0, 1))
 
 
 class MissingCatalogTests(unittest.TestCase):
@@ -442,24 +535,26 @@ class MissingCatalogTests(unittest.TestCase):
 class AsmLineTests(unittest.TestCase):
     def test_label_plus_instruction_and_comment_commas(self):
         self.assertEqual(
-            _mnemonic_from_asm_line("foo: vaddps ymm0, ymm1, ymm2 # a, b, c"), ("vaddps", 3)
+            _mnemonic_from_asm_line("foo: vaddps ymm0, ymm1, ymm2 # a, b, c")[:2], ("vaddps", 3)
         )
 
     def test_att_memory_operand_counts_once(self):
         self.assertEqual(
-            _mnemonic_from_asm_line("vaddps (%rax,%rbx,4), %xmm1, %xmm2"), ("vaddps", 3)
+            _mnemonic_from_asm_line("vaddps (%rax,%rbx,4), %xmm1, %xmm2")[:2], ("vaddps", 3)
         )
 
     def test_avx512_mask_and_broadcast_count_once(self):
-        self.assertEqual(_mnemonic_from_asm_line("vaddps zmm0{k1}{z}, zmm1, zmm2"), ("vaddps", 3))
         self.assertEqual(
-            _mnemonic_from_asm_line("vaddps zmm0, zmm1, dword ptr [rax]{1to16}"),
+            _mnemonic_from_asm_line("vaddps zmm0{k1}{z}, zmm1, zmm2")[:2], ("vaddps", 3)
+        )
+        self.assertEqual(
+            _mnemonic_from_asm_line("vaddps zmm0, zmm1, dword ptr [rax]{1to16}")[:2],
             ("vaddps", 3),
         )
 
     def test_semicolon_comment_only_when_flagged(self):
         self.assertEqual(
-            _mnemonic_from_asm_line("vaddps ymm0, ymm1, ymm2 ; add, then, more", True),
+            _mnemonic_from_asm_line("vaddps ymm0, ymm1, ymm2 ; add, then, more", True)[:2],
             ("vaddps", 3),
         )
         # Without the flag ";" stays, as in GAS x86 statement separation.
