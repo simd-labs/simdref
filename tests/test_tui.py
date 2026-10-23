@@ -193,5 +193,52 @@ class TuiAnnotateClipboardTests(unittest.TestCase):
         app.notify.assert_called()
 
 
+@unittest.skipUnless(HAS_TEXTUAL, "textual required")
+class TuiMissingSectionTests(unittest.TestCase):
+    """A detail with no operands or no perf data says so, instead of omitting the section."""
+
+    def _markup(self, payload):
+        return [s[1] for s in payload if s[0] == "static_markup"]
+
+    def test_intrinsic_without_instruction_marks_missing_sections(self):
+        from simdref.models import IntrinsicRecord
+        from simdref.tui import SimdrefApp
+
+        app = SimdrefApp(initial_view="annotate")
+        intrinsic = IntrinsicRecord(
+            name="_mm512_mask_reduce_min_epi32",
+            signature="int _mm512_mask_reduce_min_epi32(__mmask16 k, __m512i a)",
+            description="Reduce by minimum using mask k.",
+            header="immintrin.h",
+            isa=["AVX512F"],
+        )
+        with patch.object(app, "_find_linked_instruction", return_value=None):
+            lines = self._markup(app._build_intrinsic_payload(intrinsic))
+        self.assertTrue(any("no linked instruction" in line for line in lines), lines)
+
+    def test_instruction_without_data_marks_operands_and_perf(self):
+        from simdref.models import InstructionRecord
+        from simdref.tui import SimdrefApp
+
+        app = SimdrefApp(initial_view="annotate")
+        bare = InstructionRecord(mnemonic="NEG", form="NEG (R32)", summary="Negate.", isa=["I86"])
+        lines = self._markup(app._build_instruction_payload(bare))
+        self.assertTrue(any("operands: no data" in line for line in lines), lines)
+        self.assertTrue(any("performance: no data" in line for line in lines), lines)
+
+        full = InstructionRecord(
+            mnemonic="NEG",
+            form="NEG (R32)",
+            summary="Negate.",
+            isa=["I86"],
+            operand_details=[{"idx": "1", "r": "1", "w": "1", "type": "reg", "width": "32"}],
+            arch_details={
+                "SKL": {"measurement": {"TP_loop": "0.25"}, "latencies": [{"cycles": "1"}]}
+            },
+        )
+        lines = self._markup(app._build_instruction_payload(full))
+        self.assertFalse(any("no data" in line for line in lines), lines)
+
+
 if __name__ == "__main__":
     unittest.main()

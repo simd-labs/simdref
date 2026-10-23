@@ -150,6 +150,12 @@ _INITIAL_RESULT_BATCH = 50
 _RESULT_BATCH_SIZE = 10
 _RESULT_PREFETCH_THRESHOLD = 5
 
+
+def _NO_DATA(text: str) -> tuple[str, str]:
+    """Detail line that marks a section with no data, instead of omitting it."""
+    return ("static_markup", f"  [dim]{text}[/]")
+
+
 _ISA_FAMILIES: list[str] = [
     name for name, _ in sorted(ISA_FAMILY_ORDER.items(), key=lambda item: item[1])
 ]
@@ -1781,6 +1787,8 @@ class SimdrefApp(App):
         if linked:
             self._append_operand_section(payload, linked)
             self._append_perf_sections(payload, linked)
+        else:
+            payload.append(_NO_DATA("no linked instruction: no operands or performance data"))
         if intrinsic.doc_sections:
             self._append_description_sections(payload, intrinsic.doc_sections)
         if linked and linked.description:
@@ -1816,6 +1824,7 @@ class SimdrefApp(App):
 
     def _append_operand_section(self, payload: list[tuple], item: InstructionRecord) -> None:
         if not item.operand_details:
+            payload.append(_NO_DATA("operands: no data"))
             return
         table = Table(header_style="bold blue")
         table.add_column("idx", width=4)
@@ -1844,6 +1853,8 @@ class SimdrefApp(App):
                 payload.append(
                     ("static_markup", f"  [green]latency:[/] {lat}  [green]CPI:[/] {cpi}")
                 )
+            else:
+                payload.append(_NO_DATA("performance: no data"))
             return
         label_map = {
             "uarch": "microarch",
