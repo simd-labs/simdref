@@ -5,7 +5,7 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.0.13], 2026-10-26
 
 ### Fixed
 
@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `xorl`, `addq` and `cmpq` to the base instruction. They use the suffix and
   the line operands to pick the form, so `add $8, %rax` no longer shows the
   8-bit form and `jmp .L2` no longer shows the memory form.
+- LSP hover and inlay hints decide the architecture of each line once and rank
+  the operand forms with one key. The architectures are x86 AT&T, x86 Intel,
+  AArch64, ARM32 and RISC-V. This fixes the 16-bit `sp`, `bp`, `si` and `di`
+  forms (#40), the operand order of loads and stores (#41), the `I8` shift
+  form instead of the fixed `1` form (#42) and x86 entries on RISC-V word
+  instructions (#43). It also fixes the forms for `movsd`, `cmpsd`, `lea`,
+  `vpermilps`, `pinsrw`, `vinsertf128`, `vpmovzxbw` and `vpsllq`, and for
+  AArch64 vector and `fp` lines.
+- Generated x86 summaries name the real integer width (16, 32 or 64 bits).
+  Before, they always said 32-bit. The change shows after the next catalog
+  update (`isa update`).
 
 ## [0.0.12], 2026-10-07
 
