@@ -152,9 +152,10 @@ def _operand_classes(operands: str, intel: bool = False) -> set[str]:
         op = op.strip()
         name = op.lstrip("*%").casefold()
         reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
-        if name in ("sp", "bp", "si", "di"):
-            # a bare "sp" is the ARM stack pointer, "%sp" is the 64-bit x86 GPR
-            reg = 64 if op.startswith("%") else None
+        if name in ("sp", "bp", "si", "di") and not op.startswith("%") and not intel:
+            # In AT&T a bare "sp" is a symbol, not the 16-bit register; the
+            # register needs the "%". In Intel syntax a bare "sp" is the r16.
+            reg = None
         if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
             classes.add("i")
         elif "(" in op or "[" in op:

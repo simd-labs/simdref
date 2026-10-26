@@ -431,13 +431,24 @@ class LspEndToEndTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, hover(line))
 
-    def test_percent_sp_is_the_64_bit_register_form(self):
-        # "%sp" is the 64-bit x86 GPR, not the 16-bit "sp" of the ARM fix at
-        # test_arm_scalar_lines_keep_the_arm_form.
+    def test_percent_sp_is_the_16_bit_register_form(self):
+        # "%sp" is the 16-bit x86 stack pointer, not a 64-bit GPR: the operand
+        # classes carry r16 and the chosen form is the 16-bit one.
+        self.assertEqual(lsp._operand_classes("%rax, %sp"), {"r16", "r64"})
         self.server.open(ASM_URI, "asm", "mov %rax, %sp\n")
         hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
-        self.assertIn("MOV (M64, R64)", hover)
-        self.assertNotIn("Moffs16", hover)
+        self.assertNotIn("MOV (M64, R64)", hover)
+        self.assertNotIn("R64)", hover)
+
+    def test_intel_bare_sp_is_the_16_bit_register(self):
+        # In an Intel file a bare "sp" is the 16-bit x86 register, not the ARM
+        # stack pointer: the same classes and 16-bit form as "%sp" in AT&T.
+        self.assertEqual(lsp._operand_classes("rax, sp", intel=True), {"r16", "r64"})
+        uri = "file:///tmp/simdref_lsp_test_sp.asm"
+        self.server.open(uri, "nasm", "mov rax, sp\n")
+        hover = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertNotIn("MOV (M64, R64)", hover)
+        self.assertNotIn("R64)", hover)
 
     def test_add_with_64_bit_register_is_not_the_8_bit_form(self):
         hints, hover = self._att_hover_and_hints()
