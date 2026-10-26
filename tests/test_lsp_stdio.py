@@ -401,6 +401,7 @@ class LspEndToEndTests(unittest.TestCase):
     ATT_TEXT = (
         "xorl %eax, %eax\naddq $8, %rax\ncmpq %rsi, %rax\nadd $8, %rax\njmp .L2\n"
         "vpsrlq $1, %xmm0, %xmm1\nmovsb\nshl $1, %rax\nxor %eax, %eax\ncmp %rsi, %rax\n"
+        "shl $2, %rax\n"
     )
 
     def _att_hover_and_hints(self):
@@ -430,6 +431,13 @@ class LspEndToEndTests(unittest.TestCase):
         for line, name in ((5, "VPSRLQ ("), (6, "MOVSB"), (7, "SHL (")):
             with self.subTest(name=name):
                 self.assertIn(name, hover(line))
+
+    def test_shl_immediate_count_picks_the_i8_form(self):
+        # Line 10 shifts by 2, so the fixed-1 form must not win the tie.
+        _, hover = self._att_hover_and_hints()
+        self.assertIn("SHL (R64, I8)", hover(10))
+        self.assertNotIn("SHL (R64, 1)", hover(10))
+        self.assertNotIn("SHL (R64, 0)", hover(10))
 
     def test_percent_sp_is_the_16_bit_register_form(self):
         # "%sp" is the 16-bit x86 stack pointer, not a 64-bit GPR: the operand

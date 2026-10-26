@@ -179,12 +179,16 @@ def _form_score(key: str, classes: set[str], width: int | None) -> int:
     score = 0
     for op in _operands_of_key(key):
         op = _ACCUMULATOR.get(op.casefold(), op.casefold())
-        if re.fullmatch(r"i\d+|[01]", op):
+        literal = re.fullmatch(r"[01]", op)
+        if literal or re.fullmatch(r"i\d+", op):
             op = "i"
         elif re.fullmatch(r"rel\d+", op):
             op = "rel"
         op = re.sub(r"(?<=\d)[lh]$", "", op)  # r8l and r8h are both r8
         if op in classes or (re.fullmatch(r"m\d+", op) and "m" in classes):
+            # a fixed 0/1 form matches only that value; no point, so the I8 form wins the tie
+            if literal:
+                continue
             score += 1 + (op[1:] == str(width))
         else:
             score -= 1
