@@ -123,204 +123,258 @@ _GPR_PATTERNS = (
     (8, r"[a-d][lh]|(si|di|bp|sp)l|r(8|9|1[0-5])b"),
 )
 _STRING_OP_RE = re.compile(r"(movs|cmps|scas|lods|stos|ins|outs)[bwdq]", re.IGNORECASE)
-# shortcut: the catalog has no RISC-V scalar rows; drop this list when it does.
-_RISCV_WORD_OPS = frozenset(
-    {
-        "addw",
-        "addiw",
-        "subw",
-        "sllw",
-        "slliw",
-        "srlw",
-        "srliw",
-        "sraw",
-        "sraiw",
-        "mulw",
-        "divw",
-        "divuw",
-        "remw",
-        "remuw",
-        "negw",
-    }
-)
-_RISCV_REGS = frozenset(
-    {f"x{i}" for i in range(32)}
-    | {f"t{i}" for i in range(7)}
+_X86_VECTOR_WIDTHS = {"xmm": "v128", "ymm": "v256", "zmm": "v512"}
+_X86_VECTOR_RE = re.compile(r"(?:[xyz]mm(?:[12]?[0-9]|3[01])|k[0-7]|mm[0-7])\Z")
+_A64_ARRANGEMENT_RE = re.compile(r"[bdhqsvz](?:[0-9]|[12][0-9]|3[01])\.[0-9]*[bhsdq]\Z")
+_A64_SCALAR_RE = re.compile(r"(?:x(?:[0-9]|[12][0-9]|30)|w(?:[0-9]|[12][0-9]|30)|xzr|wzr)\Z")
+_A64_VECTOR_BARE_RE = re.compile(r"[vdq](?:[0-9]|[12][0-9]|3[01])\Z")
+_ARM32_SCALAR_RE = re.compile(r"(?:r(?:[0-9]|1[0-5])|ip|pc)\Z")
+# ARM has "sp" and "fp"; RISC-V shares both spellings and adds these scalar aliases.
+_RISCV_SCALARS = frozenset(
+    {f"a{i}" for i in range(8)}
     | {f"s{i}" for i in range(12)}
-    | {f"a{i}" for i in range(8)}
-    | {"zero", "ra", "sp", "gp", "tp", "fp"}
+    | {f"t{i}" for i in range(7)}
+    | {"zero", "ra", "gp", "tp"}
 )
 
 
-def _lookup_mnemonic(conn, mnemonic: str, operands: str = "", intel: bool = False):
+def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
     """Return (forms, width). The exact mnemonic wins, else drop an AT&T size suffix (addq -> add).
 
-    A RISC-V word op returns no rows when the first operand is a RISC-V register.
+    The suffix strip runs on an x86 or undecided line only: "addw" on a RISC-V
+    or ARM32 line must not land on x86 "add". Rows of other architectures stay
+    in the result; _match_form filters them by the line's candidates.
     """
     forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
     width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
     # movsbl is a sign-extend, not the string op movsb.
     if forms or not width or _STRING_OP_RE.fullmatch(mnemonic[:-1]):
         return forms, None
-    # Only x86 has AT&T suffixes: "bl" on ARM must not become "b".
-    # The RISC-V guard fires only on a RISC-V first register operand, in AT&T.
-    # shortcut: a bare AT&T symbol named like a RISC-V register loses hover; upgrade when the LSP knows the target.
-    if (
-        not intel
-        and mnemonic.casefold() in _RISCV_WORD_OPS
-        and operands.split(",", 1)[0].strip().casefold() in _RISCV_REGS
-    ):
+    if arch and "x86" not in arch:
         return [], None
     stripped = load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
     return [form for form in stripped if form.architecture == "x86"], width
 
 
-def _operand_class(op: str, intel: bool = False) -> str | None:
-    """Name one source operand like a catalog form does: i, m, r8..r64, rel.
+def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | None], bool]:
+    """One pass over the line: (candidate architecture buckets, one class per operand, reverse).
 
-    In AT&T (.s) a bare symbol is a memory reference: "mov symbol, %eax" reads
-    memory, "jmp *sym" jumps indirect through memory, and ".L2" is a symbol too.
-    In Intel (.asm) a bare ID names a target that may still be a register alias
-    the catalog spells as rel, so it keeps the rel class.
+    A strong vote (a %- or Intel-style register, an x86 vector, an AArch64
+    arrangement, an AArch64/ARM32/RISC-V-only scalar) names one bucket. A
+    spelling two architectures share ("sp", "fp", bare v/d/q) votes for every
+    bucket it can mean and only counts when no strong vote fired. Empty
+    candidates mean undecided; callers then keep today's unfiltered behaviour.
+    "reverse" is True when the line's operand order flips into key order
+    (AT&T x86). A register of a non-candidate architecture reads as a symbol.
     """
-    name = op.lstrip("*%").casefold()
-    reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
-    if name in ("sp", "bp", "si", "di") and not op.startswith("%") and not intel:
-        # In AT&T a bare "sp" is a symbol, not the 16-bit register; the
-        # register needs the "%". In Intel syntax a bare "sp" is the r16.
-        reg = None
+    parts = re.split(r",(?![^(\[{]*[\)\]}])", operands)
+    strong, weak = set(), set()
+    for raw in parts:
+        op = raw.strip()
+        name = op.lstrip("*").lstrip("%").casefold()
+        prefixed = op.lstrip("*").startswith("%")
+        reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
+        if op.startswith("$"):
+            strong.add("x86")
+        elif _X86_VECTOR_RE.fullmatch(name):
+            strong.add("x86")
+        elif prefixed and reg:
+            strong.add("x86")
+        elif not name or "(" in op or "[" in op or "{" in op:
+            continue
+        elif _A64_ARRANGEMENT_RE.fullmatch(name) or _A64_SCALAR_RE.fullmatch(name) or name == "wsp":
+            strong.add("arm")
+        elif _ARM32_SCALAR_RE.fullmatch(name):
+            strong.add("arm")
+        elif name in _RISCV_SCALARS:
+            strong.add("riscv")
+        elif _A64_VECTOR_BARE_RE.fullmatch(name):
+            weak.update(("arm", "riscv"))
+        elif name in ("sp", "fp"):
+            weak.update(("arm", "riscv"))
+        elif name == "lr":
+            weak.add("arm")
+    arch = frozenset({"x86"}) if intel or "x86" in strong else frozenset(strong or weak)
+    classes = [_operand_class(op.strip(), intel, arch) for op in parts]
+    reverse = not intel and ("x86" in arch or not arch)
+    return arch, classes, reverse
+
+
+def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
+    """Classify one operand on a line whose candidates are arch, or None.
+
+    Classes: r8..r64, v128/v256/v512/k/mm, av (AArch64 vector with an
+    arrangement), x/w/xzr/wzr/sp/wsp (AArch64 scalars; fp and lr read as x),
+    ar (ARM32), rv (RISC-V), i, lit0/lit1, m, rel. A bare symbol is a memory
+    reference in AT&T and a rel target in Intel syntax.
+    """
+    if not op:
+        return None
+    name = op.lstrip("*").lstrip("%").casefold()
+    if re.fullmatch(r"\$?0+", op):
+        return "lit0"
+    if re.fullmatch(r"\$?0*1", op):
+        return "lit1"
     if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
         return "i"
+    if "{1to" in op:
+        return "mbc"
+    if "{" in op:
+        op = re.sub(r"\{[^}]*\}", "", op).strip()
+        name = op.lstrip("*").lstrip("%").casefold()
     if "(" in op or "[" in op:
         return "m"
-    if reg:
-        return f"r{reg}"
-    if op.startswith("*"):
-        # "*sym" and "*target" are the indirect (memory) jump form.
+    reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
+    # In AT&T a bare "sp" is the ARM stack pointer or a symbol, never the r16.
+    if reg and (intel or op.lstrip("*").startswith("%") or name != "sp"):
+        if intel or arch.isdisjoint({"arm", "riscv"}):
+            return f"r{reg}"
+    if _X86_VECTOR_RE.fullmatch(name):
+        if name[0] == "k":
+            return "k"
+        if name[0] == "m":
+            return "mm"
+        return _X86_VECTOR_WIDTHS[name[:3]]
+    if not intel and op.startswith("*"):
         return "m"
-    if name and re.fullmatch(r"r\d{1,2}|lr|pc", name):
-        # ARM scalar registers: r0-r15 (x86 only has r8-r15), lr, pc.
-        # Keep them out of x86 operand classes so the ARM form matches.
-        return None
-    if (
-        name
-        and not intel
-        and not op.startswith("%")
-        and re.fullmatch(r"x\d{1,2}|w\d{1,2}|xzr|wzr|sp", name)
-    ):
-        # AArch64 general registers: x0-x30, w0-w30, xzr, wzr, sp.
-        # Keep them out of x86 operand classes so the ARM form matches.
-        return None
-    if name and not op.startswith("%") and not re.match(r"[xyz]mm\d|k\d", name):
+    if "arm" in arch:
+        if _A64_ARRANGEMENT_RE.fullmatch(name) or _A64_VECTOR_BARE_RE.fullmatch(name):
+            return "av"
+        if _A64_SCALAR_RE.fullmatch(name):
+            return {"xzr": "xzr", "wzr": "wzr"}.get(name, name[0])
+        if name in ("sp", "wsp", "fp", "lr"):
+            return {"sp": "sp", "wsp": "wsp"}.get(name, "x")
+        if _ARM32_SCALAR_RE.fullmatch(name):
+            return "ar"
+    if "riscv" in arch and (name in _RISCV_SCALARS or _A64_VECTOR_BARE_RE.fullmatch(name)):
+        return "rv"
+    if "x86" in arch or not arch:
         return "rel" if intel else "m"
     return None
 
 
-def _operand_class_list(operands: str, intel: bool = False) -> list[str | None]:
-    """The classes of _operand_class in source order, one per operand."""
-    return [_operand_class(op.strip(), intel) for op in re.split(r",(?![^(\[{]*[\)\]}])", operands)]
+_IMMEDIATE_ACCEPT = frozenset({"i", "lit0", "lit1"})
+_LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
+_CLASS_KIND = dict(
+    [(c, "register") for c in ("r8", "r16", "r32", "r64")]
+    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred", "za")]
+    + [(c, "memory") for c in ("m", "moffs", "mbc")]
+    + [(c, "immediate") for c in ("i", "lit0", "lit1")]
+    + [(c, "scalar") for c in ("x", "w", "xzr", "wzr", "sp", "wsp", "ar", "rv")]
+    + [("rel", "rel")]
+)
 
 
-def _operand_classes(operands: str, intel: bool = False) -> set[str]:
-    """The class of each source operand, as a set."""
-    return {c for c in _operand_class_list(operands, intel) if c is not None}
+def _form_accept(op: str) -> frozenset:
+    """The line classes a catalog-key operand accepts, as one frozenset.
 
-
-def _form_score(key: str, classes: set[str], width: int | None) -> int:
-    # shortcut: the AT&T tiebreak reverses the line, which swaps the two
-    # sources of a 3-operand line; a tie among such forms may pick the swapped form.
-    score = 0
-    for op in _operands_of_key(key):
-        op = _ACCUMULATOR.get(op.casefold(), op.casefold())
-        literal = re.fullmatch(r"[01]", op)
-        if literal or re.fullmatch(r"i\d+", op):
-            op = "i"
-        elif re.fullmatch(r"rel\d+", op):
-            op = "rel"
-        op = re.sub(r"(?<=\d)[lh]$", "", op)  # r8l and r8h are both r8
-        if op in classes or (re.fullmatch(r"m\d+", op) and "m" in classes):
-            # a fixed 0/1 form matches only that value; no point, so the I8 form wins the tie
-            if literal:
-                continue
-            score += 1 + (op[1:] == str(width))
-        else:
-            score -= 1
-    return score
-
-
-def _form_classes(key: str) -> list[str]:
-    """The class of each operand of a form key, in key order."""
-    classes = []
-    for op in _operands_of_key(key):
-        op = _ACCUMULATOR.get(op.casefold(), op.casefold())
-        if re.fullmatch(r"[01]|i\d+", op):
-            op = "i"
-        elif re.fullmatch(r"rel\d+", op):
-            op = "rel"
-        elif re.fullmatch(r"m\d+", op):
-            op = "m"
-        classes.append(re.sub(r"(?<=\d)[lh]$", "", op))
-    return classes
-
-
-def _position_score(key: str, line: list[str | None]) -> int:
-    """Count the positions whose operand class matches the line's class."""
-    return sum(1 for a, b in zip(line, _form_classes(key)) if a == b)
+    An immediate-width key (i8..i64) takes every immediate class. A literal 0/1
+    takes only its own value: a fixed-1 shift is not the line's "2". An AArch64
+    placeholder maps to the register family it encodes (<XNSP> = x or sp).
+    """
+    o = op.casefold()
+    if o in ("0", "1"):
+        return frozenset({"lit" + o})
+    if re.fullmatch(r"i\d+", o):
+        return _IMMEDIATE_ACCEPT
+    if o in _ACCUMULATOR or o == "cl":
+        return frozenset({_ACCUMULATOR.get(o, "r8")})
+    m = re.fullmatch(r"r(8|16|32|64)[hl]?", o)
+    if m:
+        return frozenset({"r" + m.group(1)})
+    if o in _X86_VECTOR_WIDTHS or o in ("k", "mm"):
+        return frozenset({_X86_VECTOR_WIDTHS.get(o, o)})
+    if re.fullmatch(r"m\d+_\d+to\d+", o):
+        return frozenset({"mbc"})
+    if re.fullmatch(r"m\d+", o):
+        return frozenset({"m"})
+    if re.fullmatch(r"moffs\d+", o):
+        return frozenset({"moffs"})
+    if re.fullmatch(r"rel\d*", o):
+        return frozenset({"rel"})
+    if op.startswith("["):
+        return frozenset({"m"})
+    name = re.sub(r"(#\d+)+$", "", op.upper())
+    if "<HASH>" in name:
+        return _IMMEDIATE_ACCEPT
+    if re.match(r"V\d+<|^[ZV]\d+\.|^\{|^<ZA>", name):
+        return frozenset({"av"})
+    if re.match(r"^D<|^<FPFAR_DT>$|^<[BHSDQ]T>$|^Q0$", name):
+        return frozenset({"dfp"})
+    if re.match(r"^P\d", name):
+        return frozenset({"pred"})
+    if "WORX" in name or "R_OPTION" in name:
+        return frozenset({"w", "x"})
+    if "WZR" in name:
+        return frozenset({"w", "wzr"})
+    if "XZR" in name:
+        return frozenset({"x", "xzr"})
+    if "WSP" in name:
+        return frozenset({"w", "wsp"})
+    if "SP" in name:
+        return frozenset({"x", "sp"})
+    return frozenset()
 
 
 def _match_form(
     matches,
     operand_count: int | None = None,
-    operand_text: str = "",
+    line: tuple = (frozenset(), [], False),
     suffix_bits: int | None = None,
-    intel: bool = False,
 ):
-    """Pick the form the line names, ranked by operand agreement and width.
+    """Pick the form the line names, under one total order.
 
-    A smaller operand count only breaks rank ties. operand_text holds the operands of
-    the line. suffix_bits is the AT&T size suffix width.
+    line is _classify_line's (arch candidates, ordered classes, reverse). Rows
+    of a non-candidate architecture drop out before ranking; an undecided line
+    keeps every row. Rank: class-set score (accepted +1 / same kind 0 / else
+    -1, a literal scores only on its own value), position score, iN over a
+    literal 0/1, match with the AT&T suffix width, fewer operands, key name.
+    The no-same-count fallback uses the same key.
     """
+    arch, classes, reverse = line
+    if arch:
+        matches = [m for m in matches if m.architecture in arch]
     if operand_count is None:
         return matches[0] if matches else None
-    same_count = [m for m in matches if len(_operands_of_key(m.key)) == operand_count]
-    classes = _operand_classes(operand_text, intel=intel)
-    ordered = _operand_class_list(operand_text, intel=intel)
-    # AT&T writes the destination last; the key order starts with it.
-    att = list(reversed(ordered))
+    same = [m for m in matches if len(_operands_of_key(m.key)) == operand_count]
+    pool = same or matches
+    if not pool:
+        return None
+    ordered = list(reversed(classes)) if reverse else classes
+    line_set = {c for c in classes if c}
+    line_kinds = {_CLASS_KIND[c] for c in line_set if c in _CLASS_KIND}
 
-    def _rank(m):
-        line = att if not intel and m.architecture == "x86" else ordered
-        return (_form_score(m.key, classes, suffix_bits), _position_score(m.key, line))
+    def _rank(form):
+        accepts = [_form_accept(op) for op in _operands_of_key(form.key)]
+        set_score = position = in_over_lit = width = 0
+        for acc in accepts:
+            if acc == _IMMEDIATE_ACCEPT:
+                set_score += 1 if acc & line_set else -1
+            elif acc in _LITERAL_ACCEPT:
+                set_score += 0 if acc & line_set else -1
+            elif acc & line_set:
+                set_score += 1
+            elif {_CLASS_KIND[a] for a in acc} & line_kinds:
+                pass
+            else:
+                set_score -= 1
+            if any(
+                c in line_set and int(c[1:]) == suffix_bits
+                for c in acc
+                if re.fullmatch(r"[rv]\d+", c)
+            ):
+                width += 1
+        for cls, acc in zip(ordered, accepts):
+            if cls in acc:
+                position += 1
+            if cls in ("i", "lit0", "lit1"):
+                if acc == _IMMEDIATE_ACCEPT:
+                    in_over_lit += 1
+                elif acc in _LITERAL_ACCEPT:
+                    in_over_lit -= 1
+        return (-set_score, -position, -in_over_lit, -width, len(accepts), form.key)
 
-    if not same_count:
-        # ponytail: a line has no architecture, so rank every form the line
-        # names. Fewer operands break rank ties only: a zero-operand "movsd"
-        # must not get the MOVSD_XMM hint.
-        return (
-            max(matches, key=lambda m: (_rank(m), -len(_operands_of_key(m.key))))
-            if matches
-            else None
-        )
-    # Score candidates by how many operands agree with the register width the
-    # line names ("ymm0" vs "YMM, YMM, M128"). Rank the width-matched forms by
-    # the same rank key; the width score breaks exact rank ties.
-    tokens = re.findall(r"\b(zmm|ymm|xmm|m512|m256|m128|m64|m32)\d*\b", operand_text.casefold())
-    if tokens:
-        width = tokens[0].rstrip("0123456789")
-        if width.startswith(("x", "y", "z")):
-
-            def _width_score(item):
-                operands = [op.casefold().rstrip("0123456789") for op in _operands_of_key(item.key)]
-                return sum(1 for op in operands if op == width)
-
-            scored = sorted(same_count, key=lambda m: (-_width_score(m), m.key))
-            if _width_score(scored[0]) > _width_score(scored[-1]):
-                keep = [m for m in same_count if _width_score(m) > 0]
-                return max(keep, key=lambda m: (_rank(m), _width_score(m)))
-    # ASM_COMMENT_RE cuts an ARM "#16" operand and leaves a trailing comma.
-    if operand_text.rstrip().endswith(","):
-        same_count = [m for m in same_count if m.architecture != "x86"] or same_count
-    return max(same_count, key=_rank)
+    return min(pool, key=_rank)
 
 
 def _hover_markdown(
@@ -381,10 +435,11 @@ def _hover_markdown(
     ):
         instruction = None
     if instruction is None:
-        matches, width = _lookup_mnemonic(conn, word, operands=operand_text, intel=intel)
         # Match the form on the source line like _hint_label does, so
         # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-        instruction = _match_form(matches, operand_count, operand_text, width, intel)
+        line = _classify_line(operand_text, intel)
+        matches, width = _lookup_mnemonic(conn, word, line[0])
+        instruction = _match_form(matches, operand_count, line, width)
     if instruction is not None:
         body = instruction_markdown(instruction, conn=conn)
         links = [f"Full page: {web_deep_link('instruction', instruction.key)}"]
@@ -527,16 +582,14 @@ def _cut_label(text: str) -> str:
 
 
 @functools.lru_cache(maxsize=1024)
-def _mnemonic_matches(
-    db_path: str, mnemonic: str, operands: str = "", intel: bool = False
-) -> tuple:
+def _mnemonic_matches(db_path: str, mnemonic: str, arch: frozenset = frozenset()) -> tuple:
     # The inlay-hint loop asks the same mnemonics for every line, so query once
-    # per (catalog, mnemonic, operands, intel) and reuse. The key carries the
+    # per (catalog, mnemonic, arch candidates) and reuse. The key carries the
     # path, not the connection, so a reloaded catalog at the same path would
     # keep stale rows; clear the cache if catalog reload lands.
     conn = open_db(path=Path(db_path))
     try:
-        forms, width = _lookup_mnemonic(conn, mnemonic, operands, intel=intel)
+        forms, width = _lookup_mnemonic(conn, mnemonic, arch)
         return tuple(forms), width
     finally:
         conn.close()
@@ -549,11 +602,12 @@ def _hint_label(
     operands: str = "",
     intel: bool = False,
 ) -> str | None:
-    matches, width = _mnemonic_matches(db_path, mnemonic, operands, intel=intel)
+    line = _classify_line(operands, intel)
+    matches, width = _mnemonic_matches(db_path, mnemonic, line[0])
     if not matches:
         return None
-    chosen = _match_form(matches, operand_count, operands, width, intel)
-    return _cut_label(chosen.summary or "")
+    chosen = _match_form(matches, operand_count, line, width)
+    return _cut_label(chosen.summary or "") if chosen else None
 
 
 def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: int) -> list[dict]:
