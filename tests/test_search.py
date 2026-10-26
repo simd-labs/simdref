@@ -14,7 +14,12 @@ from simdref.display import (
     strip_instruction_decorators,
 )
 from simdref.queries import instruction_rows_for_intrinsic
-from simdref.ingest import _instruction_summary, _normalize_operand_xtype, build_catalog
+from simdref.ingest import (
+    _instruction_summary,
+    _normalize_operand_xtype,
+    build_catalog,
+    parse_uops_xml,
+)
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.ingest_catalog import parse_arm_intrinsics_payload
 from simdref.models import InstructionRecord, IntrinsicRecord
@@ -155,6 +160,8 @@ class SearchTests(unittest.TestCase):
         self.assertEqual(_normalize_operand_xtype("4i8"), "i8")
         self.assertEqual(_normalize_operand_xtype("2u16"), "u16")
         self.assertEqual(_normalize_operand_xtype("int"), "i32")
+        self.assertEqual(_normalize_operand_xtype("int", "16"), "i16")
+        self.assertEqual(_normalize_operand_xtype("int", "64"), "i64")
         self.assertEqual(_normalize_operand_xtype("f32"), "f32")
 
     def test_generated_summary_for_terse_instruction(self):
@@ -167,6 +174,15 @@ class SearchTests(unittest.TestCase):
             ],
         )
         self.assertEqual(summary, "Add 32-bit integer operands.")
+
+    def test_generated_summary_keeps_operand_width(self):
+        records = parse_uops_xml(
+            '<root><instruction asm="MOV" string="MOV (R64, M64)" summary="Move">'
+            '<operand idx="0" type="reg" width="64" xtype="int" name="R64" w="1"/>'
+            '<operand idx="1" type="mem" width="64" xtype="int" name="M64" r="1"/>'
+            "</instruction></root>"
+        )
+        self.assertEqual(records[0].summary, "Move 64-bit integer operands.")
 
     def test_build_catalog_emits_status_messages(self):
         messages: list[str] = []

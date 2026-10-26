@@ -85,12 +85,13 @@ def _canonical_instruction_key(name: str, form: str) -> str:
 
 
 @lru_cache(maxsize=128)
-def _normalize_operand_xtype(value: str) -> str:
+def _normalize_operand_xtype(value: str, width: str = "") -> str:
     xtype = value.strip()
     if not xtype:
         return xtype
     if xtype == "int":
-        return "i32"
+        # uops.info marks every scalar integer operand xtype=int; the width holds the size
+        return f"i{width}" if width in {"8", "16", "32", "64"} else "i32"
     match = re.fullmatch(r"\d+([iu]\d+)", xtype)
     if match:
         return match.group(1)
@@ -1020,7 +1021,9 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
         arch_details: dict[str, dict[str, Any]] = {}
         for child in node:
             if child.tag == "operand":
-                xtype = _normalize_operand_xtype(child.attrib.get("xtype", "").strip())
+                xtype = _normalize_operand_xtype(
+                    child.attrib.get("xtype", "").strip(), child.attrib.get("width", "").strip()
+                )
                 operand_payload = {
                     key: (
                         _intern_small(value.strip())
