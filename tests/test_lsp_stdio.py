@@ -472,10 +472,26 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("JMP (M64)", hover(4))
 
     def test_mov_of_a_bare_symbol_picks_a_memory_form(self):
-        # "mov symbol, %eax" reads memory: the picked form has an M slot, not rel.
+        # "mov symbol, %eax" reads memory: the destination %eax leads the form
+        # key and the bare symbol is a memory slot, not rel.
         self.server.open(ASM_URI, "asm", "mov symbol, %eax\n")
         hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
-        self.assertIn("MOV (M32, R32)", hover)
+        self.assertIn("MOV (R32, M32)", hover)
+
+    def test_att_operand_order_picks_store_form(self):
+        # AT&T writes the destination last: "sub %rax, (%rbx)" stores, so the
+        # memory operand leads the form key.
+        self.server.open(ASM_URI, "asm", "sub %rax, (%rbx)\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("SUB (M64, R64)", hover)
+        self.assertNotIn("SUB (R64, M64)", hover)
+
+    def test_att_operand_order_picks_load_form(self):
+        # "sub (%rbx), %rax" loads: the register operand leads the form key.
+        self.server.open(ASM_URI, "asm", "sub (%rbx), %rax\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("SUB (R64, M64)", hover)
+        self.assertNotIn("SUB (M64, R64)", hover)
 
     def test_jmp_star_register_picks_the_indirect_form(self):
         # "jmp *%rax" is the indirect jump, not the direct rel8 form.

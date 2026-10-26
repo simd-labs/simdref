@@ -175,43 +175,51 @@ def _lookup_mnemonic(conn, mnemonic: str, operands: str = "", intel: bool = Fals
     return [form for form in stripped if form.architecture == "x86"], width
 
 
-def _operand_classes(operands: str, intel: bool = False) -> set[str]:
-    """Name each source operand like a catalog form does: i, m, r8..r64, rel.
+def _operand_class(op: str, intel: bool = False) -> str | None:
+    """Name one source operand like a catalog form does: i, m, r8..r64, rel.
 
     In AT&T (.s) a bare symbol is a memory reference: "mov symbol, %eax" reads
     memory, "jmp *sym" jumps indirect through memory, and ".L2" is a symbol too.
     In Intel (.asm) a bare ID names a target that may still be a register alias
     the catalog spells as rel, so it keeps the rel class.
     """
-    classes = set()
-    for op in re.split(r",(?![^(\[{]*[)\]}])", operands):
-        op = op.strip()
-        name = op.lstrip("*%").casefold()
-        reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
-        if name in ("sp", "bp", "si", "di") and not op.startswith("%") and not intel:
-            # In AT&T a bare "sp" is a symbol, not the 16-bit register; the
-            # register needs the "%". In Intel syntax a bare "sp" is the r16.
-            reg = None
-        if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
-            classes.add("i")
-        elif "(" in op or "[" in op:
-            classes.add("m")
-        elif reg:
-            classes.add(f"r{reg}")
-        elif op.startswith("*"):
-            # "*sym" and "*target" are the indirect (memory) jump form.
-            classes.add("m")
-        elif name and re.fullmatch(r"r\d{1,2}|lr|pc", name):
-            # ARM scalar registers: r0-r15 (x86 only has r8-r15), lr, pc.
-            # Keep them out of x86 operand classes so the ARM form matches.
-            pass
-        elif name and not op.startswith("%") and not re.match(r"[xyz]mm\d|k\d", name):
-            classes.add("rel" if intel else "m")
-    return classes
+    name = op.lstrip("*%").casefold()
+    reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
+    if name in ("sp", "bp", "si", "di") and not op.startswith("%") and not intel:
+        # In AT&T a bare "sp" is a symbol, not the 16-bit register; the
+        # register needs the "%". In Intel syntax a bare "sp" is the r16.
+        reg = None
+    if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
+        return "i"
+    if "(" in op or "[" in op:
+        return "m"
+    if reg:
+        return f"r{reg}"
+    if op.startswith("*"):
+        # "*sym" and "*target" are the indirect (memory) jump form.
+        return "m"
+    if name and re.fullmatch(r"r\d{1,2}|lr|pc", name):
+        # ARM scalar registers: r0-r15 (x86 only has r8-r15), lr, pc.
+        # Keep them out of x86 operand classes so the ARM form matches.
+        return None
+    if name and not op.startswith("%") and not re.match(r"[xyz]mm\d|k\d", name):
+        return "rel" if intel else "m"
+    return None
+
+
+def _operand_class_list(operands: str, intel: bool = False) -> list[str | None]:
+    """The classes of _operand_class in source order, one per operand."""
+    return [_operand_class(op.strip(), intel) for op in re.split(r",(?![^(\[{]*[\)\]}])", operands)]
+
+
+def _operand_classes(operands: str, intel: bool = False) -> set[str]:
+    """The class of each source operand, as a set."""
+    return {c for c in _operand_class_list(operands, intel) if c is not None}
 
 
 def _form_score(key: str, classes: set[str], width: int | None) -> int:
-    # shortcut: operand order is ignored (AT&T reverses it), upgrade if a catalog form needs it.
+    # shortcut: the AT&T tiebreak reverses the line, which swaps the two
+    # sources of a 3-operand line; a tie among such forms may pick the swapped form.
     score = 0
     for op in _operands_of_key(key):
         op = _ACCUMULATOR.get(op.casefold(), op.casefold())
@@ -229,6 +237,26 @@ def _form_score(key: str, classes: set[str], width: int | None) -> int:
         else:
             score -= 1
     return score
+
+
+def _form_classes(key: str) -> list[str]:
+    """The class of each operand of a form key, in key order."""
+    classes = []
+    for op in _operands_of_key(key):
+        op = _ACCUMULATOR.get(op.casefold(), op.casefold())
+        if re.fullmatch(r"[01]|i\d+", op):
+            op = "i"
+        elif re.fullmatch(r"rel\d+", op):
+            op = "rel"
+        elif re.fullmatch(r"m\d+", op):
+            op = "m"
+        classes.append(re.sub(r"(?<=\d)[lh]$", "", op))
+    return classes
+
+
+def _position_score(key: str, line: list[str | None]) -> int:
+    """Count the positions whose operand class matches the line's class."""
+    return sum(1 for a, b in zip(line, _form_classes(key)) if a == b)
 
 
 def _match_form(
@@ -268,7 +296,15 @@ def _match_form(
     if operand_text.rstrip().endswith(","):
         same_count = [m for m in same_count if m.architecture != "x86"] or same_count
     classes = _operand_classes(operand_text, intel=intel)
-    return max(same_count, key=lambda m: _form_score(m.key, classes, suffix_bits))
+    ordered = _operand_class_list(operand_text, intel=intel)
+    # AT&T writes the destination last; the key order starts with it.
+    att = list(reversed(ordered))
+
+    def _rank(m):
+        line = att if not intel and m.architecture == "x86" else ordered
+        return (_form_score(m.key, classes, suffix_bits), _position_score(m.key, line))
+
+    return max(same_count, key=_rank)
 
 
 def _hover_markdown(
