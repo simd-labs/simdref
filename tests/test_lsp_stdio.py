@@ -460,6 +460,29 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertNotIn("SHL (R64, 1)", hover(10))
         self.assertNotIn("SHL (R64, 0)", hover(10))
 
+    def test_lea_picks_the_64_bit_form(self):
+        # Every lea form has one operand, so the fallback picks. It must name
+        # the width of %rdi, not the first form LEA_B (R16).
+        self.server.open(ASM_URI, "asm", "lea 0x8(%rsp), %rdi\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        key = hover.splitlines()[1]
+        self.assertIn("R64", key)
+        self.assertNotIn("R16", key)
+
+    def test_vpermilps_immediate_picks_the_i8_form(self):
+        # The line names an immediate, so the I8 form must beat the
+        # register form the width pre-pass took by name order.
+        self.server.open(ASM_URI, "asm", "vpermilps $1, %ymm1, %ymm2\n")
+        key = self.server.hover(ASM_URI, 0, 1)["contents"]["value"].splitlines()[1]
+        self.assertIn("I8)", key)
+
+    def test_pinsrw_register_picks_the_r32_form(self):
+        # %eax is R32; the M16 form must not win on key order.
+        self.server.open(ASM_URI, "asm", "pinsrw $1, %eax, %xmm0\n")
+        key = self.server.hover(ASM_URI, 0, 1)["contents"]["value"].splitlines()[1]
+        self.assertIn("R32", key)
+        self.assertNotIn("M16", key)
+
     def test_percent_sp_is_the_16_bit_register_form(self):
         # "%sp" is the 16-bit x86 stack pointer, not a 64-bit GPR: the operand
         # classes carry r16 and the chosen form is the 16-bit one.

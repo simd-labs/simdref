@@ -272,29 +272,7 @@ def _match_form(
     """
     if operand_count is None:
         return matches[0] if matches else None
-    # ponytail: a line has no architecture, so take the first form with the same operand count.
-    # The fallback takes the first form with fewest operands, never a form with more
-    # operands than the line: a zero-operand "movsd" must not get the MOVSD_XMM hint.
     same_count = [m for m in matches if len(_operands_of_key(m.key)) == operand_count]
-    if not same_count:
-        return min(matches, key=lambda m: len(_operands_of_key(m.key)), default=None)
-    # Score candidates by how many operands agree with the register width the
-    # line names ("ymm0" vs "YMM, YMM, M128"). Skip the tiebreak on a tie.
-    tokens = re.findall(r"\b(zmm|ymm|xmm|m512|m256|m128|m64|m32)\d*\b", operand_text.casefold())
-    if tokens:
-        width = tokens[0].rstrip("0123456789")
-        if width.startswith(("x", "y", "z")):
-
-            def _score(item):
-                operands = [op.casefold().rstrip("0123456789") for op in _operands_of_key(item.key)]
-                return sum(1 for op in operands if op == width)
-
-            scored = sorted(same_count, key=lambda m: (-_score(m), m.key))
-            if _score(scored[0]) > _score(scored[-1]):
-                return scored[0]
-    # ASM_COMMENT_RE cuts an ARM "#16" operand and leaves a trailing comma.
-    if operand_text.rstrip().endswith(","):
-        same_count = [m for m in same_count if m.architecture != "x86"] or same_count
     classes = _operand_classes(operand_text, intel=intel)
     ordered = _operand_class_list(operand_text, intel=intel)
     # AT&T writes the destination last; the key order starts with it.
@@ -304,6 +282,34 @@ def _match_form(
         line = att if not intel and m.architecture == "x86" else ordered
         return (_form_score(m.key, classes, suffix_bits), _position_score(m.key, line))
 
+    if not same_count:
+        # ponytail: a line has no architecture, so rank every form the line
+        # names. Fewer operands break rank ties only: a zero-operand "movsd"
+        # must not get the MOVSD_XMM hint.
+        return (
+            max(matches, key=lambda m: (_rank(m), -len(_operands_of_key(m.key))))
+            if matches
+            else None
+        )
+    # Score candidates by how many operands agree with the register width the
+    # line names ("ymm0" vs "YMM, YMM, M128"). Rank the width-matched forms by
+    # the same rank key; the width score breaks exact rank ties.
+    tokens = re.findall(r"\b(zmm|ymm|xmm|m512|m256|m128|m64|m32)\d*\b", operand_text.casefold())
+    if tokens:
+        width = tokens[0].rstrip("0123456789")
+        if width.startswith(("x", "y", "z")):
+
+            def _width_score(item):
+                operands = [op.casefold().rstrip("0123456789") for op in _operands_of_key(item.key)]
+                return sum(1 for op in operands if op == width)
+
+            scored = sorted(same_count, key=lambda m: (-_width_score(m), m.key))
+            if _width_score(scored[0]) > _width_score(scored[-1]):
+                keep = [m for m in same_count if _width_score(m) > 0]
+                return max(keep, key=lambda m: (_rank(m), _width_score(m)))
+    # ASM_COMMENT_RE cuts an ARM "#16" operand and leaves a trailing comma.
+    if operand_text.rstrip().endswith(","):
+        same_count = [m for m in same_count if m.architecture != "x86"] or same_count
     return max(same_count, key=_rank)
 
 
