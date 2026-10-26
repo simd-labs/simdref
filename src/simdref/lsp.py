@@ -275,9 +275,10 @@ def _match_form(
     suffix_bits: int | None = None,
     intel: bool = False,
 ):
-    """Pick the same form the line names: exact operand count, then width, then smallest.
+    """Pick the form the line names, ranked by operand agreement and width.
 
-    operand_text holds the operands of the line. suffix_bits is the AT&T size suffix width.
+    A smaller operand count only breaks rank ties. operand_text holds the operands of
+    the line. suffix_bits is the AT&T size suffix width.
     """
     if operand_count is None:
         return matches[0] if matches else None
