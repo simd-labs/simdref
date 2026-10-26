@@ -269,6 +269,27 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("https://www.uops.info/html-instr/VADDPS_YMM_YMM_YMM.html", value)
         self.assertIn("https://www.felixcloutier.com/x86/addps", value)
 
+    def test_movsd_hover_matches_the_sse_form(self):
+        # A bare "movsd" row is the string move, so the exact hit would show
+        # the string form. A two-operand line must get the SSE form instead.
+        # AT&T source order is memory->xmm, and the key lists destination first.
+        self.server.open(ASM_URI, "asm", "movsd 0x10(%rsp), %xmm0\n")
+        result = self.server.hover(ASM_URI, 0, 2)
+        self.assertIsNotNone(result, "hover on movsd with operands returned null")
+        value = result["contents"]["value"]
+        self.assertIn("MOVSD_XMM (XMM, M64)", value)
+        self.assertNotIn("MOVSD_XMM (M64, XMM)", value)
+        self.assertNotIn("Move Data From String to String", value)
+
+    def test_bare_string_movsd_keeps_the_string_form(self):
+        # Zero operands: the exact "movsd" row IS the string move, so hover
+        # keeps it instead of falling through to a matched form.
+        self.server.open(ASM_URI, "asm", "movsd\n")
+        result = self.server.hover(ASM_URI, 0, 2)
+        self.assertIsNotNone(result, "hover on bare movsd returned null")
+        self.assertIn("Move Data From String to String", result["contents"]["value"])
+        self.assertNotIn("MOVSD_XMM (M64, XMM)", result["contents"]["value"])
+
     def test_hover_makes_no_network_call(self):
         # The server is a subprocess, so block sockets there via sitecustomize.
         import tempfile

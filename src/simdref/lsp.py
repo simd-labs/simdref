@@ -355,6 +355,15 @@ def _hover_markdown(
     if not allow_instruction:
         return None
     instruction = load_instruction_from_db(conn, word)
+    # An exact name can name a row with a different operand count (a bare
+    # "movsd" is the string move), so like the hint path, pick the form by
+    # the line's operand count instead of trusting that one row.
+    if (
+        instruction is not None
+        and operand_count is not None
+        and len(_operands_of_key(instruction.key)) != operand_count
+    ):
+        instruction = None
     if instruction is None:
         matches, width = _lookup_mnemonic(conn, word, operands=operand_text, intel=intel)
         # Match the form on the source line like _hint_label does, so
