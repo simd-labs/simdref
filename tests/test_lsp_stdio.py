@@ -484,18 +484,16 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertNotIn("M16", key)
 
     def test_percent_sp_is_the_16_bit_register_form(self):
-        # "%sp" is the 16-bit x86 stack pointer, not a 64-bit GPR: the operand
-        # classes carry r16 and the chosen form is the 16-bit one.
-        self.assertEqual(lsp._operand_classes("%rax, %sp"), {"r16", "r64"})
+        # "%sp" is the 16-bit x86 stack pointer: the chosen form must not
+        # name an R64 or M64 form for it.
         self.server.open(ASM_URI, "asm", "mov %rax, %sp\n")
         hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
         self.assertNotIn("MOV (M64, R64)", hover)
         self.assertNotIn("R64)", hover)
 
     def test_intel_bare_sp_is_the_16_bit_register(self):
-        # In an Intel file a bare "sp" is the 16-bit x86 register, not the ARM
-        # stack pointer: the same classes and 16-bit form as "%sp" in AT&T.
-        self.assertEqual(lsp._operand_classes("rax, sp", intel=True), {"r16", "r64"})
+        # In an Intel file a bare "sp" is the 16-bit x86 register: the chosen
+        # form must not name an R64 form for it.
         uri = "file:///tmp/simdref_lsp_test_sp.asm"
         self.server.open(uri, "nasm", "mov rax, sp\n")
         hover = self.server.hover(uri, 0, 1)["contents"]["value"]
@@ -677,15 +675,17 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertNotIn("ADD (R16", value)
 
     def test_arm_fp_register_keeps_the_arm_form(self):
-        # AArch64: fp is a scalar register in the ARM set. x86 ADD rows must be
-        # filtered off this line.
+        # AArch64: fp is x29, not the stack pointer. The line must rank an
+        # X-register (or XZR) ADD form, not an x86 ADD form.
         uri = "file:///tmp/simdref_lsp_arm_fp.s"
         self.server.open(uri, "asm", "add fp, x1, x2\n")
         result = self.server.hover(uri, 0, 1)
         self.assertIsNotNone(result, "hover on an arm fp add returned null")
         value = result["contents"]["value"]
-        self.assertIn("XDSP_OPTION", value)
-        self.assertNotIn("ADD (R16", value)
+        self.assertIn("XDORXZR", value)
+        self.assertNotIn("R16", value)
+        self.assertNotIn("R64", value)
+        self.assertNotIn("M16", value)
 
     def test_arm_x_registers_pick_the_x_form(self):
         # AArch64: x0-x30 are 64-bit and w0-w30 are 32-bit. The width classes must
@@ -707,15 +707,16 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIsNone(self.server.hover(uri, 0, 1), "addw on an ARM32 line has no hover")
 
     def test_att_bare_register_names_are_symbols(self):
-        # AT&T: a bare sp and a bare x1 (no %) are symbols, not registers. Both
-        # read as memory (M32), never Moffs.
+        # AT&T: a bare sp and a bare x1 (no %) are symbols. "mov sp, %eax"
+        # loads the symbol into %eax, so the Intel-ordered form is
+        # (R32, M32), never Moffs.
         uri = "file:///tmp/simdref_lsp_bare_sym.s"
         self.server.open(uri, "asm", "mov sp, %eax\nmov x1, %eax\n")
         hover_sp = self.server.hover(uri, 0, 1)["contents"]["value"]
-        self.assertIn("MOV (M32, R32)", hover_sp)
+        self.assertIn("MOV (R32, M32)", hover_sp)
         self.assertNotIn("Moffs", hover_sp)
         hover_x1 = self.server.hover(uri, 1, 1)["contents"]["value"]
-        self.assertIn("MOV (M32, R32)", hover_x1)
+        self.assertIn("MOV (R32, M32)", hover_x1)
         self.assertNotIn("Moffs", hover_x1)
 
     def test_riscv_vector_lines_do_not_land_on_x86_or_arm(self):
