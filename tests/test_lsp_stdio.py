@@ -630,6 +630,108 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertEqual(self.server.hints(ASM_URI), [])
         self.assertIsNone(self.server.hover(ASM_URI, 0, 1))
 
+    def test_vinsertf128_register_line_picks_the_register_form(self):
+        # Intel: xmm2 is a v128 register, not M128. The vector classes must rank
+        # the register form above the memory form.
+        uri = "file:///tmp/simdref_lsp_vinsertf128.asm"
+        self.server.open(uri, "nasm", "vinsertf128 ymm0, ymm1, xmm2, 0\n")
+        hover = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertIn("VINSERTF128 (YMM, YMM, XMM, I8)", hover)
+        self.assertNotIn("VINSERTF128 (YMM, YMM, M128, I8)", hover)
+
+    def test_vpmovzxbw_picks_the_ymm_destination(self):
+        # AT&T: %ymm0 is a v256 destination, so the (YMM, XMM) form outranks the
+        # (XMM, XMM) form by width agreement.
+        self.server.open(ASM_URI, "asm", "vpmovzxbw %xmm1, %ymm0\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("VPMOVZXBW (YMM, XMM)", hover)
+        self.assertNotIn("VPMOVZXBW (XMM, XMM)", hover)
+
+    def test_vpsllq_register_count_picks_the_xmm_count_form(self):
+        # AT&T: three register operands (xmm, ymm, ymm). The vector classes must
+        # pick the (YMM, YMM, XMM) form, not an all-XMM variant.
+        self.server.open(ASM_URI, "asm", "vpsllq %xmm1, %ymm2, %ymm3\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("VPSLLQ (YMM, YMM, XMM)", hover)
+        self.assertNotIn("VPSLLQ (XMM, XMM, XMM)", hover)
+
+    def test_cmpsd_xmm_pair_is_not_the_string_form(self):
+        # AT&T: two xmm operands. The bare string-op CMPSD key must not shadow the
+        # SSE forms on an operand-matched line.
+        self.server.open(ASM_URI, "asm", "cmpsd %xmm1, %xmm0\n")
+        result = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(result, "hover on a cmpsd xmm pair returned null")
+        value = result["contents"]["value"]
+        self.assertIn("CMPSD_XMM", value)
+        self.assertNotIn("String", value)
+
+    def test_arm_vector_add_keeps_the_arm_form(self):
+        # AArch64: the .4s arrangement is an ARM vector signal. The line must rank
+        # the AArch64 vector form, not an x86 ADD form.
+        uri = "file:///tmp/simdref_lsp_arm_vec.s"
+        self.server.open(uri, "asm", "add v0.4s, v1.4s, v2.4s\n")
+        result = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(result, "hover on an arm vector add returned null")
+        value = result["contents"]["value"]
+        self.assertIn("V0.<T_OPTION>", value)
+        self.assertNotIn("ADD (R16", value)
+
+    def test_arm_fp_register_keeps_the_arm_form(self):
+        # AArch64: fp is a scalar register in the ARM set. x86 ADD rows must be
+        # filtered off this line.
+        uri = "file:///tmp/simdref_lsp_arm_fp.s"
+        self.server.open(uri, "asm", "add fp, x1, x2\n")
+        result = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(result, "hover on an arm fp add returned null")
+        value = result["contents"]["value"]
+        self.assertIn("XDSP_OPTION", value)
+        self.assertNotIn("ADD (R16", value)
+
+    def test_arm_x_registers_pick_the_x_form(self):
+        # AArch64: x0-x30 are 64-bit and w0-w30 are 32-bit. The width classes must
+        # separate the X and W forms.
+        uri = "file:///tmp/simdref_lsp_arm_xw.s"
+        self.server.open(uri, "asm", "add x0, x1, x2\nadd w0, w1, w2\n")
+        hover_x = self.server.hover(uri, 0, 1)["contents"]["value"]
+        hover_w = self.server.hover(uri, 1, 1)["contents"]["value"]
+        self.assertIn("XD", hover_x)
+        self.assertNotIn("WD", hover_x)
+        self.assertIn("WD", hover_w)
+        self.assertNotIn("XD", hover_w)
+
+    def test_arm32_addw_does_not_show_x86(self):
+        # ARM32: addw is not in the catalog. The x86-gated suffix strip must not
+        # resolve it to an x86 ADD form on a non-x86 line.
+        uri = "file:///tmp/simdref_lsp_addw.s"
+        self.server.open(uri, "asm", "addw r0, r1, r2\n")
+        self.assertIsNone(self.server.hover(uri, 0, 1), "addw on an ARM32 line has no hover")
+
+    def test_att_bare_register_names_are_symbols(self):
+        # AT&T: a bare sp and a bare x1 (no %) are symbols, not registers. Both
+        # read as memory (M32), never Moffs.
+        uri = "file:///tmp/simdref_lsp_bare_sym.s"
+        self.server.open(uri, "asm", "mov sp, %eax\nmov x1, %eax\n")
+        hover_sp = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertIn("MOV (M32, R32)", hover_sp)
+        self.assertNotIn("Moffs", hover_sp)
+        hover_x1 = self.server.hover(uri, 1, 1)["contents"]["value"]
+        self.assertIn("MOV (M32, R32)", hover_x1)
+        self.assertNotIn("Moffs", hover_x1)
+
+    def test_riscv_vector_lines_do_not_land_on_x86_or_arm(self):
+        # RISC-V vector: these lines must stay on RISC-V forms, not fall onto x86
+        # or AArch64 ADD/MOV forms.
+        uri = "file:///tmp/simdref_lsp_riscv.s"
+        self.server.open(uri, "asm", "vadd.vv v1, v2, v3\nvle32.v v1, (a0)\n")
+        hover_vadd = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertIn("vadd.vv", hover_vadd)
+        self.assertNotIn("ADD (R16", hover_vadd)
+        self.assertNotIn("ADD (R32", hover_vadd)
+        hover_vle = self.server.hover(uri, 1, 1)["contents"]["value"]
+        self.assertIn("vle32.v", hover_vle)
+        self.assertNotIn("ADD (R16", hover_vle)
+        self.assertNotIn("ADD (R32", hover_vle)
+
 
 class MissingCatalogTests(unittest.TestCase):
     def test_missing_catalog_sends_show_message_once(self):
