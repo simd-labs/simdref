@@ -202,6 +202,15 @@ def _operand_class(op: str, intel: bool = False) -> str | None:
         # ARM scalar registers: r0-r15 (x86 only has r8-r15), lr, pc.
         # Keep them out of x86 operand classes so the ARM form matches.
         return None
+    if (
+        name
+        and not intel
+        and not op.startswith("%")
+        and re.fullmatch(r"x\d{1,2}|w\d{1,2}|xzr|wzr|sp", name)
+    ):
+        # AArch64 general registers: x0-x30, w0-w30, xzr, wzr, sp.
+        # Keep them out of x86 operand classes so the ARM form matches.
+        return None
     if name and not op.startswith("%") and not re.match(r"[xyz]mm\d|k\d", name):
         return "rel" if intel else "m"
     return None

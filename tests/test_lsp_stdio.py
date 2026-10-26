@@ -561,6 +561,19 @@ class LspEndToEndTests(unittest.TestCase):
             ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
         )
 
+    def test_arm_three_register_add_keeps_the_arm_form(self):
+        # x0/x1/x2 are AArch64 general registers, not x86, so the hover and
+        # hint must not name an x86 form like ADD (R16, M16, I16).
+        self.server.open(ASM_URI, "asm", "add x0, x1, x2\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(hover, "add x0, x1, x2 got no hover")
+        value = hover["contents"]["value"]
+        for x86_token in ("R16", "R64", "M16", "I16"):
+            self.assertNotIn(x86_token, value, f"hover named an x86 form: {x86_token}")
+        self.assertIn("Add operands.", value)
+        hints = self.server.hints(ASM_URI)
+        self.assertEqual([h["label"] for h in hints], ["Add operands."])
+
     def test_riscv_word_ops_do_not_resolve_to_x86(self):
         # "addw" has no catalog row, and its strip would land on the x86 "add".
         cases = [
