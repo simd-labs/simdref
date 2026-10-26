@@ -123,18 +123,54 @@ _GPR_PATTERNS = (
     (8, r"[a-d][lh]|(si|di|bp|sp)l|r(8|9|1[0-5])b"),
 )
 _STRING_OP_RE = re.compile(r"(movs|cmps|scas|lods|stos|ins|outs)[bwdq]", re.IGNORECASE)
+# shortcut: the catalog has no RISC-V scalar rows; drop this list when it does.
+_RISCV_WORD_OPS = frozenset(
+    {
+        "addw",
+        "addiw",
+        "subw",
+        "sllw",
+        "slliw",
+        "srlw",
+        "srliw",
+        "sraw",
+        "sraiw",
+        "mulw",
+        "divw",
+        "divuw",
+        "remw",
+        "remuw",
+        "negw",
+    }
+)
+_RISCV_REGS = frozenset(
+    {f"x{i}" for i in range(32)}
+    | {f"t{i}" for i in range(7)}
+    | {f"s{i}" for i in range(12)}
+    | {f"a{i}" for i in range(8)}
+    | {"zero", "ra", "sp", "gp", "tp", "fp"}
+)
 
 
-def _lookup_mnemonic(conn, mnemonic: str):
-    """Return (forms, width). The exact mnemonic wins, else drop an AT&T size suffix (addq -> add)."""
+def _lookup_mnemonic(conn, mnemonic: str, operands: str = "", intel: bool = False):
+    """Return (forms, width). The exact mnemonic wins, else drop an AT&T size suffix (addq -> add).
+
+    A RISC-V word op returns no rows when the first operand is a RISC-V register.
+    """
     forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
     width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
     # movsbl is a sign-extend, not the string op movsb.
     if forms or not width or _STRING_OP_RE.fullmatch(mnemonic[:-1]):
         return forms, None
     # Only x86 has AT&T suffixes: "bl" on ARM must not become "b".
-    # shortcut: RISC-V addw/subw also get the x86 rows because the catalog has no
-    # RISC-V scalar rows, filter them out when the catalog adds those rows.
+    # The RISC-V guard fires only on a RISC-V first register operand, in AT&T.
+    # shortcut: a bare AT&T symbol named like a RISC-V register loses hover; upgrade when the LSP knows the target.
+    if (
+        not intel
+        and mnemonic.casefold() in _RISCV_WORD_OPS
+        and operands.split(",", 1)[0].strip().casefold() in _RISCV_REGS
+    ):
+        return [], None
     stripped = load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
     return [form for form in stripped if form.architecture == "x86"], width
 
@@ -284,7 +320,7 @@ def _hover_markdown(
         return None
     instruction = load_instruction_from_db(conn, word)
     if instruction is None:
-        matches, width = _lookup_mnemonic(conn, word)
+        matches, width = _lookup_mnemonic(conn, word, operands=operand_text, intel=intel)
         # Match the form on the source line like _hint_label does, so
         # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
         instruction = _match_form(matches, operand_count, operand_text, width, intel)
@@ -430,14 +466,16 @@ def _cut_label(text: str) -> str:
 
 
 @functools.lru_cache(maxsize=1024)
-def _mnemonic_matches(db_path: str, mnemonic: str) -> tuple:
+def _mnemonic_matches(
+    db_path: str, mnemonic: str, operands: str = "", intel: bool = False
+) -> tuple:
     # The inlay-hint loop asks the same mnemonics for every line, so query once
-    # per (catalog, mnemonic) and reuse. The key carries the path, not the
-    # connection, so a reloaded catalog at the same path would keep stale rows;
-    # clear the cache if catalog reload lands.
+    # per (catalog, mnemonic, operands, intel) and reuse. The key carries the
+    # path, not the connection, so a reloaded catalog at the same path would
+    # keep stale rows; clear the cache if catalog reload lands.
     conn = open_db(path=Path(db_path))
     try:
-        forms, width = _lookup_mnemonic(conn, mnemonic)
+        forms, width = _lookup_mnemonic(conn, mnemonic, operands, intel=intel)
         return tuple(forms), width
     finally:
         conn.close()
@@ -450,7 +488,7 @@ def _hint_label(
     operands: str = "",
     intel: bool = False,
 ) -> str | None:
-    matches, width = _mnemonic_matches(db_path, mnemonic)
+    matches, width = _mnemonic_matches(db_path, mnemonic, operands, intel=intel)
     if not matches:
         return None
     chosen = _match_form(matches, operand_count, operands, width, intel)

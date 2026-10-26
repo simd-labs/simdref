@@ -501,6 +501,56 @@ class LspEndToEndTests(unittest.TestCase):
             ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
         )
 
+    def test_riscv_word_ops_do_not_resolve_to_x86(self):
+        # "addw" has no catalog row, and its strip would land on the x86 "add".
+        cases = [
+            (op, "a0, a1, a2")
+            for op in (
+                "addw",
+                "subw",
+                "sllw",
+                "srlw",
+                "sraw",
+                "mulw",
+                "divw",
+                "divuw",
+                "remw",
+                "remuw",
+            )
+        ]
+        cases += [(op, "a0, a1, 5") for op in ("addiw", "slliw", "srliw", "sraiw")]
+        cases += [("negw", "a0, a1"), ("addw", "a0, a1, %pcrel_hi(sym)")]
+        for op, operands in cases:
+            with self.subTest(op=op, operands=operands):
+                self.server.open(ASM_URI, "asm", f"{op} {operands}\n")
+                self.assertEqual(self.server.hints(ASM_URI), [])
+                self.assertIsNone(self.server.hover(ASM_URI, 0, 1))
+
+    def test_att_x86_word_ops_still_resolve(self):
+        # "%ax" and a bare symbol are not RISC-V registers, so the guard must not fire.
+        self.server.open(ASM_URI, "asm", "addw %ax, %bx\nmulw %ax\nmulw sym\n")
+        add = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(add, "addw %ax, %bx got no hover")
+        self.assertIn("ADD (", add["contents"]["value"])
+        mul = self.server.hover(ASM_URI, 1, 1)
+        self.assertIsNotNone(mul, "mulw %ax got no hover")
+        self.assertIn("MUL (R16)", mul["contents"]["value"])
+        mem = self.server.hover(ASM_URI, 2, 1)
+        self.assertIsNotNone(mem, "mulw sym got no hover")
+        self.assertIn("MUL (", mem["contents"]["value"])
+
+    def test_intel_word_ops_still_resolve(self):
+        # Intel syntax writes registers bare: the guard is AT&T-only, so a bare
+        # "ax" must not read as RISC-V.
+        uri = "file:///tmp/simdref_lsp_test_word.asm"
+        self.server.open(uri, "nasm", "add ax, bx\naddw ax, bx\n")
+        add = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(add, "add ax, bx in nasm got no hover")
+        self.assertIn("ADD (", add["contents"]["value"])
+        addw = self.server.hover(uri, 1, 1)
+        self.assertIsNotNone(addw, "addw ax, bx in nasm got no hover")
+        self.assertIn("ADD (", addw["contents"]["value"])
+
     def test_movsbl_is_not_the_string_move(self):
         # movsbl is a sign-extend. The suffix strip must not land on the string op movsb.
         self.server.open(ASM_URI, "asm", "movsbl %al, %eax\n")
