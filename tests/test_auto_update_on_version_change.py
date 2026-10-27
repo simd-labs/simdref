@@ -11,6 +11,7 @@ in isolation.
 from __future__ import annotations
 
 import io
+import os
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -117,7 +118,9 @@ class AutoUpdateOnVersionChangeTests(unittest.TestCase):
             with (
                 mock.patch.object(cli, "__version__", "1.2.3"),
                 mock.patch.object(cli, "_download_release_or_fallback") as dl,
+                mock.patch.dict("os.environ", {}, clear=False),
             ):
+                os.environ.pop("SIMDREF_SKIP_AUTOUPDATE", None)
                 cli._maybe_auto_update_for_version_change()
             dl.assert_not_called()
             self.assertEqual(fx._read(), "1.2.3")
@@ -136,7 +139,9 @@ class AutoUpdateOnVersionChangeTests(unittest.TestCase):
                 mock.patch.object(
                     cli, "_download_release_or_fallback", side_effect=typer.Exit(code=1)
                 ),
+                mock.patch.dict("os.environ", {}, clear=False),
             ):
+                os.environ.pop("SIMDREF_SKIP_AUTOUPDATE", None)
                 buf = io.StringIO()
                 fake_console = Console(file=buf, force_terminal=False, width=200)
                 with mock.patch.object(cli, "err_console", fake_console):
