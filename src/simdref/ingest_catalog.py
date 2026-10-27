@@ -15,6 +15,7 @@ from typing import Any, Callable
 from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
+from simdref.display import strip_instruction_decorators
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
@@ -987,19 +988,39 @@ def parse_arm_sve_instruction_map(
     return records
 
 
+def _normalize_uops_form(form: str) -> str:
+    """Strip uops.info display decorators and opcode-map suffixes from a form.
+
+    ``ADD_01 (R16, R16)``, ``ADD_EVEX_01 (R16, R16)`` and ``MOVSD_XMM_0F10
+    (XMM, XMM)`` name an encoding variant of the plain assembly form; the
+    variant suffix is not part of the form.
+    """
+    head, sep, tail = form.partition(" ")
+    head = strip_instruction_decorators(head)
+    head = re.sub(r"_[0-9A-F]{2,4}$", "", head)
+    return f"{head}{sep}{tail}".strip()
+
+
 def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
     records: list[InstructionRecord] = []
+    by_key: dict[str, InstructionRecord] = {}
     for node in _iter_xml_elements(source, "instruction"):
-        mnemonic = _intern_small((node.attrib.get("asm") or node.attrib.get("name") or "").strip())
+        mnemonic = _intern_small(
+            strip_instruction_decorators(
+                node.attrib.get("asm") or node.attrib.get("name") or ""
+            ).strip()
+        )
         if not mnemonic:
             continue
-        form = (
-            node.attrib.get("string")
-            or node.attrib.get("form")
-            or node.attrib.get("cpl")
-            or node.attrib.get("category")
-            or ""
-        ).strip()
+        form = _normalize_uops_form(
+            (
+                node.attrib.get("string")
+                or node.attrib.get("form")
+                or node.attrib.get("cpl")
+                or node.attrib.get("category")
+                or ""
+            ).strip()
+        )
         raw_summary = node.attrib.get("summary", "").strip()
         isa = _normalize_isa(
             node.attrib.get("isa-set", "")
@@ -1061,20 +1082,27 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
                     elif grandchild.tag == "IACA":
                         arch_entry["iaca"].append(dict(grandchild.attrib))
                 arch_details[arch] = arch_entry
-        records.append(
-            InstructionRecord(
-                mnemonic=mnemonic,
-                form=form,
-                summary=_instruction_summary(
-                    mnemonic, raw_summary, operand_details, architecture="x86"
-                ),
-                architecture="x86",
-                isa=isa,
-                operand_details=operand_details,
-                metadata=metadata,
-                arch_details=arch_details,
-            )
+        record = InstructionRecord(
+            mnemonic=mnemonic,
+            form=form,
+            summary=_instruction_summary(
+                mnemonic, raw_summary, operand_details, architecture="x86"
+            ),
+            architecture="x86",
+            isa=isa,
+            operand_details=operand_details,
+            metadata=metadata,
+            arch_details=arch_details,
         )
+        existing = by_key.get(record.db_key)
+        if existing is not None:
+            # Encoding variants share one row; keep the first variant's
+            # measurements and fold in per-uarch data only where it has none.
+            for arch, entry in arch_details.items():
+                existing.arch_details.setdefault(arch, entry)
+            continue
+        by_key[record.db_key] = record
+        records.append(record)
     return records
 
 

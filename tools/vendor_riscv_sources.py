@@ -69,7 +69,9 @@ def instruction_category(mnemonic: str, isa: list[str]) -> str:
         return "Vector Crypto"
     if any(token.startswith("zvfbf") for token in isa_tokens):
         return "BFloat16"
-    if lowered.startswith(("vl", "vs")):
+    if lowered.startswith(
+        ("vl", "vs", "ld", "lb", "lh", "lw", "sd", "sb", "sh", "sw", "lr", "sc", "amo")
+    ):
         return "Loads and Stores"
     if lowered.startswith("vm") and ".m" in lowered:
         return "Mask Operations"
@@ -121,14 +123,9 @@ def parse_instruction_file(path: Path, source_url: str) -> dict[str, object]:
     }
 
 
-def iter_vector_instruction_files(udb_root: Path) -> list[Path]:
+def iter_instruction_files(udb_root: Path) -> list[Path]:
     inst_root = udb_root / "spec" / "std" / "isa" / "inst"
-    files: list[Path] = []
-    for path in inst_root.rglob("*.yaml"):
-        extension_dir = path.parent.name
-        if extension_dir.startswith(("V", "Zv", "Zve")):
-            files.append(path)
-    return sorted(files)
+    return sorted(inst_root.rglob("*.yaml"))
 
 
 def infer_intrinsic_policy(name: str) -> tuple[str, str]:
@@ -363,7 +360,7 @@ def build_intrinsics_bundle(
 def collect_base_instructions(udb_root: Path) -> dict[str, dict[str, object]]:
     instructions: dict[str, dict[str, object]] = {}
     blob = f"{UDB_PROJECT_URL}/blob/{git_rev(udb_root)}"
-    for path in iter_vector_instruction_files(udb_root):
+    for path in iter_instruction_files(udb_root):
         parsed = parse_instruction_file(path, f"{blob}/{path.relative_to(udb_root).as_posix()}")
         if not parsed:
             continue

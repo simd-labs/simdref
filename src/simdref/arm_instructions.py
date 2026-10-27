@@ -311,6 +311,13 @@ _RULE_PLACEHOLDER: dict[str, str] = {
     "Dn": "d1",
     "Dm": "d2",
     "Da": "d3",
+    # FP accumulator register operands; t/s letters follow the Xt/Xs numbering.
+    "fpfar_dt": "d0",
+    "fpfar_ds": "d1",
+    "fpfar_st": "s0",
+    "fpfar_ss": "s1",
+    "fpfar_ht": "h0",
+    "fpfar_hs": "h1",
     "Sd": "s0",
     "Sn": "s1",
     "Sm": "s2",
