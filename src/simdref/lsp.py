@@ -238,14 +238,34 @@ def _classify_line(
     return arch, classes, reverse, used_weak
 
 
+def _a64_address_class(op: str) -> str:
+    """Sub-class of an AArch64 bracket address, distinguishing the index mode.
+
+    "mpre" is pre-index ("[x9, #-32]!"); "mo" holds an immediate offset inside
+    the brackets ("[sp, #16]"); "mreg" offsets by a register ("[x9, x10]" or an
+    extended form); "m" is a plain base register. The post-index form splits at
+    its top-level comma, so its bracket reads as plain "m" and the trailing
+    "#imm" is its own immediate operand.
+    """
+    if op.rstrip().endswith("!"):
+        return "mpre"
+    if "[" not in op or "]" not in op:
+        return "m"
+    body = op[op.index("[") + 1 : op.find("]")].replace(" ", "")
+    parts = body.split(",")
+    if len(parts) > 1:
+        return "mo" if parts[1].startswith("#") else "mreg"
+    return "m"
+
+
 def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     """Classify one operand on a line whose candidates are arch, or None.
 
     Classes: r8..r64, v128/v256/v512/k/mm, av (AArch64 vector with an
     arrangement), x/w/xzr/wzr/sp/wsp (AArch64 scalars; fp and lr read as x),
     b/h/s/d/q (AArch64 scalar FP by width), ar (ARM32), rv (RISC-V), and
-    i, lit0/lit1, m, rel. A bare symbol is a memory reference in AT&T and a
-    rel target in Intel syntax.
+    i, lit0/lit1, m, mpre/mo/mreg (AArch64 address index modes), rel. A bare
+    symbol is a memory reference in AT&T and a rel target in Intel syntax.
     """
     if not op:
         return None
@@ -256,6 +276,9 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         return "lit1"
     if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
         return "i"
+    # AArch64 marks immediates with '#' ("#-16", "#0x10", "#:lo12:sym").
+    if op.startswith("#"):
+        return "i"
     if "{1to" in op:
         return "mbc"
     if "{" in op:
@@ -263,7 +286,11 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         name = op.lstrip("*").lstrip("%").casefold()
     if "(" in op or "[" in op:
         sized = _INTEL_SIZE_RE.match(op)
-        return f"m{_INTEL_SIZE_BITS[sized.group(1).casefold()]}" if sized else "m"
+        if sized:
+            return f"m{_INTEL_SIZE_BITS[sized.group(1).casefold()]}"
+        if "[" in op and "arm" in arch:
+            return _a64_address_class(op)
+        return "m"
     reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
     # In AT&T a bare "sp" is the ARM stack pointer or a symbol, never the r16.
     if reg and (intel or op.lstrip("*").startswith("%") or name not in ("sp", "bp", "si", "di")):
@@ -300,7 +327,7 @@ _LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
 _CLASS_KIND = dict(
     [(c, "register") for c in ("r8", "r16", "r32", "r64")]
     + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred")]
-    + [(c, "memory") for c in ("m", "moffs", "mbc")]
+    + [(c, "memory") for c in ("m", "moffs", "mbc", "mo", "mpre", "mreg")]
     + [(f"m{bits}", "memory") for bits in set(_INTEL_SIZE_BITS.values())]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
     + [
@@ -339,11 +366,23 @@ def _form_accept(op: str) -> frozenset:
     if re.fullmatch(r"rel\d*", o):
         return frozenset({"rel"})
     if op.startswith("["):
+        # An AArch64 bracket key encodes the index mode: pre-index carries
+        # '!' ("[<XNSP>, <HASH>#0]!"), a register offset holds a bare comma
+        # ("[<XNSP>, <WORX>]"), an immediate offset keeps its '#' ("[#0]"),
+        # and a plain base has neither ("[<XNSP>]"). "m" stays acceptable to
+        # the unsigned-offset key, whose '#imm' defaults to 0 on the line.
+        if "!" in op:
+            return frozenset({"mpre"})
+        body = op[1 : op.index("]")] if "]" in op else op[1:]
+        if "," in body:
+            return frozenset({"mreg"})
+        if "#" in body:
+            return frozenset({"mo", "m"})
         return frozenset({"m"})
     name = re.sub(r"(#\d+)+$", "", op.upper())
     if "<HASH>" in name:
         return _IMMEDIATE_ACCEPT
-    if re.match(r"V\d+<|^[ZV]\d+\.|^\{|^<ZA>", name):
+    if re.match(r"V\d+<|^[ZV]\d+\.|^\{", name):
         return frozenset({"av"})
     # Numbered scalar FP placeholders: D0 or S1 style numbers, <BT> or <QT1> style aliases.
     if re.fullmatch(r"[BHSDQ]\d+", name):
@@ -486,6 +525,21 @@ def _match_form(
     return min(pool, key=_rank)
 
 
+def _a64_mov_imm_alias(mnemonic: str, arch: frozenset, operands: str) -> str | None:
+    """The mnemonic a GAS `mov <Wd>, #imm` alias encodes as, or None.
+
+    The catalog keys no AArch64 MOV row: an immediate move becomes MOVN for a
+    negative value and MOVZ otherwise. shortcut: the bitmask ORR alias reads
+    as MOVZ here; separating it needs a logical-immediate decode of the value.
+    """
+    if "arm" not in arch or mnemonic.casefold() != "mov":
+        return None
+    found = re.search(r"#\s*(-?0x|-?\d)", operands, re.IGNORECASE)
+    if not found:
+        return None
+    return "movn" if found.group(1).startswith("-") else "movz"
+
+
 def _hover_markdown(
     conn,
     word: str,
@@ -559,6 +613,12 @@ def _hover_markdown(
         if matches is None:
             matches, width = _lookup_mnemonic(conn, word, line[0])
         instruction = _match_form(matches, operand_count, line, width)
+    if instruction is None:
+        # A GAS `mov <Wd>, #imm` is an alias the catalog keys as MOVZ/MOVN.
+        alias = _a64_mov_imm_alias(word, line[0], operand_text)
+        if alias:
+            alias_forms, alias_width = _lookup_mnemonic(conn, alias, line[0])
+            instruction = _match_form(alias_forms, operand_count, line, alias_width)
     if instruction is not None:
         # The url and reference rows of the body already carry the source links.
         link = web_deep_link("instruction", instruction.key)
@@ -728,7 +788,21 @@ def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
 def _operands_of_key(key: str) -> list[str]:
     start, end = key.find("("), key.rfind(")")
     inner = key[start + 1 : end].strip() if 0 <= start < end else ""
-    return [piece.strip() for piece in inner.split(",")] if inner else []
+    if not inner:
+        return []
+    # AArch64 address operands hold their own commas ("[<XNSP>, <HASH>#0]!"),
+    # so only a comma outside every bracket separates operands.
+    ops, depth, cut = [], 0, 0
+    for index, char in enumerate(inner):
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            ops.append(inner[cut:index].strip())
+            cut = index + 1
+    ops.append(inner[cut:].strip())
+    return ops
 
 
 def _cut_label(text: str) -> str:
@@ -765,6 +839,12 @@ def _hint_label(
     if line is None:
         return None
     chosen = _match_form(matches, operand_count, line, width)
+    if chosen is None:
+        # The same GAS `mov <Wd>, #imm` alias as hover, so both agree.
+        alias = _a64_mov_imm_alias(mnemonic, line[0], operands)
+        if alias:
+            forms, alias_width = _mnemonic_matches(db_path, alias, line[0])
+            chosen = _match_form(list(forms), operand_count, line, alias_width)
     return _cut_label(chosen.summary or "") if chosen else None
 
 
