@@ -161,8 +161,10 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
     return [form for form in stripped if form.architecture == "x86"], width
 
 
-def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | None], bool]:
-    """One pass over the line: (candidate architecture buckets, one class per operand, reverse).
+def _classify_line(
+    operands: str, intel: bool
+) -> tuple[frozenset, list[str | None], bool, frozenset]:
+    """One pass over the line: (candidate buckets, one class per operand, reverse, weak votes).
 
     A strong vote (a %- or Intel-style register, an x86 vector, an AArch64
     arrangement, an AArch64/ARM32/RISC-V-only scalar) names one bucket. A
@@ -171,6 +173,9 @@ def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | No
     candidates mean undecided; callers then keep today's unfiltered behaviour.
     "reverse" is True when the line's operand order flips into key order
     (AT&T x86). A register of a non-candidate architecture reads as a symbol.
+    "weak votes" names the candidates that came from shared spellings alone;
+    callers gate them against the mnemonic's forms. It is empty when a strong
+    vote decided the line: a strong vote stays out of the gate.
     """
     parts = re.split(r",(?![^(\[{]*[)\]}])", operands)
     strong, weak = set(), set()
@@ -206,10 +211,15 @@ def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | No
             weak.update(("arm", "riscv"))
         elif name == "lr":
             weak.add("arm")
-    arch = frozenset({"x86"}) if intel or "x86" in strong else frozenset(strong or weak)
+    if intel or "x86" in strong:
+        arch, used_weak = frozenset({"x86"}), frozenset()
+    elif strong:
+        arch, used_weak = frozenset(strong), frozenset()
+    else:
+        arch, used_weak = frozenset(weak), frozenset(weak)
     classes = [_operand_class(op.strip(), intel, arch) for op in parts]
     reverse = not intel and ("x86" in arch or not arch)
-    return arch, classes, reverse
+    return arch, classes, reverse, used_weak
 
 
 def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
@@ -339,6 +349,63 @@ def _form_accept(op: str) -> frozenset:
     return frozenset()
 
 
+def _form_takes_line(form, classes: list) -> bool:
+    """The form accepts the line's operand classes position by position.
+
+    A bare key constrains nothing; neither does a placeholder _form_accept
+    leaves empty. Rejecting on an empty set hid the AArch64 scalar saturating
+    family (<V_OPTION><D> maps to no class). An operand the classifier gave no
+    class (None) constrains nothing either.
+    """
+    ops = _operands_of_key(form.key)
+    if not ops:
+        return True
+    if len(ops) != len(classes):
+        return False
+    for cls, op in zip(classes, ops):
+        accept = _form_accept(op)
+        if cls is not None and accept and cls not in accept:
+            return False
+    return True
+
+
+def _gate_weak_votes(matches, line: tuple, operands: str, intel: bool):
+    """Keep a weak-voted candidate only when its rows accept the line, or None.
+
+    A register spelling two architectures share admits its other architecture
+    only when one of the mnemonic's forms there accepts the line's operands
+    position by position. A line made only of shared names shows nothing when
+    no candidate accepts it: None vetoes the line, and callers return no entry
+    instead of the unfiltered pool. Strong votes never reach this gate.
+    The returned line tuple carries classes for the pruned candidates.
+    """
+    arch, classes, reverse, weak = line
+    if not weak:
+        return line
+    by_arch = {}
+    for form in matches:
+        by_arch.setdefault(form.architecture, []).append(form)
+    parts = [piece.strip() for piece in re.split(r",(?![^(\[{]*[)\]}])", operands)]
+
+    def takes(arch_name: str) -> bool:
+        reading = [_operand_class(piece, intel, frozenset({arch_name})) for piece in parts]
+        return any(_form_takes_line(form, reading) for form in by_arch.get(arch_name, []))
+
+    kept = {a for a in arch if a not in weak}
+    kept.update(a for a in weak & arch if takes(a))
+    if not kept:
+        return None
+    pruned = frozenset(kept)
+    if pruned == arch:
+        return line
+    return (
+        pruned,
+        [_operand_class(piece, intel, pruned) for piece in parts],
+        not intel and ("x86" in pruned or not pruned),
+        weak,
+    )
+
+
 def _match_form(
     matches,
     operand_count: int | None,
@@ -347,14 +414,14 @@ def _match_form(
 ):
     """Pick the form the line names, under one total order.
 
-    line is _classify_line's (arch candidates, ordered classes, reverse). Rows
-    of a non-candidate architecture drop out before ranking; an undecided line
-    keeps every row. Rank: class-set score (accepted +1 / same kind 0 / else
+    line is _classify_line's (arch candidates, ordered classes, reverse, weak
+    votes). Rows of a non-candidate architecture drop out before ranking; an
+    undecided line keeps every row. Rank: class-set score (accepted +1 / same kind 0 / else
     -1, a literal scores only on its own value), position score, iN over a
     literal 0/1, match with the AT&T suffix width, fewer operands, key name.
     The no-same-count fallback uses the same key.
     """
-    arch, classes, reverse = line
+    arch, classes, reverse = line[0], line[1], line[2]
     if arch:
         matches = [m for m in matches if m.architecture in arch]
     if operand_count is None:
@@ -446,6 +513,15 @@ def _hover_markdown(
     if not allow_instruction:
         return None
     line = _classify_line(operand_text, intel)
+    # Weak votes come from spellings two architectures share (a RISC-V `add
+    # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them once here
+    # so the exact-name path and _match_form both honor the veto.
+    matches = width = None
+    if line[3]:
+        matches, width = _lookup_mnemonic(conn, word, line[0])
+        line = _gate_weak_votes(matches, line, operand_text, intel)
+        if line is None:
+            return None
     instruction = load_instruction_from_db(conn, word)
     # An exact name can name a row with a different operand count (a bare
     # "movsd" is the string move), or a row from the wrong architecture
@@ -459,7 +535,8 @@ def _hover_markdown(
     if instruction is None:
         # Match the form on the source line like _hint_label does, so
         # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-        matches, width = _lookup_mnemonic(conn, word, line[0])
+        if matches is None:
+            matches, width = _lookup_mnemonic(conn, word, line[0])
         instruction = _match_form(matches, operand_count, line, width)
     if instruction is not None:
         # The url and reference rows of the body already carry the source links.
@@ -661,6 +738,10 @@ def _hint_label(
     line = _classify_line(operands, intel)
     matches, width = _mnemonic_matches(db_path, mnemonic, line[0])
     if not matches:
+        return None
+    # The same weak-vote gate as hover, so both entries pick the same form.
+    line = _gate_weak_votes(matches, line, operands, intel)
+    if line is None:
         return None
     chosen = _match_form(matches, operand_count, line, width)
     return _cut_label(chosen.summary or "") if chosen else None
