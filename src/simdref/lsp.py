@@ -27,7 +27,10 @@ from simdref.storage import (
 
 WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 MNEMONIC_RE = re.compile(r"^[A-Za-z][A-Za-z0-9.]*$")
-ASM_COMMENT_RE = re.compile(r"#.*$|//.*$|/\*.*?\*/")
+# Matches an asm comment marker: '#', '//' or a '/* ... */' block. The '#'
+# context check lives in _strip_asm_comment, because a '#' can open an
+# AArch64 immediate operand.
+ASM_COMMENT_RE = re.compile(r"#|//|/\*.*?\*/")
 # In a .asm file (NASM/MASM) ";" starts a comment. A .s/.S file in GAS syntax
 # uses ";" as a statement separator, so it stays.
 ASM_SEMICOLON_COMMENT_RE = re.compile(r";.*$")
@@ -565,9 +568,48 @@ def _operand_count(operands: str) -> int:
     return count
 
 
+# Shift/extend keywords that take a shifted immediate: "add x0, x1, x2, lsl #2".
+_ASM_SHIFT_KEYWORDS = frozenset(
+    "lsl lsr asr ror msl uxtb uxth uxtw uxtx sxtb sxth sxtw sxtx".split()
+)
+
+
+def _hash_opens_operand(prefix: str, rest: str) -> bool:
+    """True when a '#' after PREFIX opens an operand immediate, not a comment."""
+    words = prefix.split()
+    if words and words[0].endswith(":"):
+        words = words[1:]
+    if prefix.rstrip().endswith(","):
+        return True
+    if words and words[-1].lower() in _ASM_SHIFT_KEYWORDS:
+        return True
+    # First operand right after the mnemonic ("svc #0"). The token after '#'
+    # separates it from a zero-operand mnemonic's comment ("ret #c3").
+    # shortcut: no mnemonic table, so "nop #2" reads as an immediate; upgrade
+    # when the catalog can name first-immediate mnemonics.
+    return len(words) == 1 and bool(rest) and rest[0] in "0123456789+-(:"
+
+
+def _strip_asm_comment(line: str) -> str:
+    """Strip one asm comment. A '#' that opens an immediate operand stays."""
+    out, pos = [], 0
+    for match in ASM_COMMENT_RE.finditer(line):
+        token = match.group()
+        if token.startswith("/*"):
+            out.append(line[pos : match.start()])
+            pos = match.end()
+            continue
+        if token == "#" and _hash_opens_operand(line[: match.start()], line[match.end() :]):
+            continue
+        out.append(line[pos : match.start()])
+        return "".join(out)  # a '#' or '//' comment runs to end of line
+    out.append(line[pos:])
+    return "".join(out)
+
+
 def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
     """Return (mnemonic, operand_count, operands) for an asm line, or None."""
-    line = ASM_COMMENT_RE.sub("", line)
+    line = _strip_asm_comment(line)
     if semicolon_is_comment:
         line = ASM_SEMICOLON_COMMENT_RE.sub("", line)
     line = line.strip()
