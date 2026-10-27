@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hover and inlay hints now resolve AT&T size-suffixed mnemonics such as
   `xorl`, `addq` and `cmpq` to the base instruction. They use the suffix and
   the line operands to pick the form, so `add $8, %rax` no longer shows the
-  8-bit form and `jmp .L2` no longer shows the memory form.
+  8-bit form.
 - LSP hover and inlay hints decide the architecture of each line once and rank
   the operand forms with one key. The architectures are x86 AT&T, x86 Intel,
   AArch64, ARM32 and RISC-V. This fixes the 16-bit `sp`, `bp`, `si` and `di`
