@@ -759,6 +759,39 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertNotIn("ADD (R16", hover_vle)
         self.assertNotIn("ADD (R32", hover_vle)
 
+    def test_arm_single_precision_scalar_lines_keep_their_arm_form(self):
+        # s0-s31 are AArch64 scalar FP registers. A bare s-register also reads
+        # as a RISC-V saved register. That is a weak vote, so the mnemonic's
+        # catalog rows arbitrate. An ARM-only mnemonic keeps its ARM form.
+        uri = "file:///tmp/simdref_lsp_arm_s.s"
+        lines = ("ldr s1, [x11], #4", "fneg s0, s1", "fmov s0, w1", "fmadd s0, s1, s2, s3")
+        self.server.open(uri, "asm", "\n".join(lines) + "\n")
+        for i, line in enumerate(lines):
+            with self.subTest(line=line):
+                self.assertIsNotNone(self.server.hover(uri, i, 1), f"{line} got no hover")
+        self.assertEqual(len(self.server.hints(uri)), len(lines))
+
+    def test_arm_double_precision_scalar_picks_the_scalar_form(self):
+        # d0-d31 are AArch64 64-bit scalar FP registers, not vectors. The
+        # numbered catalog placeholders D0 and D1 accept the same class.
+        uri = "file:///tmp/simdref_lsp_arm_d.s"
+        self.server.open(uri, "asm", "fneg d0, d1\n")
+        hover = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(hover, "fneg d0, d1 got no hover")
+        value = hover["contents"]["value"]
+        self.assertIn("FNEG (D0, D1)", value)
+        self.assertNotIn("T_OPTION", value)
+
+    def test_riscv_saved_registers_keep_the_riscv_form(self):
+        # The catalog has no SD or ADDI row, so these lines keep their current
+        # behaviour: no hover and no hint.
+        uri = "file:///tmp/simdref_lsp_riscv_saved.s"
+        text = "addi s0, sp, 16\nsd s1, 8(sp)\n"
+        self.server.open(uri, "asm", text)
+        for line in range(2):
+            self.assertIsNone(self.server.hover(uri, line, 1))
+        self.assertEqual(self.server.hints(uri), [])
+
 
 class MissingCatalogTests(unittest.TestCase):
     def test_missing_catalog_sends_show_message_once(self):

@@ -127,7 +127,9 @@ _X86_VECTOR_WIDTHS = {"xmm": "v128", "ymm": "v256", "zmm": "v512"}
 _X86_VECTOR_RE = re.compile(r"(?:[xyz]mm(?:[12]?[0-9]|3[01])|k[0-7]|mm[0-7])\Z")
 _A64_ARRANGEMENT_RE = re.compile(r"[bdhqsvz](?:[0-9]|[12][0-9]|3[01])\.[0-9]*[bhsdq]\Z")
 _A64_SCALAR_RE = re.compile(r"(?:x(?:[0-9]|[12][0-9]|30)|w(?:[0-9]|[12][0-9]|30)|xzr|wzr)\Z")
-_A64_VECTOR_BARE_RE = re.compile(r"[vdq](?:[0-9]|[12][0-9]|3[01])\Z")
+_A64_SCALAR_FP_RE = re.compile(r"[bhsdq](?:[0-9]|[12][0-9]|3[01])\Z")
+# A bare v register is a vector spelling ARM and RISC-V share.
+_A64_VECTOR_BARE_RE = re.compile(r"v(?:[0-9]|[12][0-9]|3[01])\Z")
 _ARM32_SCALAR_RE = re.compile(r"(?:r(?:[0-9]|1[0-5])|ip|pc)\Z")
 # ARM has "sp" and "fp"; RISC-V shares both spellings and adds these scalar aliases.
 _RISCV_SCALARS = frozenset(
@@ -161,8 +163,8 @@ def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | No
 
     A strong vote (a %- or Intel-style register, an x86 vector, an AArch64
     arrangement, an AArch64/ARM32/RISC-V-only scalar) names one bucket. A
-    spelling two architectures share ("sp", "fp", bare v/d/q) votes for every
-    bucket it can mean and only counts when no strong vote fired. Empty
+    spelling two architectures share ("sp", "fp", s0-s11, a bare v) votes for
+    every bucket it can mean and only counts when no strong vote fired. Empty
     candidates mean undecided; callers then keep today's unfiltered behaviour.
     "reverse" is True when the line's operand order flips into key order
     (AT&T x86). A register of a non-candidate architecture reads as a symbol.
@@ -186,6 +188,13 @@ def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | No
             strong.add("arm")
         elif _ARM32_SCALAR_RE.fullmatch(name):
             strong.add("arm")
+        elif _A64_SCALAR_FP_RE.fullmatch(name):
+            # s0-s11 are also RISC-V saved registers: a weak vote there, and
+            # the mnemonic's catalog rows arbitrate between arm and riscv.
+            if name in _RISCV_SCALARS:
+                weak.update(("arm", "riscv"))
+            else:
+                strong.add("arm")
         elif name in _RISCV_SCALARS:
             strong.add("riscv")
         elif _A64_VECTOR_BARE_RE.fullmatch(name):
@@ -205,8 +214,9 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
 
     Classes: r8..r64, v128/v256/v512/k/mm, av (AArch64 vector with an
     arrangement), x/w/xzr/wzr/sp/wsp (AArch64 scalars; fp and lr read as x),
-    ar (ARM32), rv (RISC-V), i, lit0/lit1, m, rel. A bare symbol is a memory
-    reference in AT&T and a rel target in Intel syntax.
+    b/h/s/d/q (AArch64 scalar FP by width), ar (ARM32), rv (RISC-V), and
+    i, lit0/lit1, m, rel. A bare symbol is a memory reference in AT&T and a
+    rel target in Intel syntax.
     """
     if not op:
         return None
@@ -240,6 +250,8 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if "arm" in arch:
         if _A64_ARRANGEMENT_RE.fullmatch(name) or _A64_VECTOR_BARE_RE.fullmatch(name):
             return "av"
+        if _A64_SCALAR_FP_RE.fullmatch(name):
+            return name[0]
         if _A64_SCALAR_RE.fullmatch(name):
             return {"xzr": "xzr", "wzr": "wzr"}.get(name, name[0])
         if name in ("sp", "wsp", "fp", "lr"):
@@ -260,7 +272,10 @@ _CLASS_KIND = dict(
     + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred")]
     + [(c, "memory") for c in ("m", "moffs", "mbc")]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
-    + [(c, "scalar") for c in ("x", "w", "xzr", "wzr", "sp", "wsp", "ar", "rv")]
+    + [
+        (c, "scalar")
+        for c in ("x", "w", "xzr", "wzr", "sp", "wsp", "b", "h", "s", "d", "q", "ar", "rv")
+    ]
     + [("rel", "rel")]
 )
 
@@ -299,7 +314,12 @@ def _form_accept(op: str) -> frozenset:
         return _IMMEDIATE_ACCEPT
     if re.match(r"V\d+<|^[ZV]\d+\.|^\{|^<ZA>", name):
         return frozenset({"av"})
-    if re.match(r"^D<|^<FPFAR_DT>$|^<[BHSDQ]T>$|^Q0$", name):
+    # Numbered scalar FP placeholders: D0 or S1 style numbers, <BT> or <QT1> style aliases.
+    if re.fullmatch(r"[BHSDQ]\d+", name):
+        return frozenset({name[0].lower()})
+    if re.fullmatch(r"<[BHSDQ]T\d*>", name):
+        return frozenset({name[1].lower()})
+    if re.match(r"^D<|^<FPFAR_DT>$", name):
         return frozenset({"dfp"})
     if re.match(r"^P\d", name):
         return frozenset({"pred"})
