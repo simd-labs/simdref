@@ -35,6 +35,15 @@ FORM_ROWS = [
     # A register offset keeps the register-offset form (no '<HASH>' in the row).
     ("ldr w0, [x9, x10]", "LDR (<WTORWZR__4>, [<XNSP_OPTION>, <WORX_CHOICE>"),
 ]
+# A shift/extend suffix belongs to the last register operand: the line counts
+# as three operands. cmp aliases subs, and the register-offset ldr keeps its
+# register-offset form even with a shift on the offset register.
+SHIFT_ROWS = [
+    ("add x0, x1, x2, lsl #2", "ADD (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
+    ("add x0, x1, w2, uxtw #2", "ADD (<XDSP_OPTION>, <XNSP_OPTION__6>, <R_OPTION__2>"),
+    ("cmp x0, x1, lsl #2", "SUBS (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
+    ("ldr x0, [x1, x2, lsl #3]", "LDR (<XTORXZR__11>, [<XNSP_OPTION>, <WORX_CHOICE>"),
+]
 
 
 class LeftoverArmFormPickTests(unittest.TestCase):
@@ -65,6 +74,14 @@ class LeftoverArmFormPickTests(unittest.TestCase):
 
     def test_index_modes_and_immediates_pick_their_form(self):
         for line, fragment in FORM_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+
+    def test_shift_and_extend_fold_into_the_register(self):
+        for line, fragment in SHIFT_ROWS:
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
