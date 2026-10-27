@@ -719,6 +719,32 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("MOV (R32, M32)", hover_x1)
         self.assertNotIn("Moffs", hover_x1)
 
+    def test_intel_nop_hover_matches_the_hint(self):
+        # In an Intel .asm file "nop" must hover the x86 NOP, not AArch64.
+        # Hover and hint must name the same entry.
+        uri = "file:///tmp/simdref_lsp_nop.asm"
+        self.server.open(uri, "nasm", "nop\n")
+        hover = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(hover, "hover on nop returned null")
+        value = hover["contents"]["value"]
+        self.assertNotIn("A64", value)
+        self.assertIn("No Operation", value)
+        # The inlay hint must agree.
+        hint = self.server.hints(uri, 0, 1)
+        self.assertTrue(hint, "inlay hint for nop is empty")
+        hint_label = hint[0]["label"]
+        self.assertNotIn("A64", hint_label)
+        self.assertIn("No Operation", hint_label)
+
+    def test_att_bare_16_bit_register_names_are_symbols(self):
+        # In AT&T bare si/di/bp are symbols, same rule as bare sp.
+        uri = "file:///tmp/simdref_lsp_bare16.s"
+        self.server.open(uri, "asm", "mov si, %eax\nmov di, %eax\nmov bp, %eax\n")
+        for i in range(3):
+            hover = self.server.hover(uri, i, 1)["contents"]["value"]
+            self.assertIn("MOV (R32, M32)", hover, msg=f"line {i}: {hover}")
+            self.assertNotIn("Moffs", hover, msg=f"line {i}: {hover}")
+
     def test_riscv_vector_lines_do_not_land_on_x86_or_arm(self):
         # RISC-V vector: these lines must stay on RISC-V forms, not fall onto x86
         # or AArch64 ADD/MOV forms.

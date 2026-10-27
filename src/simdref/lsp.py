@@ -167,7 +167,7 @@ def _classify_line(operands: str, intel: bool) -> tuple[frozenset, list[str | No
     "reverse" is True when the line's operand order flips into key order
     (AT&T x86). A register of a non-candidate architecture reads as a symbol.
     """
-    parts = re.split(r",(?![^(\[{]*[\)\]}])", operands)
+    parts = re.split(r",(?![^(\[{]*[)\]}])", operands)
     strong, weak = set(), set()
     for raw in parts:
         op = raw.strip()
@@ -226,7 +226,7 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         return "m"
     reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
     # In AT&T a bare "sp" is the ARM stack pointer or a symbol, never the r16.
-    if reg and (intel or op.lstrip("*").startswith("%") or name != "sp"):
+    if reg and (intel or op.lstrip("*").startswith("%") or name not in ("sp", "bp", "si", "di")):
         if intel or arch.isdisjoint({"arm", "riscv"}):
             return f"r{reg}"
     if _X86_VECTOR_RE.fullmatch(name):
@@ -257,7 +257,7 @@ _IMMEDIATE_ACCEPT = frozenset({"i", "lit0", "lit1"})
 _LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
 _CLASS_KIND = dict(
     [(c, "register") for c in ("r8", "r16", "r32", "r64")]
-    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred", "za")]
+    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred")]
     + [(c, "memory") for c in ("m", "moffs", "mbc")]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
     + [(c, "scalar") for c in ("x", "w", "xzr", "wzr", "sp", "wsp", "ar", "rv")]
@@ -318,9 +318,9 @@ def _form_accept(op: str) -> frozenset:
 
 def _match_form(
     matches,
-    operand_count: int | None = None,
-    line: tuple = (frozenset(), [], False),
-    suffix_bits: int | None = None,
+    operand_count: int | None,
+    line: tuple,
+    suffix_bits: int | None,
 ):
     """Pick the form the line names, under one total order.
 
@@ -348,9 +348,7 @@ def _match_form(
         accepts = [_form_accept(op) for op in _operands_of_key(form.key)]
         set_score = position = in_over_lit = width = 0
         for acc in accepts:
-            if acc == _IMMEDIATE_ACCEPT:
-                set_score += 1 if acc & line_set else -1
-            elif acc in _LITERAL_ACCEPT:
+            if acc in _LITERAL_ACCEPT:
                 set_score += 0 if acc & line_set else -1
             elif acc & line_set:
                 set_score += 1
@@ -424,20 +422,20 @@ def _hover_markdown(
 
     if not allow_instruction:
         return None
+    line = _classify_line(operand_text, intel)
     instruction = load_instruction_from_db(conn, word)
     # An exact name can name a row with a different operand count (a bare
-    # "movsd" is the string move), so like the hint path, pick the form by
-    # the line's operand count instead of trusting that one row.
-    if (
-        instruction is not None
-        and operand_count is not None
-        and len(_operands_of_key(instruction.key)) != operand_count
-    ):
-        instruction = None
+    # "movsd" is the string move), or a row from the wrong architecture
+    # (a bare "nop" picks AArch64 NOP over x86 in an Intel file).
+    # In both cases, fall back to _match_form so hover and hint agree.
+    if instruction is not None:
+        if line[0] and instruction.architecture not in line[0]:
+            instruction = None
+        elif operand_count is not None and len(_operands_of_key(instruction.key)) != operand_count:
+            instruction = None
     if instruction is None:
         # Match the form on the source line like _hint_label does, so
         # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-        line = _classify_line(operand_text, intel)
         matches, width = _lookup_mnemonic(conn, word, line[0])
         instruction = _match_form(matches, operand_count, line, width)
     if instruction is not None:
