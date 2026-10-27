@@ -623,10 +623,13 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("ADD (", addw["contents"]["value"])
 
     def test_movsbl_is_not_the_string_move(self):
-        # movsbl is a sign-extend. The suffix strip must not land on the string op movsb.
+        # movsbl is a sign-extend. It resolves to MOVSX; the suffix strip must
+        # not land on the string op movsb.
         self.server.open(ASM_URI, "asm", "movsbl %al, %eax\n")
-        self.assertEqual(self.server.hints(ASM_URI), [])
-        self.assertIsNone(self.server.hover(ASM_URI, 0, 1))
+        self.assertEqual(len(self.server.hints(ASM_URI)), 1)
+        value = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("MOVSX (R32, R8", value)
+        self.assertNotIn("MOVSB", value)
 
     def test_vinsertf128_register_line_picks_the_register_form(self):
         # Intel: xmm2 is a v128 register, not M128. The vector classes must rank

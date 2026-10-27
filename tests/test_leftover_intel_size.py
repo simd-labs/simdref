@@ -64,12 +64,13 @@ class IntelSizeKeywordTests(unittest.TestCase):
         self.assertIn("VMOVDQU (XMM, M128)", value)
         self.assertNotIn("VMOVDQU (YMM, M256)", value)
 
-    def test_att_movzbl_control(self):
-        # AT&T control: movzbl has no catalog row and the suffix strip lands on
-        # movzb (a deliberate non-match), so it stays unresolved. The sized m
-        # classes must not change that.
+    def test_att_movzbl_hovers_movzx_m8_form(self):
+        # AT&T control: movzbl resolves through the zero/sign-extend alias onto
+        # the MOVZX row with the widths its name carries (b source, l dest).
+        # The sized m classes must not change that.
         result = self.server.hover(ATT_URI, 0, 0)
-        self.assertIsNone(result)
+        self.assertIsNotNone(result, "hover on movzbl returned null")
+        self.assertIn("MOVZX (R32, M8)", result["contents"]["value"])
 
 
 if __name__ == "__main__":

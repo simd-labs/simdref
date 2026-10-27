@@ -183,19 +183,71 @@ def _split_asm_operands(operands: str) -> list[str]:
     ]
 
 
-def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
-    """Return (forms, width). The exact mnemonic wins, else drop an AT&T size suffix (addq -> add).
+# GAS zero/sign-extend names the catalog holds only under Intel names. Each
+# maps to (Intel mnemonic, dest bits, source bits); the converts have no
+# operands. The class is the GNU set: binutils 2.47 as + objdump accept and
+# print these names, and as rejects movzww/movsww (no 16-to-16 form exists).
+# Those two stay in the class and resolve to nothing, as in GNU as.
+_ATT_EXTEND_ALIAS = {
+    **{
+        f"movz{src}{dst}": ("MOVZX", _ATT_SUFFIX_WIDTH[dst], _ATT_SUFFIX_WIDTH[src])
+        for src in "bw"
+        for dst in "wlq"
+    },
+    **{
+        f"movs{src}{dst}": ("MOVSX", _ATT_SUFFIX_WIDTH[dst], _ATT_SUFFIX_WIDTH[src])
+        for src in "bw"
+        for dst in "wlq"
+    },
+    "movslq": ("MOVSXD", 64, 32),
+    "cbtw": ("CBW", None, None),
+    "cwtl": ("CWDE", None, None),
+    "cltq": ("CDQE", None, None),
+    "cwtd": ("CWD", None, None),
+    "cltd": ("CDQ", None, None),
+    "cqto": ("CQO", None, None),
+}
 
-    The suffix strip runs on an x86 or undecided line only: "addw" on a RISC-V
-    or ARM32 line must not land on x86 "add". Rows of other architectures stay
-    in the result; _match_form filters them by the line's candidates.
+
+def _key_operand_bits(key: str) -> tuple:
+    """The operand widths of a catalog key in order: R8l -> 8, M16 -> 16."""
+    bits = []
+    for op in _operands_of_key(key):
+        match = re.search(r"\d+", op)
+        bits.append(int(match.group(0)) if match else None)
+    return tuple(bits)
+
+
+def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
+    """Return (forms, width). The exact mnemonic wins, else an AT&T zero/sign-extend
+    alias (movzbl -> MOVZX), else a dropped AT&T size suffix (addq -> add).
+
+    The alias and the suffix strip run on an x86 or undecided line only: "addw"
+    on a RISC-V or ARM32 line must not land on x86 "add". Rows of other
+    architectures stay in the result; _match_form filters them by the line's
+    candidates.
     """
     forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
     width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
-    # movsbl is a sign-extend, not the string op movsb.
-    if forms or not width or _STRING_OP_RE.fullmatch(mnemonic[:-1]):
+    if forms:
         return forms, None
     if arch and "x86" not in arch:
+        return [], None
+    alias = _ATT_EXTEND_ALIAS.get(mnemonic.casefold())
+    if alias is not None:
+        intel, dst_bits, src_bits = alias
+        rows = [
+            form
+            for form in load_instructions_by_mnemonic_from_db(conn, intel)
+            if form.architecture == "x86"
+        ]
+        # The name carries both widths: movzwq is MOVZX (R64, R16) or MOVZX
+        # (R64, M16) only, never the M8 rows the Intel spelling can also name.
+        if dst_bits is not None:
+            rows = [form for form in rows if _key_operand_bits(form.key) == (dst_bits, src_bits)]
+        return rows, width
+    # movsbl is a sign-extend, not the string op movsb.
+    if not width or _STRING_OP_RE.fullmatch(mnemonic[:-1]):
         return [], None
     stripped = load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
     return [form for form in stripped if form.architecture == "x86"], width
