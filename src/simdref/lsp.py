@@ -117,6 +117,22 @@ def _line_prefix(text: str, line: int, character: int) -> str:
 
 
 _ATT_SUFFIX_WIDTH = {"b": 8, "w": 16, "l": 32, "q": 64}
+# Intel size keywords ("byte ptr [rdx]", NASM "byte [rdx]") name the memory width.
+_INTEL_SIZE_BITS = {
+    "byte": 8,
+    "word": 16,
+    "dword": 32,
+    "fword": 48,
+    "qword": 64,
+    "tbyte": 80,
+    "oword": 128,
+    "xmmword": 128,
+    "ymmword": 256,
+    "zmmword": 512,
+}
+_INTEL_SIZE_RE = re.compile(
+    rf"({'|'.join(_INTEL_SIZE_BITS)})\s+(?:ptr\s+)?(?:[a-z]{{2,}}:\s*)?\[", re.IGNORECASE
+)
 _ACCUMULATOR = {"al": "r8", "ax": "r16", "eax": "r32", "rax": "r64"}
 # x86 numbers only r8-r15; r0-r7 are ARM registers.
 _GPR_PATTERNS = (
@@ -246,7 +262,8 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         op = re.sub(r"\{[^}]*\}", "", op).strip()
         name = op.lstrip("*").lstrip("%").casefold()
     if "(" in op or "[" in op:
-        return "m"
+        sized = _INTEL_SIZE_RE.match(op)
+        return f"m{_INTEL_SIZE_BITS[sized.group(1).casefold()]}" if sized else "m"
     reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
     # In AT&T a bare "sp" is the ARM stack pointer or a symbol, never the r16.
     if reg and (intel or op.lstrip("*").startswith("%") or name not in ("sp", "bp", "si", "di")):
@@ -284,6 +301,7 @@ _CLASS_KIND = dict(
     [(c, "register") for c in ("r8", "r16", "r32", "r64")]
     + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred")]
     + [(c, "memory") for c in ("m", "moffs", "mbc")]
+    + [(f"m{bits}", "memory") for bits in set(_INTEL_SIZE_BITS.values())]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
     + [
         (c, "scalar")
@@ -315,7 +333,7 @@ def _form_accept(op: str) -> frozenset:
     if re.fullmatch(r"m\d+_\d+to\d+", o):
         return frozenset({"mbc"})
     if re.fullmatch(r"m\d+", o):
-        return frozenset({"m"})
+        return frozenset({o, "m"})
     if re.fullmatch(r"moffs\d+", o):
         return frozenset({"moffs"})
     if re.fullmatch(r"rel\d*", o):
@@ -442,7 +460,7 @@ def _match_form(
                 set_score += 0 if acc & line_set else -1
             elif acc & line_set:
                 set_score += 1
-            elif {_CLASS_KIND[a] for a in acc} & line_kinds:
+            elif {_CLASS_KIND[a] for a in acc if a in _CLASS_KIND} & line_kinds:
                 pass
             else:
                 set_score -= 1
@@ -451,6 +469,9 @@ def _match_form(
                 for c in acc
                 if re.fullmatch(r"[rv]\d+", c)
             ):
+                width += 1
+            # An Intel size keyword names the memory width; reward its match.
+            if any(re.fullmatch(r"m\d+", c) and c in line_set for c in acc):
                 width += 1
         for cls, acc in zip(ordered, accepts):
             if cls in acc:
