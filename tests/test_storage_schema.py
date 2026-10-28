@@ -58,15 +58,15 @@ def built_db(tmp_path: Path) -> Path:
     return db
 
 
-def test_schema_version_is_13(built_db: Path):
-    assert SQLITE_SCHEMA_VERSION == "13"
+def test_schema_version_is_14(built_db: Path):
+    assert SQLITE_SCHEMA_VERSION == "14"
     conn = sqlite3.connect(built_db)
     try:
         row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
     finally:
         conn.close()
     assert row is not None
-    assert row[0] == "13"
+    assert row[0] == "14"
 
 
 def test_intrinsics_data_has_arm_arch_column(built_db: Path):
