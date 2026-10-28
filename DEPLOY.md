@@ -18,7 +18,7 @@ Edges: `test` and `package` follow `build-catalog`. `publish-data` follows all t
 
 ### Phase 1: data creation
 
-- `build-catalog` installs LLVM 22, vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact.
+- `build-catalog` installs LLVM 23 (tested version 23.1.4), vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact.
 
 ### Phase 2: data use (parallel)
 

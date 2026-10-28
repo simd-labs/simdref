@@ -32,7 +32,7 @@ a catalog. Run `isa update` first.
 
 `isa build` rebuilds the catalog from upstream. It uses:
 
-- `llvm-mca` 18+ on `PATH`. On Debian or Ubuntu: `sudo apt install llvm`.
+- `llvm-mca` 18+ on `PATH` (23.1.4 is the tested version). On Debian or Ubuntu: `sudo apt install llvm`.
 - About 4 GB of free RAM.
 - Optional: a local `AARCHMRS_BSD*.tar.gz` in `vendor/arm/` to skip the
   download.

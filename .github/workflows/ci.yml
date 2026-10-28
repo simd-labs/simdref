@@ -65,15 +65,13 @@ jobs:
       # zero chance of a stale cache masking a schema or ingestion
       # regression.
       - name: Install LLVM toolchain
-        # Version 22 is the current stable line on apt.llvm.org
-        # (llvm-toolchain-noble-22). The previous "23 == nightly/trunk"
-        # mapping broke: trunk moved to 24 and clang-23 has no installation
-        # candidate, failing the job with apt exit 100.
+        # One LLVM version across the org: llvmorg-23.1.4 (tested version).
+        # 23 is now the stable line on apt.llvm.org.
         run: |
           wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x /tmp/llvm.sh
-          sudo /tmp/llvm.sh 22
-          echo "/usr/lib/llvm-22/bin" >> "$GITHUB_PATH"
+          sudo /tmp/llvm.sh 23
+          echo "/usr/lib/llvm-23/bin" >> "$GITHUB_PATH"
 
       - name: Install package
         run: uv pip install -e .
