@@ -151,6 +151,35 @@ _A64_SCALAR_FP_RE = re.compile(r"[bhsdq](?:[0-9]|[12][0-9]|3[01])\Z")
 _A64_VECTOR_BARE_RE = re.compile(r"v(?:[0-9]|[12][0-9]|3[01])\Z")
 # SVE predicate register with an optional /z or /m qualifier ("p0/z").
 _A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
+# SME predicate-as-counter register with an optional qualifier ("pn8/z").
+_A64_PNG_RE = re.compile(r"pn(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
+# The register spelled at either end of a Z-range member ("z0.b-z3.b").
+_A64_RANGE_END_RE = re.compile(r"z(?:3[01]|[12]?\d)\.\d*[bhsdq]", re.IGNORECASE)
+
+
+def _brace_list_class(inner: str) -> str | None:
+    """The class of a whole-brace register list, by its shape, or None.
+
+    A ZA tile list ({za0h.b[...]}) matches ZA rows only. A one-register list
+    {zN.T} matches single-register rows. A multi-register list {zA.T, zB.T}
+    or range {zA.T-zB.T} matches the multi-vector rows, keeping the count of
+    registers ("av2" or "av4"). shortcut: a 3-register list keeps the old
+    tie ("av"); only the SME2 counts 2 and 4 are cataloged.
+    """
+    members = [m.strip().casefold() for m in inner.split(",")]
+    if members[0].startswith("za"):
+        return "za"
+    count = len(members)
+    if count == 1:
+        member = members[0]
+        if "-" in member:
+            ends = _A64_RANGE_END_RE.findall(member)
+            if len(ends) == 2:
+                numbers = [int(re.match(r"z(\d+)", end, re.IGNORECASE).group(1)) for end in ends]
+                count = numbers[1] - numbers[0] + 1
+        elif _A64_ARRANGEMENT_RE.fullmatch(member):
+            return _av_class(member)
+    return f"av{count}" if count in (2, 4) else "av"
 
 
 def _av_class(arrangement: str) -> str:
@@ -311,12 +340,14 @@ def _classify_line(
         elif prefixed and reg:
             strong.add("x86")
         elif (bare := re.fullmatch(r"\{([^}]*)\}", op)) and (
-            _A64_ARRANGEMENT_RE.fullmatch(bare.group(1).strip().casefold().split(",", 1)[0].strip())
+            _A64_ARRANGEMENT_RE.fullmatch(
+                re.split(r"[,\-]", bare.group(1).strip().casefold(), maxsplit=1)[0].strip()
+            )
             or bare.group(1).strip().casefold().startswith("za")
         ):
-            # An SVE register list ("{z0.b}") or ZA tile list votes AArch64.
+            # An SVE register list ("{z0.b}"), range or ZA tile list votes AArch64.
             strong.add("arm")
-        elif _A64_PRED_RE.fullmatch(name):
+        elif _A64_PRED_RE.fullmatch(name) or _A64_PNG_RE.fullmatch(name):
             strong.add("arm")
         elif not name or "(" in op or "[" in op or "{" in op:
             continue
@@ -399,12 +430,10 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if "arm" in arch:
         list_match = re.fullmatch(r"\{([^}]*)\}", op.strip())
         if list_match:
-            # An SVE brace operand is a register list ("{z0.b}") or ZA tiles.
-            first = list_match.group(1).strip().casefold().split(",", 1)[0].strip()
-            if first.startswith("za"):
-                return "za"
-            if _A64_ARRANGEMENT_RE.fullmatch(first):
-                return _av_class(first)
+            # The class of a brace list is decided by its shape.
+            return _brace_list_class(list_match.group(1).strip())
+        if _A64_PNG_RE.fullmatch(name):
+            return "png"
         if _A64_PRED_RE.fullmatch(name):
             return "pred"
     if "{" in op:
@@ -454,8 +483,8 @@ _IMMEDIATE_ACCEPT = frozenset({"i", "lit0", "lit1"})
 _LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
 _CLASS_KIND = dict(
     [(c, "register") for c in ("r8", "r16", "r32", "r64")]
-    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "dfp", "pred", "za")]
-    + [(c, "vector") for c in ("av", "avb", "avh", "avs", "avd", "avq")]
+    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "dfp", "pred", "png")]
+    + [(c, "vector") for c in ("av", "avb", "avh", "avs", "avd", "avq", "av2", "av4")]
     + [(c, "memory") for c in ("m", "moffs", "mbc", "mo", "mpre", "mreg")]
     + [(f"m{bits}", "memory") for bits in set(_INTEL_SIZE_BITS.values())]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
@@ -533,6 +562,13 @@ def _form_accept(op: str) -> frozenset:
     if "<ZAT" in name:
         return frozenset({"za"})
     if re.match(r"V\d+<|^[ZV]\d+\.|^\{", name):
+        # A counted register list accepts only the same count.
+        zts = re.findall(r"<ZT(\d)", name)
+        if zts:
+            return frozenset({f"av{max(int(number) for number in zts)}"})
+        count = name.count(",") + 1
+        if count in (2, 4):
+            return frozenset({f"av{count}"})
         # A Z-register arrangement element ("Z0.S") accepts its class ("avs"),
         # so the same-lane row outranks the other Z-register rows.
         element = re.search(r"Z\d+\.\d*([BHSDQ])", name)
@@ -544,6 +580,8 @@ def _form_accept(op: str) -> frozenset:
         return frozenset({name[1].lower()})
     if re.match(r"^D<|^<FPFAR_DT>$", name):
         return frozenset({"dfp"})
+    if "PNG" in name:
+        return frozenset({"png"})
     if re.match(r"^P\d", name):
         return frozenset({"pred"})
     # An extend-flavored placeholder (a name with EXTEND) takes the extend

@@ -79,6 +79,26 @@ SVE_ROWS = [
     ("st1d {z0.d}, p0, [x0]", "ST1D ({<OPT_SPACE>Z0.D<OPT_SPACE>}, P0, [<XNSP__3>#0])"),
     ("ld1b {z0.b}, p0/z, [x1, x2]", "LD1B ({<OPT_SPACE>Z0.B<OPT_SPACE>}, P0/Z, [<XNSP__3>, X2])"),
 ]
+# The class of a brace list is its shape: a multi-register list or range
+# matches the counted multi-vector rows, and pn8 is a predicate-as-counter.
+SME2_ROWS = [
+    (
+        "ld1b {z0.b, z1.b}, pn8/z, [x0]",
+        "LD1B ({<OPT_SPACE><ZT1>.B-<ZT2>.B<OPT_SPACE>}, <PNG>/Z, [<XNSP__3>#0])",
+    ),
+    (
+        "st1b {z0.b, z1.b}, pn8, [x0]",
+        "ST1B ({<OPT_SPACE><ZT1>.B-<ZT2>.B<OPT_SPACE>}, <PNG>, [<XNSP__3>#0])",
+    ),
+    (
+        "ld1b {z0.b-z3.b}, pn8/z, [x0]",
+        "LD1B ({<OPT_SPACE><ZT1__2>.B-<ZT4>.B<OPT_SPACE>}, <PNG>/Z, [<XNSP__3>#0])",
+    ),
+    (
+        "st1w {z0.s-z1.s}, pn8, [x0]",
+        "ST1W ({<OPT_SPACE><ZT1>.S-<ZT2>.S<OPT_SPACE>}, <PNG>, [<XNSP__3>#0])",
+    ),
+]
 
 
 class LeftoverArmFormPickTests(unittest.TestCase):
@@ -170,6 +190,15 @@ class LeftoverArmFormPickTests(unittest.TestCase):
 
     def test_sve_lines_pick_their_register_list_row(self):
         for line, fragment in SVE_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+                self.assertNotIn("<ZAT", hover)
+
+    def test_sme2_lists_match_the_counted_rows(self):
+        for line, fragment in SME2_ROWS:
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
