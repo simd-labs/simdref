@@ -1003,8 +1003,16 @@ def _normalize_uops_form(form: str) -> str:
     return f"{head}{sep}{tail}".strip()
 
 
-def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
-    groups: dict[str, list[tuple[InstructionRecord, str]]] = {}
+def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], dict[int, str]]:
+    """Parse the uops.info XML into rows.
+
+    Returns the rows plus a map from each raw ``instruction`` element's
+    ordinal (among the mnemonic-bearing elements, in document order) to the
+    db_key of the row the parser assigned it to. The validator uses that map
+    so it never re-derives the record-to-row mapping.
+    """
+    groups: dict[str, list[tuple[InstructionRecord, str, int]]] = {}
+    raw_index = 0
     for node in _iter_xml_elements(source, "instruction"):
         mnemonic = _intern_small(
             strip_instruction_decorators(
@@ -1094,40 +1102,55 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
             metadata=metadata,
             arch_details=arch_details,
         )
-        groups.setdefault(record.db_key, []).append((record, raw_form))
+        groups.setdefault(record.db_key, []).append((record, raw_form, raw_index))
+        raw_index += 1
     records: list[InstructionRecord] = []
+    assignments: dict[int, str] = {}
     used_keys = set(groups)
     for rows in groups.values():
         if len(rows) == 1:
-            records.append(rows[0][0])
+            record, _, node_index = rows[0]
+            records.append(record)
+            assignments[node_index] = record.db_key
             continue
         # Two raw records share a row only when iform, measurements and
         # arch_details are identical. Variants whose data differs stay as
         # rows of their own, named by the raw uops string the way the
         # pre-normalization parser named them (VMOVAPD_28 (YMM, YMM) next
         # to VMOVAPD (YMM, YMM)); measurement dicts are never merged.
-        seen: set[tuple[str, str]] = set()
-        partitions: list[tuple[InstructionRecord, str]] = []
-        for record, node_raw_form in rows:
+        seen: dict[tuple[str, str], int] = {}
+        partitions: list[tuple[InstructionRecord, str, list[int]]] = []
+        for record, node_raw_form, node_index in rows:
             identity = (
                 record.metadata.get("iform", ""),
                 json.dumps(record.arch_details, sort_keys=True),
             )
-            if identity in seen:
+            position = seen.get(identity)
+            if position is not None:
+                partitions[position][2].append(node_index)
                 continue
-            seen.add(identity)
-            partitions.append((record, node_raw_form))
+            seen[identity] = len(partitions)
+            partitions.append((record, node_raw_form, [node_index]))
         records.append(partitions[0][0])
-        for record, node_raw_form in partitions[1:]:
+        for node_index in partitions[0][2]:
+            assignments[node_index] = partitions[0][0].db_key
+        for record, node_raw_form, node_indices in partitions[1:]:
             head, sep, tail = node_raw_form.partition(" ")
             candidate = f"{_LEADING_INSTR_TAG_RE.sub('', head)}{sep}{tail}".strip()
             if not candidate or _uops_form_db_key(record, candidate) in used_keys:
                 candidate = f"{record.form} [{record.metadata.get('iform', '')}]"
             while _uops_form_db_key(record, candidate) in used_keys:
                 candidate += "~"
-            used_keys.add(_uops_form_db_key(record, candidate))
+            candidate_key = _uops_form_db_key(record, candidate)
+            used_keys.add(candidate_key)
             records.append(replace(record, form=candidate))
-    return records
+            for node_index in node_indices:
+                assignments[node_index] = candidate_key
+    return records, assignments
+
+
+def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
+    return _parse_uops_xml_keyed(source)[0]
 
 
 def _uops_form_db_key(record: InstructionRecord, form: str) -> str:
