@@ -33,6 +33,7 @@ from simdref.riscv import parse_riscv_instruction_payload, parse_riscv_intrinsic
 _UOPS_METADATA_KEYS = frozenset(
     {"category", "cpl", "extension", "iclass", "iform", "url", "url-ref"}
 )
+_UOPS_SPLIT_ATTR_KEYS = ("agen", "eosz", "high8", "immzero", "mask", "zeroing")
 _UOPS_OPERAND_KEYS = ("idx", "r", "w", "type", "width", "xtype", "name")
 _ARM_ACLE_INTRINSIC_BASE_URL = (
     "https://developer.arm.com/architectures/instruction-sets/intrinsics/"
@@ -1045,6 +1046,14 @@ def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], 
             for key, value in node.attrib.items()
             if key in _UOPS_METADATA_KEYS
         }
+        # Variant-split attributes of the uops.info row (spec K1): the byte
+        # lookup narrows an iform pool with these, so they must ride on the
+        # row instead of the raw XML.
+        split_attrs = {
+            key: node.attrib[key].strip() for key in _UOPS_SPLIT_ATTR_KEYS if key in node.attrib
+        }
+        if split_attrs:
+            metadata["split_attrs"] = json.dumps(split_attrs, sort_keys=True)
         if raw_summary:
             metadata["uops_summary"] = raw_summary
         arch_details: dict[str, dict[str, Any]] = {}
@@ -1118,12 +1127,13 @@ def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], 
         # rows of their own, named by the raw uops string the way the
         # pre-normalization parser named them (VMOVAPD_28 (YMM, YMM) next
         # to VMOVAPD (YMM, YMM)); measurement dicts are never merged.
-        seen: dict[tuple[str, str], int] = {}
+        seen: dict[tuple[str, str, str], int] = {}
         partitions: list[tuple[InstructionRecord, str, list[int]]] = []
         for record, node_raw_form, node_index in rows:
             identity = (
                 record.metadata.get("iform", ""),
                 json.dumps(record.arch_details, sort_keys=True),
+                record.metadata.get("split_attrs", ""),
             )
             position = seen.get(identity)
             if position is not None:

@@ -256,6 +256,18 @@ def _candidate_instruction_lists(payload: Any) -> list[list[dict[str, Any]]]:
     return lists
 
 
+def _is_aarchmrs_tree(payload: Any) -> bool:
+    top = payload.get("instructions") if isinstance(payload, dict) else None
+    return (
+        isinstance(top, list)
+        and bool(top)
+        and all(
+            isinstance(node, dict) and str(node.get("_type", "")).endswith("InstructionSet")
+            for node in top
+        )
+    )
+
+
 def _records_from_payload(payload: Any) -> list[InstructionRecord]:
     if isinstance(payload, dict) and payload.get("format") == "arm-aarchmrs-instructions-v1":
         instructions_json = str(payload.get("instructions_json") or "[]")
@@ -264,9 +276,8 @@ def _records_from_payload(payload: Any) -> list[InstructionRecord]:
     if isinstance(payload, dict) and payload.get("format") == "arm-instructions-fixture-v1":
         return _records_from_payload(payload.get("instructions") or [])
 
-    aarchmrs = _records_from_aarchmrs_tree(payload)
-    if aarchmrs:
-        return aarchmrs
+    if _is_aarchmrs_tree(payload):
+        return _records_from_aarchmrs_tree(payload)
 
     for candidates in _candidate_instruction_lists(payload):
         records = [_normalize_instruction_item(item) for item in candidates]
@@ -279,6 +290,44 @@ def _records_from_payload(payload: Any) -> list[InstructionRecord]:
 # ---------------------------------------------------------------------------
 # AARCHMRS (official Arm machine-readable spec) tree walker
 # ---------------------------------------------------------------------------
+
+
+def _encodeset_mask_match(encoding: Any) -> tuple[int, int, int] | None:
+    """Return (bits, mask, match) for an AARCHMRS encodeset, or None.
+
+    Every encodeset entry value with a fixed '0'/'1' pattern adds mask and
+    match bits; 'x' entries (operand fields) add nothing. An entry with a
+    non-binary value or a length that disagrees with its range makes the
+    whole encodeset unusable as a key.
+    """
+    if not isinstance(encoding, dict):
+        return None
+    width = encoding.get("width")
+    values = encoding.get("values")
+    if width != 32 or not isinstance(values, list):
+        return None
+    mask = match = 0
+    for entry in values:
+        if not isinstance(entry, dict):
+            return None
+        value = str(((entry.get("value") or {}).get("value")) or "").strip("'")
+        rng = entry.get("range") or {}
+        start, field_width = rng.get("start"), rng.get("width")
+        if not isinstance(start, int) or not isinstance(field_width, int):
+            return None
+        if len(value) != field_width:
+            return None
+        for i, char in enumerate(value):
+            bit = start + field_width - 1 - i
+            if char == "x":
+                continue
+            if char not in "01":
+                return None
+            mask |= 1 << bit
+            if char == "1":
+                match |= 1 << bit
+    return 32, mask, match
+
 
 _RULE_PLACEHOLDER: dict[str, str] = {
     # Scalar
@@ -458,11 +507,16 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
         return []
 
     records: list[InstructionRecord] = []
-    seen_keys: set[tuple[str, str]] = set()
+    seen_keys: dict[tuple[str, str], tuple[int, int]] = {}
 
     def walk(node: dict[str, Any], group_path: list[str]) -> None:
         node_type = str(node.get("_type", ""))
         if node_type.endswith("Instruction"):
+            enc = _encodeset_mask_match(node.get("encoding"))
+            if enc is None:
+                enc_bits = enc_mask = enc_match = 0
+            else:
+                enc_bits, enc_mask, enc_match = enc
             assembly = node.get("assembly")
             if not isinstance(assembly, dict):
                 return
@@ -470,15 +524,25 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             if not rendered:
                 return
             head, _, tail = rendered.partition(" ")
-            mnemonic = head.strip().upper()
-            if not mnemonic or not re.match(r"^[A-Z][A-Z0-9]*$", mnemonic):
+            # Head tokens can glue a literal or rule placeholder onto the
+            # mnemonic (RET<Rn_option>, DCPS1#0, B.<cond_option>): take the
+            # leading alphanumeric run instead of dropping the whole node.
+            mnemonic_match = re.match(r"[A-Z][A-Z0-9]*", head.strip().upper())
+            if not mnemonic_match:
                 return
+            mnemonic = mnemonic_match.group(0)
             operand_form = tail.strip()
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
             key = (mnemonic, form.casefold())
-            if key in seen_keys:
-                return
-            seen_keys.add(key)
+            seen_enc = seen_keys.get(key)
+            if seen_enc is not None:
+                if seen_enc == (enc_mask, enc_match):
+                    return
+                # Sibling encodings of one rendered form stay separate rows;
+                # their keys are never merged (spec K4).
+                form = f"{form} [{str(node.get('name') or '').strip()}]"
+                key = (mnemonic, form.casefold())
+            seen_keys[key] = (enc_mask, enc_match)
             summary = _generated_summary(mnemonic)
             if not summary.endswith("."):
                 summary += "."
@@ -497,6 +561,9 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                     isa=_infer_aarchmrs_isa(group_path),
                     metadata=metadata,
                     source="arm-a64",
+                    enc_bits=enc_bits,
+                    enc_mask=enc_mask,
+                    enc_match=enc_match,
                 )
             )
             return
@@ -510,8 +577,15 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 walk(child, next_path)
 
     for top_node in top:
-        if isinstance(top_node, dict):
-            walk(top_node, [str(top_node.get("name") or "")])
+        if not isinstance(top_node, dict):
+            continue
+        set_name = str(top_node.get("name") or "")
+        # A32/T32 encodings cannot be scoped from a bare word (their patterns
+        # overlap A32 condition space), and the byte key is defined on the A64
+        # instruction set only (spec K2/K4).
+        if set_name != "A64":
+            continue
+        walk(top_node, [set_name])
     return records
 
 
