@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import dataclasses
 import html
 import io
 import json
@@ -1004,6 +1005,9 @@ def _normalize_uops_form(form: str) -> str:
 def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
     records: list[InstructionRecord] = []
     by_key: dict[str, InstructionRecord] = {}
+    # Distinct variant values per merge key, in document order. The merged
+    # row gets the union of every label a consumer filters or displays.
+    variant_values: dict[str, dict[str, list[str]]] = {}
     for node in _iter_xml_elements(source, "instruction"):
         mnemonic = _intern_small(
             strip_instruction_decorators(
@@ -1098,11 +1102,67 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
         if existing is not None:
             # Encoding variants share one row; keep the first variant's
             # measurements and fold in per-uarch data only where it has none.
+            # ISA/extension labels, summaries and display metadata keep the
+            # union of all variants, or the merge drops rows from the ISA
+            # family filters (an AVX512F_128-only row hid the FMA label of
+            # its VEX variant, dropping VFMADD132PD from the AVX filter).
             for arch, entry in arch_details.items():
                 existing.arch_details.setdefault(arch, entry)
+            merged = variant_values.setdefault(
+                record.db_key,
+                {
+                    "isa": list(existing.isa),
+                    "summary": [existing.summary] if existing.summary else [],
+                    "extension": (
+                        [existing.metadata["extension"]]
+                        if existing.metadata.get("extension")
+                        else []
+                    ),
+                    "category": (
+                        [existing.metadata["category"]] if existing.metadata.get("category") else []
+                    ),
+                    "cpl": [existing.metadata["cpl"]] if existing.metadata.get("cpl") else [],
+                },
+            )
+            for field_name, values in (
+                ("isa", record.isa),
+                ("summary", [record.summary] if record.summary else []),
+                (
+                    "extension",
+                    [record.metadata["extension"]] if record.metadata.get("extension") else [],
+                ),
+                (
+                    "category",
+                    [record.metadata["category"]] if record.metadata.get("category") else [],
+                ),
+                ("cpl", [record.metadata["cpl"]] if record.metadata.get("cpl") else []),
+            ):
+                for value in values:
+                    if value not in merged[field_name]:
+                        merged[field_name].append(value)
+            # Single-valued metadata (url, url-ref, iclass, iform,
+            # uops_summary) keeps the first variant and fills gaps only.
+            for meta_key, meta_value in record.metadata.items():
+                existing.metadata.setdefault(meta_key, meta_value)
             continue
         by_key[record.db_key] = record
         records.append(record)
+    if variant_values:
+        for index, rec in enumerate(records):
+            merged = variant_values.get(rec.db_key)
+            if merged is None:
+                continue
+            metadata = dict(rec.metadata)
+            for meta_key in ("extension", "category", "cpl"):
+                if merged[meta_key]:
+                    metadata[meta_key] = "/".join(merged[meta_key])
+            summary = " | ".join(merged["summary"]) or rec.summary
+            records[index] = dataclasses.replace(
+                rec,
+                isa=merged["isa"] or rec.isa,
+                summary=summary,
+                metadata=metadata,
+            )
     return records
 
 
