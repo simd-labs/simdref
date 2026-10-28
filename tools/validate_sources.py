@@ -17,12 +17,15 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from simdref.arm_instructions import parse_arm_instruction_payload
+from simdref.display import strip_instruction_decorators
 from simdref.ingest import load_or_parse_intel_sdm
 from simdref.ingest_catalog import (
     _arm_live_instruction_refs,
     _canonical_instruction_key,
     _iter_xml_elements,
     _normalize_arm_intrinsic_name,
+    _normalize_uops_form,
+    _parse_uops_xml_keyed,
     _resolve_instruction_ref,
     parse_arm_intrinsics_payload,
     parse_intel_payload,
@@ -375,9 +378,14 @@ def validate_intel_intrinsics() -> tuple[int, int]:
 
 
 def _raw_uops_instructions(source: str | Path) -> list[dict[str, Any]]:
+    # The parser decides which record to skip the same way
+    # (decorator-stripped mnemonic empty), so the raw records line up with
+    # the parser's record ordinals one to one.
     raw_records: list[dict[str, Any]] = []
     for node in _iter_xml_elements(source, "instruction"):
-        mnemonic = _strip(node.attrib.get("asm") or node.attrib.get("name"))
+        mnemonic = strip_instruction_decorators(
+            node.attrib.get("asm") or node.attrib.get("name") or ""
+        ).strip()
         if not mnemonic:
             continue
         form = _strip(
@@ -386,10 +394,30 @@ def _raw_uops_instructions(source: str | Path) -> list[dict[str, Any]]:
             or node.attrib.get("cpl")
             or node.attrib.get("category")
         )
+        arch_details: dict[str, Any] = {}
+        for child in node:
+            if child.tag != "architecture":
+                continue
+            arch = (
+                child.attrib.get("name")
+                or child.attrib.get("uarch")
+                or child.attrib.get("arch")
+                or ""
+            ).strip()
+            if not arch:
+                continue
+            entry: dict[str, Any] = {"measurement": {}, "latencies": []}
+            for grandchild in child:
+                if grandchild.tag == "measurement":
+                    entry["measurement"] = dict(grandchild.attrib)
+                    entry["latencies"] = [
+                        dict(latency.attrib) for latency in grandchild.findall("./latency")
+                    ]
+            arch_details[arch] = entry
         raw_records.append(
             {
                 "mnemonic": mnemonic,
-                "form": form,
+                "form": _normalize_uops_form(form),
                 "iform": _strip(node.attrib.get("iform")),
                 "iclass": _strip(node.attrib.get("iclass")),
                 "extension": _strip(node.attrib.get("extension")),
@@ -397,74 +425,78 @@ def _raw_uops_instructions(source: str | Path) -> list[dict[str, Any]]:
                 "url": _strip(node.attrib.get("url")),
                 "url-ref": _strip(node.attrib.get("url-ref")),
                 "operand_count": len(node.findall("./operand")),
+                "arch_details": arch_details,
             }
         )
     return raw_records
 
 
+def _uops_measurements_cover(row_details: dict[str, Any], raw_details: dict[str, Any]) -> bool:
+    for arch, raw_entry in raw_details.items():
+        entry = row_details.get(arch)
+        if entry is None:
+            return False
+        if entry.get("measurement") != raw_entry.get("measurement"):
+            return False
+        if entry.get("latencies") != raw_entry.get("latencies"):
+            return False
+    return True
+
+
 def validate_uops_instructions() -> tuple[int, int]:
     source, _source = fetch_uops_xml()
     parsed = parse_uops_xml(source)
-    by_iform: dict[str, list[Any]] = {}
-    by_key: dict[tuple[str, str], list[Any]] = {}
-    for record in parsed:
-        if record.metadata.get("iform"):
-            by_iform.setdefault(record.metadata["iform"], []).append(record)
-        by_key.setdefault((record.mnemonic, record.form), []).append(record)
+    # The parser decides which row each raw record lands on; ask it for the
+    # row key of every raw record and look up exactly that row. No grouping
+    # index and no normalization re-derived here, so no sibling row can
+    # stand in for a record that lost its data.
+    row_keys = _parse_uops_xml_keyed(source)[1]
+    rows_by_key: dict[str, Any] = {record.db_key: record for record in parsed}
     raw_records = _raw_uops_instructions(source)
     failures = 0
     checked = 0
+    if len(row_keys) != len(raw_records):
+        print(
+            f"FAIL uops: parser keyed {len(row_keys)} records, "
+            f"validator reads {len(raw_records)} raw records"
+        )
+        failures += 1
 
-    for raw in raw_records:
+    for index, raw in enumerate(raw_records):
         checked += 1
-        candidates = by_iform.get(raw["iform"], []) if raw["iform"] else []
-        if not candidates:
-            candidates = by_key.get((raw["mnemonic"], raw["form"]), [])
-        if not candidates:
-            print(
-                f"FAIL uops: missing record for {raw['mnemonic']} / {raw['iform'] or raw['form']}"
-            )
+        label = raw["iform"] or raw["form"]
+        record = rows_by_key.get(row_keys.get(index, ""))
+        if record is None:
+            print(f"FAIL uops: missing parsed row for {raw['mnemonic']} / {label}")
             failures += 1
             continue
-
-        record = None
-        for candidate in candidates:
-            if candidate.mnemonic != raw["mnemonic"]:
-                continue
-            if raw["form"] and candidate.form != raw["form"]:
-                continue
-            if len(candidate.operand_details) != raw["operand_count"]:
-                continue
-            record = candidate
-            break
-        if record is None:
-            record = candidates[0]
-
         if record.mnemonic != raw["mnemonic"]:
-            print(f"FAIL uops: mnemonic mismatch for {raw['iform'] or raw['mnemonic']}")
+            print(f"FAIL uops: mnemonic mismatch for {label}")
             failures += 1
-        if raw["iform"] and record.metadata.get("iform", "") != raw["iform"]:
-            print(f"FAIL uops: iform mismatch for {raw['iform']}")
+        if record.metadata.get("iform", "") != raw["iform"]:
+            print(f"FAIL uops: iform mismatch for {label}")
             failures += 1
         if raw["iclass"] and record.metadata.get("iclass", "") != raw["iclass"]:
-            print(f"FAIL uops: iclass mismatch for {raw['iform'] or raw['mnemonic']}")
+            print(f"FAIL uops: iclass mismatch for {label}")
             failures += 1
         if raw["category"] and record.metadata.get("category", "") != raw["category"]:
-            print(f"FAIL uops: category mismatch for {raw['iform'] or raw['mnemonic']}")
+            print(f"FAIL uops: category mismatch for {label}")
             failures += 1
         if raw["extension"] and record.metadata.get("extension", "") != raw["extension"]:
-            print(f"FAIL uops: extension mismatch for {raw['iform'] or raw['mnemonic']}")
+            print(f"FAIL uops: extension mismatch for {label}")
             failures += 1
         if len(record.operand_details) != raw["operand_count"]:
-            print(f"FAIL uops: operand count mismatch for {raw['iform'] or raw['mnemonic']}")
+            print(f"FAIL uops: operand count mismatch for {label}")
+            failures += 1
+        if raw["arch_details"] and not _uops_measurements_cover(
+            record.arch_details, raw["arch_details"]
+        ):
+            print(f"FAIL uops: missing measurements for {label}")
             failures += 1
         if not record.summary.strip():
-            print(f"FAIL uops: empty summary for {raw['iform'] or raw['mnemonic']}")
+            print(f"FAIL uops: empty summary for {label}")
             failures += 1
 
-    if len(parsed) < len(raw_records):
-        print(f"FAIL uops: parsed count {len(parsed)} < source count {len(raw_records)}")
-        failures += 1
     print(
         f"validated uops.info instructions: checked={checked} parsed={len(parsed)} failures={failures}"
     )
