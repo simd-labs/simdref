@@ -4,9 +4,12 @@ A post-index line ("ldr s1, [x11], #4") hovers the post-index row, not the
 register-offset row; a '#' immediate holds class i, so the immediate row
 outranks a same-shape register row. The bracket key split counts only
 top-level commas, so a pre-index key and a register-offset key read as two
-operands, like the line. "mov <Wd>, #imm" is the GAS alias the catalog keys
-as MOVZ (or MOVN for a negative value). Hover and inlay hints go through the
-same picker, so they agree on every row.
+operands, like the line. An AArch64 alias fires only where the operand text
+alone decides the target: register moves are ORR, moves with sp or wsp are
+ADD immediate #0, an immediate move is MOVZ, MOVN or ORR by its exact
+encoding, and one ZA tile under a governing predicate is MOVA. Any other
+mov form shows nothing. Hover and inlay hints go through the same picker,
+so they agree on every row.
 """
 
 import os
@@ -99,16 +102,44 @@ SME2_ROWS = [
         "ST1W ({<OPT_SPACE><ZT1>.S-<ZT2>.S<OPT_SPACE>}, <PNG>, [<XNSP__3>#0])",
     ),
 ]
-# The alias target of a mov line is decided by the operand class: a ZA tile
-# or array operand means MOVA, P registers mean the predicate ORR form, an
-# SVE immediate means DUP.
+# The alias target of a mov line is decided by the operand class: a single
+# ZA tile under a governing predicate means MOVA, a general-register pair is
+# ORR, sp or wsp is ADD immediate #0, and an immediate is MOVZ, MOVN or ORR
+# by its exact encoding.
 MOV_ALIAS_ROWS = [
     ("mov za0h.b[w12, 0], p0/m, z0.b", "MOVA (<ZAD__ZERO><HV__7>.B[W1, #0], P0/M, Z1.B)"),
     ("mov z0.b, p0/m, za0h.b[w12, 0]", "MOVA (Z0.B, P0/M, <ZAN__ZERO><HV__4>.B[W1, #0])"),
-    ("mov p0.b, p1.b", "ORR (P0.B, P0/Z, P1.B, P2.B)"),
-    ("mov z0.b, #42", "DUP (Z0.4S, <HASH>#0#0)"),
     ("mov x0, x1", "ORR (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
     ("mov x29, sp", "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)"),
+    ("mov x0, #0x10, lsl #16", "MOVZ (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)"),
+    ("mov x0, #0X1234", "MOVZ (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)"),
+    ("mov w0, #-65536", "MOVZ (<WDORWZR>, <HASH>#0<OPTIONAL_EXTEND__12>)"),
+    ("mov x0, #0xffffffffffff1234", "MOVN (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)"),
+    ("mov w0, #0xffff1234", "MOVN (<WDORWZR>, <HASH>#0<OPTIONAL_EXTEND__12>)"),
+    ("mov x0, #-0X8000000000000000", "MOVZ (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)"),
+    ("mov w0, #0x00ff00ff", "ORR (<WDWSP_OPTION>, <WNORWZR>, <HASH>#0)"),
+    ("mov x0, #0x00ff00ff00ff00ff", "ORR (<XDSP_OPTION>, <XNORXZR__11>, <HASH>#0)"),
+]
+# Every other mov form shows nothing: SIMD&FP forms, vector lanes, SVE and
+# predicate forms, multi-tile ZA lists, and any immediate that does not
+# parse. The server must survive every one of these inputs.
+MOV_NULL_ROWS = [
+    "mov z0.b, w2",
+    "mov z0.b, p1/m, z2.b",
+    "mov d0, v1.d[1]",
+    "mov v0.b[0], v1.b[15]",
+    "mov v0.8b, v1.8b",
+    "mov b0, v1.b[15]",
+    "mov p0.b, p1.b",
+    "mov p0.b, p1/m, p2.b",
+    "mov z0.b, #42",
+    "mov za0h.b[w12, 0:1], {z0.b-z1.b}",
+    "mov za.b[w8, 0, vgx2], {z0.b-z1.b}",
+    "mov z0.d, sp",
+    "mov x0, #0x",
+    "mov x0, #",
+    "mov x0, #" + "9" * 5000,
+    "mov x0, #:lo12:sym",
 ]
 
 
@@ -217,7 +248,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
                 self.assertIsNotNone(hint)
                 self.assertNotIn("<ZAT", hover)
 
-    def test_mov_picks_the_alias_row_of_its_operand_class(self):
+    def test_mov_keeps_only_decided_alias_rows(self):
         for line, fragment in MOV_ALIAS_ROWS:
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
@@ -226,6 +257,19 @@ class LeftoverArmFormPickTests(unittest.TestCase):
                 if fragment.startswith("MOVA"):
                     self.assertNotIn("ORR (", hover)
                 self.assertIsNotNone(hint)
+
+    def test_undecided_mov_forms_show_nothing(self):
+        for line in MOV_NULL_ROWS:
+            with self.subTest(line=line[:40]):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNone(hover)
+                self.assertIsNone(hint)
+
+    def test_x86_pred_operand_line_stays_x86(self):
+        hover, hint = self._hover_and_hint("str p0.b")
+        self.assertIsNotNone(hover)
+        self.assertIn("STR (M16)", hover)
+        self.assertNotIn("arm:", hover)
 
 
 if __name__ == "__main__":

@@ -149,15 +149,17 @@ _A64_SCALAR_RE = re.compile(r"(?:x(?:[0-9]|[12][0-9]|30)|w(?:[0-9]|[12][0-9]|30)
 _A64_SCALAR_FP_RE = re.compile(r"[bhsdq](?:[0-9]|[12][0-9]|3[01])\Z")
 # A bare v register is a vector spelling ARM and RISC-V share.
 _A64_VECTOR_BARE_RE = re.compile(r"v(?:[0-9]|[12][0-9]|3[01])\Z")
-# SVE predicate register with an optional arrangement, /z or /m qualifier
-# ("p0", "p0.b", "p0/z").
-_A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:\.[bhsdq])?(?:/[zm])?\Z", re.IGNORECASE)
-# An SME ZA tile or array operand ("za0h.b[w12, 0]", "za0.d[w8, #0]", brace list).
-_A64_ZA_TILE_RE = re.compile(r"\{?\s*za\d", re.IGNORECASE)
-# A vector element with a lane index ("v1.d[1]", "z1.b[3]").
-_A64_INDEX_ELEM_RE = re.compile(r"[zv](?:3[01]|[12]?\d)\.\d*[bhsdq]\[\d+\]\Z", re.IGNORECASE)
-# An immediate value after the hash ("#0x10", "#-42").
-_A64_MOV_IMM_RE = re.compile(r"#\s*(-?(?:0x[0-9a-f]+|\d+))", re.IGNORECASE)
+# SVE predicate register with an optional /z or /m qualifier ("p0/z").
+_A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
+# A single SME ZA tile element ("za0h.b[w12, 0]"), never a multi-tile range
+# ("za0h.b[w12, 0:1]") or a vector-length-grouped array ("za.b[w8, 0, vgx2]").
+_A64_ZA_TILE_RE = re.compile(r"za\d+[vh]?\.[bhsd]\[\s*w\d+\s*,\s*#?\d+\s*\]", re.IGNORECASE)
+# Operand spellings only AArch64 uses: a vector lane ("v1.d[1]"), a predicate
+# with an arrangement ("p0.b"), a predicate counter ("pn8.b"), or a ZA tile.
+_A64_ONLY_RE = re.compile(
+    r"[zv](?:3[01]|[12]?\d)\.\d*[bhsdq]\[\d+\]|pn?(?:1[0-5]|[0-9])\.[bhsdq]|\{?\s*za",
+    re.IGNORECASE,
+)
 
 
 def _logical_immediate(value: int, bits: int) -> bool:
@@ -381,10 +383,7 @@ def _classify_line(
         ):
             # An SVE register list ("{z0.b}"), range or ZA tile list votes AArch64.
             strong.add("arm")
-        elif _A64_PRED_RE.fullmatch(name) or _A64_PNG_RE.fullmatch(name):
-            strong.add("arm")
-        elif _A64_INDEX_ELEM_RE.fullmatch(name):
-            # An indexed element ("v0.s[1]", "z1.b[3]") votes AArch64.
+        elif _A64_PNG_RE.fullmatch(name):
             strong.add("arm")
         elif not name or "(" in op or "[" in op or "{" in op:
             continue
@@ -808,94 +807,92 @@ def _zreg(classes: list) -> str:
     return "wzr" if classes and classes[0] in ("w", "wsp", "wzr") else "xzr"
 
 
-def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
-    """(alias mnemonic, classes transform) for an AArch64 alias line, or None.
+def _a64_gpr_bits(name: str) -> int | None:
+    """The width of a general-register spelling (sp, fp, lr included), or None."""
+    bits = {"sp": 64, "fp": 64, "lr": 64, "xzr": 64, "wsp": 32, "wzr": 32}
+    return bits.get(name) or (
+        (64, 32)[name.startswith("w")] if _A64_SCALAR_RE.fullmatch(name) else None
+    )
 
-    The catalog keys no MOVE/CMP/CMN/TST row in arm: an immediate move is
-    MOVN (negative value) or MOVZ, a register move is ORR shifted register
-    with the width-apportioned zero register at operand 2, a move with sp or
-    wsp on either side is ADD immediate with #0, and cmp/cmn/tst are
-    subs/adds/ands with the zero register inserted as destination. The
-    transform rewrites the line's class list accordingly, so the weak gate,
-    hover and the inlay hint all judge the aliased form.
-    The alias applies only to a line decided as AArch64: one ARM32 name
-    (r0-r15, ip, pc) rules it out, and a non-arm candidate bucket does too.
-    shortcut: fails when the immediate value is not a plain number, and
-    alias-target rows missing from the catalog (SUBS immediate) match the
-    nearest row of the target mnemonic.
+
+def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
+    """(alias mnemonic, classes transform) for an AArch64 alias line.
+
+    The catalog keys no MOV/CMP/CMN/TST row in arm, so the alias names the
+    canonical instruction. Only forms the operand text alone decides are
+    aliased: a register mov is ORR with the zero register as source, a mov
+    with sp or wsp is ADD immediate #0, an immediate mov is MOVZ, MOVN or
+    ORR by its exact encoding, one ZA tile under a predicate is MOVA, and
+    cmp/cmn/tst are subs/adds/ands with the zero register as destination.
+    Every other form returns ("", None): hover and hint show nothing, never
+    a row of another instruction. An x86 or ARM32 line is no alias at all.
+    shortcut: alias-target rows missing from the catalog (SUBS immediate)
+    match the nearest row of the target mnemonic.
     """
-    if "arm" not in arch:
+    if "x86" in arch:
         return None
     parts, _marks = _split_asm_operands(operands)
     names = [piece.strip().lstrip("*").casefold() for piece in parts]
     if any(_ARM32_SCALAR_RE.fullmatch(name) for name in names):
         return None
     mnemonic = mnemonic.casefold()
+    if mnemonic not in ("mov", "cmp", "cmn", "tst"):
+        return None
+    if "arm" not in arch and not any(_A64_ONLY_RE.match(name) for name in names):
+        return None
     if mnemonic == "mov":
-        folded = ", ".join(parts)
-        # A ZA tile or array operand (or tile list) means SME MOVA.
-        if any(_A64_ZA_TILE_RE.match(name) for name in names):
+        # MOVA: one ZA tile element, a governing predicate, one Z register.
+        if (
+            len(parts) == 3
+            and any(_A64_ZA_TILE_RE.fullmatch(name) for name in names)
+            and any(_A64_PRED_RE.fullmatch(name) for name in names)
+            and any(_A64_ARRANGEMENT_RE.fullmatch(name) for name in names)
+        ):
             return ("mova", lambda classes: classes)
-        if any(name in ("sp", "wsp") for name in names):
-            # MOV to/from SP is an ADD immediate; append a literal zero.
-            return ("add", lambda classes: [*classes, "lit0"])
-        index_parts = [i for i, name in enumerate(names) if _A64_INDEX_ELEM_RE.fullmatch(name)]
-        if index_parts:
-            # Element moves: z-register forms are DUP, v-lane insert is INS,
-            # else UMOV to a general register or DUP to an FP scalar.
-            if names[0].startswith("z"):
-                return ("dup", lambda classes: classes)
-            if 0 in index_parts:
-                return ("ins", lambda classes: classes)
-            if _A64_SCALAR_FP_RE.fullmatch(names[0]):
-                return ("dup", lambda classes: classes)
-            return ("umov", lambda classes: classes)
-        if "#" in folded:
-            # An SVE z-register destination is a DUP immediate, or a CPY when
-            # a predicate gates the move.
-            if _A64_ARRANGEMENT_RE.fullmatch(names[0]) and names[0].startswith("z"):
-                if any(_A64_PRED_RE.fullmatch(name) for name in names):
-                    return ("cpy", lambda classes: classes)
-                return ("dup", lambda classes: classes)
-            value_match = _A64_MOV_IMM_RE.search(folded)
-            if value_match:
-                digits = value_match.group(1)
-                value = int(digits.lstrip("-"), 16 if "0x" in digits else 10)
-                if not digits.startswith("-"):
-                    bits = 64 if names[0].startswith("x") else 32
-                    mask = (1 << bits) - 1
-                    # MOVZ wins when the value is a shifted halfword.
-                    if any(value & (mask & ~(0xFFFF << step)) == 0 for step in (0, 16, 32, 48)):
+        if len(parts) == 2:
+            dst, src = names
+            dst_bits, src_bits = _a64_gpr_bits(dst), _a64_gpr_bits(src)
+            if dst_bits and src_bits and dst_bits == src_bits:
+                if dst in ("sp", "wsp") or src in ("sp", "wsp"):
+                    # MOV to or from SP is ADD immediate with #0.
+                    return ("add", lambda classes: [*classes, "lit0"])
+                # A register move is ORR shifted register: the zero register
+                # is the source. shortcut: nearest row when no ORR row takes it.
+                return ("orr", lambda classes: [classes[0], _zreg(classes), *classes[1:]])
+            if dst_bits and src.startswith("#"):
+                # int(text, 0) inside a length cap: a parse failure means the
+                # line shows nothing, and a huge immediate cannot crash the
+                # server.
+                text = src.strip().lstrip("#").strip()
+                try:
+                    value = int(text, 0) if len(text) <= 20 else None
+                except ValueError:
+                    value = None
+                if value is None:
+                    return ("", None)
+                mask = (1 << dst_bits) - 1
+                value &= mask
+                steps = (0, 16, 32, 48)
+                if dst not in ("sp", "wsp"):
+                    # MOVZ when the value is a shifted halfword, else MOVN
+                    # when the inverted value is.
+                    if any(value & (mask & ~(0xFFFF << step)) == 0 for step in steps):
                         return ("movz", lambda classes: classes)
-                    # A bitmask-decodable value is an ORR immediate with the
-                    # zero register as the source.
-                    if _logical_immediate(value, bits):
-                        return ("orr", lambda classes: [classes[0], _zreg(classes), *classes[1:]])
-            # shortcut: the alias of a positive value not decodable as a
-            # bitmask immediate is MOVZ, and the alias of a negative is MOVN.
-            return (
-                ("movn" if folded.split("#")[-1].strip().startswith("-") else "movz"),
-                lambda classes: classes,
-            )
-
-        # A register move is an ORR; expand the classes to the canonical row:
-        # a general register pair takes the zero register as the source, a
-        # vector move repeats the source, a predicate move fills all four.
-        def _orr_classes(classes):
-            scalar = {"w", "x", "sp", "wsp", "wzr", "xzr", "ws", "xs"}
-            if classes and all(c in scalar for c in classes):
-                return [classes[0], _zreg(classes), *classes[1:]]
-            if classes and all(_CLASS_KIND.get(c) == "vector" for c in classes):
-                if all(c == "pred" for c in classes):
-                    return [classes[0], classes[0], *classes[1:], *classes[1:]]
-                return [classes[0], *classes[1:], *classes[1:]]
-            return classes
-
-        return ("orr", _orr_classes)
-    alias = {"cmp": "subs", "cmn": "adds", "tst": "ands"}.get(mnemonic)
-    if alias:
+                    if any((value ^ mask) & (mask & ~(0xFFFF << step)) == 0 for step in steps):
+                        return ("movn", lambda classes: classes)
+                # ORR bitmask immediate: the only immediate MOV to SP.
+                if _logical_immediate(value, dst_bits):
+                    return ("orr", lambda classes: [classes[0], _zreg(classes), *classes[1:]])
+        return ("", None)
+    alias = {"cmp": "subs", "cmn": "adds", "tst": "ands"}[mnemonic]
+    # The catalog holds register and immediate forms of the target only.
+    if (
+        len(parts) == 2
+        and _a64_gpr_bits(names[0])
+        and (_a64_gpr_bits(names[1]) or names[1].startswith("#"))
+    ):
         return (alias, lambda classes: [_zreg(classes), *classes])
-    return None
+    return ("", None)
 
 
 def _hover_markdown(
@@ -953,12 +950,15 @@ def _hover_markdown(
         operand_count = len(line[1])
     # One alias step for hover and hint: an AArch64 alias line (mov, cmp,
     # cmn, tst) is judged on the alias mnemonic's rows before any weak-gate
-    # or catalog-miss decision.
+    # or catalog-miss decision. An empty alias mnemonic means the operand
+    # text does not decide the form: show nothing.
     alias = _a64_alias_for_line(word, line[0], operand_text)
     if alias:
         word_mn, transform = alias
     else:
         word_mn, transform = word, None
+    if not word_mn:
+        return None
     # Weak votes come from spellings two architectures share (a RISC-V `add
     # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them once here
     # so the exact-name path and _match_form both honor the veto.
@@ -1192,7 +1192,8 @@ def _hint_label(
 ) -> str | None:
     line = _classify_line(operands, intel)
     # The same one alias step as hover, before the catalog-miss return, so
-    # both entries judge the alias mnemonic's rows.
+    # both entries judge the alias mnemonic's rows. An empty alias mnemonic
+    # matches no rows and the hint is None, like hover.
     alias = _a64_alias_for_line(mnemonic, line[0], operands)
     lookup_mn, transform = alias if alias else (mnemonic, None)
     matches, width = _mnemonic_matches(db_path, lookup_mn, line[0])
