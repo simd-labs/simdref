@@ -149,8 +149,42 @@ _A64_SCALAR_RE = re.compile(r"(?:x(?:[0-9]|[12][0-9]|30)|w(?:[0-9]|[12][0-9]|30)
 _A64_SCALAR_FP_RE = re.compile(r"[bhsdq](?:[0-9]|[12][0-9]|3[01])\Z")
 # A bare v register is a vector spelling ARM and RISC-V share.
 _A64_VECTOR_BARE_RE = re.compile(r"v(?:[0-9]|[12][0-9]|3[01])\Z")
-# SVE predicate register with an optional /z or /m qualifier ("p0/z").
-_A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
+# SVE predicate register with an optional arrangement, /z or /m qualifier
+# ("p0", "p0.b", "p0/z").
+_A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:\.[bhsdq])?(?:/[zm])?\Z", re.IGNORECASE)
+# An SME ZA tile or array operand ("za0h.b[w12, 0]", "za0.d[w8, #0]", brace list).
+_A64_ZA_TILE_RE = re.compile(r"\{?\s*za\d", re.IGNORECASE)
+# A vector element with a lane index ("v1.d[1]", "z1.b[3]").
+_A64_INDEX_ELEM_RE = re.compile(r"[zv](?:3[01]|[12]?\d)\.\d*[bhsdq]\[\d+\]\Z", re.IGNORECASE)
+# An immediate value after the hash ("#0x10", "#-42").
+_A64_MOV_IMM_RE = re.compile(r"#\s*(-?(?:0x[0-9a-f]+|\d+))", re.IGNORECASE)
+
+
+def _logical_immediate(value: int, bits: int) -> bool:
+    """True when value is encodable as an AArch64 logical (bitmask) immediate
+    of the given register width: a rotated run of ones, replicated at a
+    power-of-two element size.
+    """
+    mask = (1 << bits) - 1
+    value &= mask
+    if value in (0, mask):
+        return False
+    for size in (64, 32, 16, 8, 4, 2):
+        if size > bits:
+            continue
+        smask = (1 << size) - 1
+        for run in range(1, size):
+            base = smask >> (size - run)
+            for rot in range(size):
+                pattern = ((base >> rot) | (base << (size - rot))) & smask
+                replicated = 0
+                for chunk in range(bits // size):
+                    replicated |= pattern << (size * chunk)
+                if replicated == value:
+                    return True
+    return False
+
+
 # SME predicate-as-counter register with an optional qualifier ("pn8/z").
 _A64_PNG_RE = re.compile(r"pn(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
 # The register spelled at either end of a Z-range member ("z0.b-z3.b").
@@ -348,6 +382,9 @@ def _classify_line(
             # An SVE register list ("{z0.b}"), range or ZA tile list votes AArch64.
             strong.add("arm")
         elif _A64_PRED_RE.fullmatch(name) or _A64_PNG_RE.fullmatch(name):
+            strong.add("arm")
+        elif _A64_INDEX_ELEM_RE.fullmatch(name):
+            # An indexed element ("v0.s[1]", "z1.b[3]") votes AArch64.
             strong.add("arm")
         elif not name or "(" in op or "[" in op or "{" in op:
             continue
@@ -783,9 +820,9 @@ def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
     hover and the inlay hint all judge the aliased form.
     The alias applies only to a line decided as AArch64: one ARM32 name
     (r0-r15, ip, pc) rules it out, and a non-arm candidate bucket does too.
-    shortcut: the bitmask ORR alias of an immediate move reads as MOVZ (no
-    logical-immediate decode), and alias-target rows missing from the
-    catalog (SUBS immediate) match the nearest row of the target mnemonic.
+    shortcut: fails when the immediate value is not a plain number, and
+    alias-target rows missing from the catalog (SUBS immediate) match the
+    nearest row of the target mnemonic.
     """
     if "arm" not in arch:
         return None
@@ -796,14 +833,65 @@ def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
     mnemonic = mnemonic.casefold()
     if mnemonic == "mov":
         folded = ", ".join(parts)
+        # A ZA tile or array operand (or tile list) means SME MOVA.
+        if any(_A64_ZA_TILE_RE.match(name) for name in names):
+            return ("mova", lambda classes: classes)
         if any(name in ("sp", "wsp") for name in names):
+            # MOV to/from SP is an ADD immediate; append a literal zero.
             return ("add", lambda classes: [*classes, "lit0"])
-        if "#" not in folded:
-            return ("orr", lambda classes: [classes[0], _zreg(classes), *classes[1:]])
-        found = re.search(r"#\s*(-?0x|-?\d)", folded, re.IGNORECASE)
-        if not found:
-            return None
-        return ("movn" if found.group(1).startswith("-") else "movz", lambda classes: classes)
+        index_parts = [i for i, name in enumerate(names) if _A64_INDEX_ELEM_RE.fullmatch(name)]
+        if index_parts:
+            # Element moves: z-register forms are DUP, v-lane insert is INS,
+            # else UMOV to a general register or DUP to an FP scalar.
+            if names[0].startswith("z"):
+                return ("dup", lambda classes: classes)
+            if 0 in index_parts:
+                return ("ins", lambda classes: classes)
+            if _A64_SCALAR_FP_RE.fullmatch(names[0]):
+                return ("dup", lambda classes: classes)
+            return ("umov", lambda classes: classes)
+        if "#" in folded:
+            # An SVE z-register destination is a DUP immediate, or a CPY when
+            # a predicate gates the move.
+            if _A64_ARRANGEMENT_RE.fullmatch(names[0]) and names[0].startswith("z"):
+                if any(_A64_PRED_RE.fullmatch(name) for name in names):
+                    return ("cpy", lambda classes: classes)
+                return ("dup", lambda classes: classes)
+            value_match = _A64_MOV_IMM_RE.search(folded)
+            if value_match:
+                digits = value_match.group(1)
+                value = int(digits.lstrip("-"), 16 if "0x" in digits else 10)
+                if not digits.startswith("-"):
+                    bits = 64 if names[0].startswith("x") else 32
+                    mask = (1 << bits) - 1
+                    # MOVZ wins when the value is a shifted halfword.
+                    if any(value & (mask & ~(0xFFFF << step)) == 0 for step in (0, 16, 32, 48)):
+                        return ("movz", lambda classes: classes)
+                    # A bitmask-decodable value is an ORR immediate with the
+                    # zero register as the source.
+                    if _logical_immediate(value, bits):
+                        return ("orr", lambda classes: [classes[0], _zreg(classes), *classes[1:]])
+            # shortcut: the alias of a positive value not decodable as a
+            # bitmask immediate is MOVZ, and the alias of a negative is MOVN.
+            return (
+                ("movn" if folded.split("#")[-1].strip().startswith("-") else "movz"),
+                lambda classes: classes,
+            )
+
+        # A register move is an ORR; expand the classes to the canonical row:
+        # a general register pair takes the zero register as the source, a
+        # vector move repeats the source, a predicate move fills all four.
+        def _orr_classes(classes):
+            scalar = {"w", "x", "sp", "wsp", "wzr", "xzr", "ws", "xs"}
+            if classes and all(c in scalar for c in classes):
+                return [classes[0], _zreg(classes), *classes[1:]]
+            if classes and all(_CLASS_KIND.get(c) == "vector" for c in classes):
+                if all(c == "pred" for c in classes):
+                    return [classes[0], classes[0], *classes[1:], *classes[1:]]
+                return [classes[0], *classes[1:], *classes[1:]]
+            return classes
+
+        return ("orr", _orr_classes)
     alias = {"cmp": "subs", "cmn": "adds", "tst": "ands"}.get(mnemonic)
     if alias:
         return (alias, lambda classes: [_zreg(classes), *classes])

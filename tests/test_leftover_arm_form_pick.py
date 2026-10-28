@@ -99,6 +99,17 @@ SME2_ROWS = [
         "ST1W ({<OPT_SPACE><ZT1>.S-<ZT2>.S<OPT_SPACE>}, <PNG>, [<XNSP__3>#0])",
     ),
 ]
+# The alias target of a mov line is decided by the operand class: a ZA tile
+# or array operand means MOVA, P registers mean the predicate ORR form, an
+# SVE immediate means DUP.
+MOV_ALIAS_ROWS = [
+    ("mov za0h.b[w12, 0], p0/m, z0.b", "MOVA (<ZAD__ZERO><HV__7>.B[W1, #0], P0/M, Z1.B)"),
+    ("mov z0.b, p0/m, za0h.b[w12, 0]", "MOVA (Z0.B, P0/M, <ZAN__ZERO><HV__4>.B[W1, #0])"),
+    ("mov p0.b, p1.b", "ORR (P0.B, P0/Z, P1.B, P2.B)"),
+    ("mov z0.b, #42", "DUP (Z0.4S, <HASH>#0#0)"),
+    ("mov x0, x1", "ORR (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
+    ("mov x29, sp", "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)"),
+]
 
 
 class LeftoverArmFormPickTests(unittest.TestCase):
@@ -205,6 +216,16 @@ class LeftoverArmFormPickTests(unittest.TestCase):
                 self.assertIn(fragment, hover)
                 self.assertIsNotNone(hint)
                 self.assertNotIn("<ZAT", hover)
+
+    def test_mov_picks_the_alias_row_of_its_operand_class(self):
+        for line, fragment in MOV_ALIAS_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                if fragment.startswith("MOVA"):
+                    self.assertNotIn("ORR (", hover)
+                self.assertIsNotNone(hint)
 
 
 if __name__ == "__main__":
