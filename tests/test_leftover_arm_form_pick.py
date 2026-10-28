@@ -44,7 +44,35 @@ SHIFT_ROWS = [
     ("cmp x0, x1, lsl #2", "SUBS (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
     ("ldr x0, [x1, x2, lsl #3]", "LDR (<XTORXZR__11>, [<XNSP_OPTION>, <WORX_CHOICE>"),
 ]
-# An SVE line without ZA tiles picks its exact Z-register-list row.
+# Finding 5: the suffix kind selects shifted vs extended register rows.
+EXTEND_ROWS = [
+    ("sub x0, x1, w2, sxtx #2", "SUB (<XDSP_OPTION>, <XNSP_OPTION__6>, <R_OPTION__2>"),
+    ("sub x0, x1, x2, sxtx #2", "SUB (<XDSP_OPTION>, <XNSP_OPTION__6>, <R_OPTION__2>"),
+    ("add x0, x1, x2, lsr #1", "ADD (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
+    ("adds x0, x1, w2, uxtw #1", "ADDS (<XDORXZR__6>, <XNSP_OPTION__6>, <R_OPTION__2>"),
+]
+# Finding 1: alias lines agree between hover and hint.
+ALIAS_ROWS = [
+    ("cmn x0, x1", "ADDS (<XDORXZR__6>"),
+    ("tst x0, x1", "ANDS (<XDORXZR__6>"),
+    ("cmp w0, w1", "SUBS (<WDORWZR>"),
+    ("mov x0, x1", "ORR (<XDORXZR__6>"),
+]
+# Finding 3: sp/wsp moves are ADD immediate with #0, at the operand width.
+SP_MOVE_ROWS = [
+    ("mov x29, sp", "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)"),
+    ("mov sp, x29", "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)"),
+    ("mov w0, wsp", "ADD (<WDWSP_OPTION>, <WNWSP_OPTION>, <HASH>#0#0)"),
+]
+# Finding 4: the weak gate judges the aliased form on shared fp/sp spellings.
+WEAK_ROWS = [
+    ("mov fp, sp", "ADD (<XDSP_OPTION>"),
+    ("cmp fp, sp", "SUBS"),
+    ("tst fp, sp", "ANDS"),
+]
+# Finding 2: an ARM32 line (r0-r15) gets no AArch64 alias: no hover, no hint.
+ARM32_ROWS = ["mov r9, r10", "mov r0, #1", "cmp r0, r1", "mov r3, sp"]
+# Finding 6: an SVE line without ZA tiles picks its exact register-list row.
 SVE_ROWS = [
     ("ld1b {z0.b}, p0/z, [x0]", "LD1B ({<OPT_SPACE>Z0.B<OPT_SPACE>}, P0/Z, [<XNSP__3>#0])"),
     ("ld1w {z0.s}, p0/z, [x0]", "LD1W ({<OPT_SPACE>Z0.S<OPT_SPACE>}, P0/Z, [<XNSP__3>#0])"),
@@ -100,6 +128,45 @@ class LeftoverArmFormPickTests(unittest.TestCase):
         self.assertIsNotNone(hover)
         self.assertNotIn("<HASH>", hover)
         self.assertIn("LDR (<WTORWZR__4>, [<XNSP_OPTION>, <WORX_CHOICE>", hover)
+
+    def test_extend_suffix_picks_the_extended_row(self):
+        for line, fragment in EXTEND_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+
+    def test_alias_lines_agree_on_hover_and_hint(self):
+        for line, fragment in ALIAS_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+
+    def test_sp_moves_are_add_immediate(self):
+        for line, fragment in SP_MOVE_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+
+    def test_weak_gate_judges_the_aliased_form(self):
+        for line, fragment in WEAK_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+
+    def test_arm32_lines_get_no_aarch64_alias(self):
+        for line in ARM32_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNone(hover)
+                self.assertIsNone(hint)
 
     def test_sve_lines_pick_their_register_list_row(self):
         for line, fragment in SVE_ROWS:

@@ -180,25 +180,35 @@ _RISCV_SCALARS = frozenset(
 _ASM_SHIFT_KEYWORDS = frozenset(
     "lsl lsr asr ror msl uxtb uxth uxtw uxtx sxtb sxth sxtw sxtx".split()
 )
+_EXTEND_SHIFT_KEYWORDS = frozenset("uxtb uxth uxtw uxtx sxtb sxth sxtw sxtx".split())
 
 
-def _split_asm_operands(operands: str) -> list[str]:
-    """Split at top-level commas and drop trailing shift/extend suffix pieces.
+def _split_asm_operands(operands: str) -> tuple[list[str], list[str | None]]:
+    """Split at top-level commas; fold a trailing shift/extend suffix piece.
 
-    A piece that starts with a shift or extend keyword ("lsl #2", "uxtw")
-    modifies the last register operand: "add x0, x1, x2, lsl #2" reads as
-    three operands, matching form keys that absorb the suffix into their
-    placeholder ("<XMORXZR>#0"). shortcut: a label spelled like a keyword in
-    operand position ("add x0, x1, lsl") folds away; it is not a register.
+    Returns (parts, marks). A piece that starts with a shift or extend
+    keyword ("lsl #2", "uxtw") modifies the last register operand and is not
+    an operand of its own: "add x0, x1, x2, lsl #2" reads as three operands,
+    matching form keys that absorb the suffix into their placeholder. The
+    marks keep the suffix kind per part: "e" for an extend (uxtb..sxtx), "s"
+    for a shift (lsl/lsr/asr/ror/msl), so the extended-register and
+    shifted-register rows stay distinct. shortcut: a label spelled like a
+    keyword in operand position ("add x0, x1, lsl") folds away; it is not a
+    register.
     """
     if not operands.strip():
-        return []
-    parts = re.split(r",(?![^(\[{]*[)\]}])", operands)
-    return [
-        piece.strip()
-        for index, piece in enumerate(parts)
-        if index == 0 or piece.strip().split(None, 1)[0].casefold() not in _ASM_SHIFT_KEYWORDS
-    ]
+        return [], []
+    parts: list[str] = []
+    marks: list[str | None] = []
+    for index, piece in enumerate(re.split(r",(?![^(\[{]*[)\]}])", operands)):
+        token = piece.strip().split(None, 1)[0].casefold() if piece.strip() else ""
+        if index and token in _ASM_SHIFT_KEYWORDS:
+            if marks:
+                marks[-1] = "e" if token in _EXTEND_SHIFT_KEYWORDS else "s"
+            continue
+        parts.append(piece.strip())
+        marks.append(None)
+    return parts, marks
 
 
 # GAS zero/sign-extend names the catalog holds only under Intel names. Each
@@ -287,7 +297,7 @@ def _classify_line(
     callers gate them against the mnemonic's forms. It is empty when a strong
     vote decided the line: a strong vote stays out of the gate.
     """
-    parts = _split_asm_operands(operands)
+    parts, marks = _split_asm_operands(operands)
     strong, weak = set(), set()
     for raw in parts:
         op = raw.strip()
@@ -336,6 +346,9 @@ def _classify_line(
     else:
         arch, used_weak = frozenset(weak), frozenset(weak)
     classes = [_operand_class(op.strip(), intel, arch) for op in parts]
+    classes = [
+        f"{cls}{mark}" if mark and cls in ("w", "x") else cls for cls, mark in zip(classes, marks)
+    ]
     reverse = not intel and ("x86" in arch or not arch)
     return arch, classes, reverse, used_weak
 
@@ -448,7 +461,25 @@ _CLASS_KIND = dict(
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
     + [
         (c, "scalar")
-        for c in ("x", "w", "xzr", "wzr", "sp", "wsp", "b", "h", "s", "d", "q", "ar", "rv")
+        for c in (
+            "x",
+            "w",
+            "xzr",
+            "wzr",
+            "sp",
+            "wsp",
+            "b",
+            "h",
+            "s",
+            "d",
+            "q",
+            "ar",
+            "rv",
+            "we",
+            "xe",
+            "ws",
+            "xs",
+        )
     ]
     + [("rel", "rel")]
 )
@@ -515,12 +546,15 @@ def _form_accept(op: str) -> frozenset:
         return frozenset({"dfp"})
     if re.match(r"^P\d", name):
         return frozenset({"pred"})
+    # An extend-flavored placeholder (a name with EXTEND) takes the extend
+    # marker class; every register placeholder also takes the shift marker.
+    extend = "EXTEND" in name
     if "WORX" in name or "R_OPTION" in name:
-        return frozenset({"w", "x"})
+        return frozenset({"w", "x"} | ({"we", "xe"} if extend else {"ws", "xs"}))
     if "WZR" in name:
-        return frozenset({"w", "wzr"})
+        return frozenset({"w", "wzr"} | ({"we"} if extend else {"ws"}))
     if "XZR" in name:
-        return frozenset({"x", "xzr"})
+        return frozenset({"x", "xzr"} | ({"xe"} if extend else {"xs"}))
     if "WSP" in name:
         return frozenset({"w", "wsp"})
     if "SP" in name:
@@ -548,7 +582,26 @@ def _form_takes_line(form, classes: list) -> bool:
     return True
 
 
-def _gate_weak_votes(matches, line: tuple, operands: str, intel: bool):
+def _form_takes_line_lenient(form, classes: list) -> bool:
+    """Alias-judged acceptance: every per-position accept touches the line.
+
+    An alias inserts an implicit operand (`cmp x, y` reads `subs zr, x, y`),
+    so a shared line's classes need not land on the exact alias row; the row
+    admits the line when each of its operands accepts some class the line
+    carries. A bare key still constrains nothing.
+    """
+    ops = _operands_of_key(form.key)
+    if not ops or len(ops) != len(classes):
+        return False
+    have = {cls for cls in classes if cls}
+    for cls, op in zip(classes, ops):
+        accept = _form_accept(op)
+        if cls is not None and accept and not (accept & have):
+            return False
+    return True
+
+
+def _gate_weak_votes(matches, line: tuple, operands: str, intel: bool, transform=None):
     """Keep a weak-voted candidate only when its rows accept the line, or None.
 
     A register spelling two architectures share admits its other architecture
@@ -557,6 +610,9 @@ def _gate_weak_votes(matches, line: tuple, operands: str, intel: bool):
     no candidate accepts it: None vetoes the line, and callers return no entry
     instead of the unfiltered pool. Strong votes never reach this gate.
     The returned line tuple carries classes for the pruned candidates.
+    TRANSFORM is the alias class insert for a mov/cmp/cmn/tst line: the gate
+    then judges the alias mnemonic's rows, strictly first and with each
+    operand's accept set intersected with the line's classes second.
     """
     arch, classes, reverse, weak = line
     if not weak:
@@ -564,10 +620,16 @@ def _gate_weak_votes(matches, line: tuple, operands: str, intel: bool):
     by_arch = {}
     for form in matches:
         by_arch.setdefault(form.architecture, []).append(form)
-    parts = _split_asm_operands(operands)
+    parts, _marks = _split_asm_operands(operands)
 
     def takes(arch_name: str) -> bool:
         reading = [_operand_class(piece, intel, frozenset({arch_name})) for piece in parts]
+        if transform is not None:
+            transformed = transform(reading)
+            forms = by_arch.get(arch_name, [])
+            return any(_form_takes_line(form, transformed) for form in forms) or any(
+                _form_takes_line_lenient(form, transformed) for form in forms
+            )
         return any(_form_takes_line(form, reading) for form in by_arch.get(arch_name, []))
 
     kept = {a for a in arch if a not in weak}
@@ -666,39 +728,48 @@ def _match_form(
     return min(pool, key=_rank)
 
 
-def _a64_alias_mnemonic(mnemonic: str, arch: frozenset, operands: str) -> str | None:
-    """The mnemonic an AArch64 alias line encodes as, or None.
+def _zreg(classes: list) -> str:
+    """The width-apportioned zero register for the line's register family."""
+    return "wzr" if classes and classes[0] in ("w", "wsp", "wzr") else "xzr"
 
-    The catalog keys no MOVE/CMP/CMN/TST row: an immediate move becomes MOVN
-    for a negative value and MOVZ otherwise, a register move is ORR shifted
-    register, and cmp/cmn/tst are subs/adds/ands with a zero destination.
-    shortcut: the bitmask ORR alias of an immediate move reads as MOVZ here,
-    and the few alias-target rows missing from the catalog (SUBS immediate,
-    X-width extended adds) match to the nearest row of the target mnemonic.
+
+def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
+    """(alias mnemonic, classes transform) for an AArch64 alias line, or None.
+
+    The catalog keys no MOVE/CMP/CMN/TST row in arm: an immediate move is
+    MOVN (negative value) or MOVZ, a register move is ORR shifted register
+    with the width-apportioned zero register at operand 2, a move with sp or
+    wsp on either side is ADD immediate with #0, and cmp/cmn/tst are
+    subs/adds/ands with the zero register inserted as destination. The
+    transform rewrites the line's class list accordingly, so the weak gate,
+    hover and the inlay hint all judge the aliased form.
+    The alias applies only to a line decided as AArch64: one ARM32 name
+    (r0-r15, ip, pc) rules it out, and a non-arm candidate bucket does too.
+    shortcut: the bitmask ORR alias of an immediate move reads as MOVZ (no
+    logical-immediate decode), and alias-target rows missing from the
+    catalog (SUBS immediate) match the nearest row of the target mnemonic.
     """
     if "arm" not in arch:
         return None
-    alias = {"cmp": "subs", "cmn": "adds", "tst": "ands"}.get(mnemonic.casefold())
+    parts, _marks = _split_asm_operands(operands)
+    names = [piece.strip().lstrip("*").casefold() for piece in parts]
+    if any(_ARM32_SCALAR_RE.fullmatch(name) for name in names):
+        return None
+    mnemonic = mnemonic.casefold()
+    if mnemonic == "mov":
+        folded = ", ".join(parts)
+        if any(name in ("sp", "wsp") for name in names):
+            return ("add", lambda classes: [*classes, "lit0"])
+        if "#" not in folded:
+            return ("orr", lambda classes: [classes[0], _zreg(classes), *classes[1:]])
+        found = re.search(r"#\s*(-?0x|-?\d)", folded, re.IGNORECASE)
+        if not found:
+            return None
+        return ("movn" if found.group(1).startswith("-") else "movz", lambda classes: classes)
+    alias = {"cmp": "subs", "cmn": "adds", "tst": "ands"}.get(mnemonic)
     if alias:
-        return alias
-    if mnemonic.casefold() != "mov":
-        return None
-    folded = ", ".join(_split_asm_operands(operands))
-    if "#" not in folded:
-        return "orr"
-    found = re.search(r"#\s*(-?0x|-?\d)", folded, re.IGNORECASE)
-    if not found:
-        return None
-    return "movn" if found.group(1).startswith("-") else "movz"
-
-
-def _mov_reg_line(line: tuple) -> tuple:
-    """The ORR encoding of a register move holds the zero register at operand 2."""
-    classes = line[1]
-    if not classes:
-        return line
-    zr = "xzr" if classes[0] == "x" else "wzr"
-    return (line[0], [classes[0], zr, *classes[1:]], line[2], line[3])
+        return (alias, lambda classes: [_zreg(classes), *classes])
+    return None
 
 
 def _hover_markdown(
@@ -754,13 +825,21 @@ def _hover_markdown(
     # checks below.
     if line[1]:
         operand_count = len(line[1])
+    # One alias step for hover and hint: an AArch64 alias line (mov, cmp,
+    # cmn, tst) is judged on the alias mnemonic's rows before any weak-gate
+    # or catalog-miss decision.
+    alias = _a64_alias_for_line(word, line[0], operand_text)
+    if alias:
+        word_mn, transform = alias
+    else:
+        word_mn, transform = word, None
     # Weak votes come from spellings two architectures share (a RISC-V `add
     # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them once here
     # so the exact-name path and _match_form both honor the veto.
     matches = width = None
     if line[3]:
-        matches, width = _lookup_mnemonic(conn, word, line[0])
-        line = _gate_weak_votes(matches, line, operand_text, intel)
+        matches, width = _lookup_mnemonic(conn, word_mn, line[0])
+        line = _gate_weak_votes(matches, line, operand_text, intel, transform=transform)
         if line is None:
             return None
     instruction = load_instruction_from_db(conn, word)
@@ -777,15 +856,9 @@ def _hover_markdown(
         # Match the form on the source line like _hint_label does, so
         # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
         if matches is None:
-            matches, width = _lookup_mnemonic(conn, word, line[0])
-        instruction = _match_form(matches, operand_count, line, width)
-    if instruction is None:
-        # A GAS alias (mov/cmp/cmn/tst) encodes as a catalog mnemonic.
-        alias = _a64_alias_mnemonic(word, line[0], operand_text)
-        if alias:
-            alias_forms, alias_width = _lookup_mnemonic(conn, alias, line[0])
-            alias_line = _mov_reg_line(line) if alias == "orr" else line
-            instruction = _match_form(alias_forms, operand_count, alias_line, alias_width)
+            matches, width = _lookup_mnemonic(conn, word_mn, line[0])
+        match_line = (line[0], transform(line[1]), line[2], line[3]) if transform else line
+        instruction = _match_form(matches, operand_count, match_line, width)
     if instruction is not None:
         # The url and reference rows of the body already carry the source links.
         link = web_deep_link("instruction", instruction.key)
@@ -893,9 +966,6 @@ def _operand_count(operands: str) -> int:
     return count
 
 
-# Shift/extend keywords that take a shifted immediate: "add x0, x1, x2, lsl #2".
-
-
 def _hash_opens_operand(prefix: str, rest: str) -> bool:
     """True when a '#' after PREFIX opens an operand immediate, not a comment."""
     words = prefix.split()
@@ -995,21 +1065,20 @@ def _hint_label(
     intel: bool = False,
 ) -> str | None:
     line = _classify_line(operands, intel)
-    matches, width = _mnemonic_matches(db_path, mnemonic, line[0])
+    # The same one alias step as hover, before the catalog-miss return, so
+    # both entries judge the alias mnemonic's rows.
+    alias = _a64_alias_for_line(mnemonic, line[0], operands)
+    lookup_mn, transform = alias if alias else (mnemonic, None)
+    matches, width = _mnemonic_matches(db_path, lookup_mn, line[0])
     if not matches:
         return None
     # The same weak-vote gate as hover, so both entries pick the same form.
-    line = _gate_weak_votes(matches, line, operands, intel)
+    line = _gate_weak_votes(matches, line, operands, intel, transform=transform)
     if line is None:
         return None
+    if transform is not None:
+        line = (line[0], transform(line[1]), line[2], line[3])
     chosen = _match_form(matches, operand_count, line, width)
-    if chosen is None:
-        # The same GAS alias (mov/cmp/cmn/tst) as hover, so both agree.
-        alias = _a64_alias_mnemonic(mnemonic, line[0], operands)
-        if alias:
-            forms, alias_width = _mnemonic_matches(db_path, alias, line[0])
-            alias_line = _mov_reg_line(line) if alias == "orr" else line
-            chosen = _match_form(list(forms), operand_count, alias_line, alias_width)
     return _cut_label(chosen.summary or "") if chosen else None
 
 
