@@ -160,6 +160,9 @@ _A64_ONLY_RE = re.compile(
     r"[zv](?:3[01]|[12]?\d)\.\d*[bhsdq]\[\d+\]|pn?(?:1[0-5]|[0-9])\.[bhsdq]|\{?\s*za",
     re.IGNORECASE,
 )
+# shortcut: this vote still picks a wrong row for `ptest p0, p1.b` (x86 PTEST),
+# `ptrue p0.b` (predicate-counter PTRUE) and `rev p0.b, p0.b` (GPR REV),
+# upgrade when the planned llvm-mc lookup replaces this vote.
 
 
 def _logical_immediate(value: int, bits: int) -> bool:

@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AArch64 `#` immediates now survive the comment strip. `ldr s1, [x11], #4` keeps the `#4` and picks the post index form.
 - The catalog now fills x86 MOVSD_XMM (XMM, XMM) and ADD (R16, R16) gaps and includes RISC-V scalar instructions. It also maps AArch64 FPFAR rules to scalar FP registers. These appear in the next release and then after `isa update`.
 
+### Known limits
+
+- Three SVE predicate lines pick a wrong row: `ptest p0, p1.b` picks x86 PTEST, `ptrue p0.b` picks predicate-counter PTRUE, and `rev p0.b, p0.b` picks GPR REV.
+
 ## [0.0.13], 2026-10-27
 
 ### Fixed
