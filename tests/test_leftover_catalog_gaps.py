@@ -184,6 +184,44 @@ class UopsFormNamingTest(unittest.TestCase):
     def test_decorated_mnemonics_are_stripped(self) -> None:
         self.assertTrue(all(not record.mnemonic.startswith("{") for record in self.records))
 
+    def test_variants_with_different_latency_keep_separate_rows(self) -> None:
+        # Two raw records with one normalized key but different measurements
+        # stay as two rows; the base parser named the second by its raw
+        # string. An identical duplicate still folds away.
+        fixture = """<?xml version="1.0"?>
+<root>
+<instruction asm="VFOO" category="XFER" extension="AVX" iclass="VFOO"
+ iform="VFOO_YMMqq_YMMqq_28" isa-set="AVX" string="VFOO_28 (YMM, YMM)" summary="Foo.">
+ <operand idx="0" type="reg" width="256" name="ymm"/>
+ <architecture name="MTL-E"><measurement TP_loop="0.17" uops="1">
+ <latency cycles="0" start_op="2" target_op="1"/></measurement></architecture>
+</instruction>
+<instruction asm="VFOO" category="XFER" extension="AVX" iclass="VFOO"
+ iform="VFOO_YMMqq_YMMqq_29" isa-set="AVX" string="VFOO_29 (YMM, YMM)" summary="Foo.">
+ <operand idx="0" type="reg" width="256" name="ymm"/>
+ <architecture name="MTL-E"><measurement TP_loop="0.17" uops="1">
+ <latency cycles="1" start_op="2" target_op="1"/></measurement></architecture>
+</instruction>
+<instruction asm="VFOO" category="XFER" extension="AVX" iclass="VFOO"
+ iform="VFOO_YMMqq_YMMqq_28" isa-set="AVX" string="VFOO_28 (YMM, YMM)" summary="Foo.">
+ <operand idx="0" type="reg" width="256" name="ymm"/>
+ <architecture name="MTL-E"><measurement TP_loop="0.17" uops="1">
+ <latency cycles="0" start_op="2" target_op="1"/></measurement></architecture>
+</instruction>
+</root>
+"""
+        records = parse_uops_xml(fixture)
+        by_key = {record.key: record for record in records}
+        self.assertEqual(len(records), 2)
+        self.assertEqual(
+            by_key["VFOO (YMM, YMM)"].arch_details["MTL-E"]["latencies"][0]["cycles"],
+            "0",
+        )
+        self.assertEqual(
+            by_key["VFOO_29 (YMM, YMM)"].arch_details["MTL-E"]["latencies"][0]["cycles"],
+            "1",
+        )
+
     def test_rows_without_encoding_tags_keep_their_names(self) -> None:
         self.assertIn("ADD (R16, M16)", self.by_key)
         self.assertIn("ADD_R0 (R8l, 0)", self.by_key)

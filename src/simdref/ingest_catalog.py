@@ -9,6 +9,7 @@ import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
@@ -1003,8 +1004,7 @@ def _normalize_uops_form(form: str) -> str:
 
 
 def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
-    records: list[InstructionRecord] = []
-    by_key: dict[str, InstructionRecord] = {}
+    groups: dict[str, list[tuple[InstructionRecord, str]]] = {}
     for node in _iter_xml_elements(source, "instruction"):
         mnemonic = _intern_small(
             strip_instruction_decorators(
@@ -1013,15 +1013,14 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
         )
         if not mnemonic:
             continue
-        form = _normalize_uops_form(
-            (
-                node.attrib.get("string")
-                or node.attrib.get("form")
-                or node.attrib.get("cpl")
-                or node.attrib.get("category")
-                or ""
-            ).strip()
-        )
+        raw_form = (
+            node.attrib.get("string")
+            or node.attrib.get("form")
+            or node.attrib.get("cpl")
+            or node.attrib.get("category")
+            or ""
+        ).strip()
+        form = _normalize_uops_form(raw_form)
         raw_summary = node.attrib.get("summary", "").strip()
         isa = _normalize_isa(
             node.attrib.get("isa-set", "")
@@ -1095,18 +1094,47 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
             metadata=metadata,
             arch_details=arch_details,
         )
-        existing = by_key.get(record.db_key)
-        if existing is not None:
-            # Same-key rows are opcode-map variants of one form and carry
-            # identical labels, because the _EVEX marker keeps the EVEX and
-            # APX variants on their own keys. Keep the first variant's
-            # measurements and fold in per-uarch data only where it has none.
-            for arch, entry in arch_details.items():
-                existing.arch_details.setdefault(arch, entry)
+        groups.setdefault(record.db_key, []).append((record, raw_form))
+    records: list[InstructionRecord] = []
+    used_keys = set(groups)
+    for rows in groups.values():
+        if len(rows) == 1:
+            records.append(rows[0][0])
             continue
-        by_key[record.db_key] = record
-        records.append(record)
+        # Two raw records share a row only when iform, measurements and
+        # arch_details are identical. Variants whose data differs stay as
+        # rows of their own, named by the raw uops string the way the
+        # pre-normalization parser named them (VMOVAPD_28 (YMM, YMM) next
+        # to VMOVAPD (YMM, YMM)); measurement dicts are never merged.
+        seen: set[tuple[str, str]] = set()
+        partitions: list[tuple[InstructionRecord, str]] = []
+        for record, node_raw_form in rows:
+            identity = (
+                record.metadata.get("iform", ""),
+                json.dumps(record.arch_details, sort_keys=True),
+            )
+            if identity in seen:
+                continue
+            seen.add(identity)
+            partitions.append((record, node_raw_form))
+        records.append(partitions[0][0])
+        for record, node_raw_form in partitions[1:]:
+            head, sep, tail = node_raw_form.partition(" ")
+            candidate = f"{_LEADING_INSTR_TAG_RE.sub('', head)}{sep}{tail}".strip()
+            if not candidate or _uops_form_db_key(record, candidate) in used_keys:
+                candidate = f"{record.form} [{record.metadata.get('iform', '')}]"
+            while _uops_form_db_key(record, candidate) in used_keys:
+                candidate += "~"
+            used_keys.add(_uops_form_db_key(record, candidate))
+            records.append(replace(record, form=candidate))
     return records
+
+
+def _uops_form_db_key(record: InstructionRecord, form: str) -> str:
+    key = form.strip() or record.mnemonic
+    if not key.casefold().startswith(record.mnemonic.casefold()):
+        key = f"{record.mnemonic} {key}".strip()
+    return f"{record.architecture}:{key.casefold()}"
 
 
 def _instruction_indexes(
