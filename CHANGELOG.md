@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`Zvabd`, `Zvdot4a8i`, `Zvzip`, `Zvfofp4min`, `Zvfofp8min`, `Zvfbdota32f`)
   link to their `riscv-unified-db` YAML file. Before, they linked to the V
   spec page, which does not describe them.
+- Hover and inlay hints now resolve AT&T zero extend and sign extend names such as `movzbl` and `movslq` to Intel MOVZX and MOVSX rows. `movzbl (%rax), %edx` picks the 8 to 32 bit zero extend form.
+- AArch64 shift and extend suffixes now count as part of the last register operand. `add x0, x1, x2, lsl #2` picks the shifted register form instead of an SVE four operand row.
+- AArch64 index mode and immediate forms now match correctly. `ldr s1, [x11], #4` picks the post index row and `mov w0, #0x10` hovers the MOVZ alias.
+- Intel memory operands now read size keywords. `mov byte ptr [rax], 1` picks the 8 bit form.
+- Shared register names now match only where the mnemonic's forms accept them. `add s0, s1, s2` hovers RISC-V ADD instead of AArch64 ADD.
+- AArch64 `#` immediates now survive the comment strip. `ldr s1, [x11], #4` keeps the `#4` and picks the post index form.
+- The catalog now fills x86 MOVSD_XMM (XMM, XMM) and ADD (R16, R16) gaps and includes RISC-V scalar instructions. It also maps AArch64 FPFAR rules to scalar FP registers. Shows after `isa update`.
 
 ## [0.0.13], 2026-10-27
 
