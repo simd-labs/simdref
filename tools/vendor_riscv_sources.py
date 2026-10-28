@@ -84,16 +84,19 @@ def instruction_category(mnemonic: str, isa: list[str]) -> str:
     return "Arithmetic"
 
 
-def instruction_doc_url(isa: list[str]) -> str:
+def instruction_doc_url(isa: list[str], source_url: str) -> str:
     lowered = {token.casefold() for token in isa}
     if any(token.startswith("zvfbf") for token in lowered):
         return BFLOAT16_DOC_URL
     if any(token.startswith("zvk") or token in {"zvbb", "zvbc"} for token in lowered):
         return VECTOR_CRYPTO_DOC_URL
-    return V_DOC_URL
+    if "v" in lowered:
+        return V_DOC_URL
+    # Newer vector extensions (Zvabd, Zvdot4a8i, ...) have no docs.riscv.org page.
+    return source_url
 
 
-def parse_instruction_file(path: Path) -> dict[str, object]:
+def parse_instruction_file(path: Path, source_url: str) -> dict[str, object]:
     text = path.read_text()
     mnemonic = extract_yaml_scalar(text, "name").casefold()
     if not mnemonic:
@@ -113,7 +116,7 @@ def parse_instruction_file(path: Path) -> dict[str, object]:
         "operation": operation.strip(),
         "isa": isa,
         "category": instruction_category(mnemonic, isa),
-        "url": instruction_doc_url(isa),
+        "url": instruction_doc_url(isa, source_url),
         "extension": extension,
     }
 
@@ -359,8 +362,9 @@ def build_intrinsics_bundle(
 
 def collect_base_instructions(udb_root: Path) -> dict[str, dict[str, object]]:
     instructions: dict[str, dict[str, object]] = {}
+    blob = f"{UDB_PROJECT_URL}/blob/{git_rev(udb_root)}"
     for path in iter_vector_instruction_files(udb_root):
-        parsed = parse_instruction_file(path)
+        parsed = parse_instruction_file(path, f"{blob}/{path.relative_to(udb_root).as_posix()}")
         if not parsed:
             continue
         mnemonic = str(parsed["mnemonic"])

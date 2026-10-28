@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   added `Zvdot4a8i` with no Operation text, and the RISC-V operation coverage
   gate fell from 0.606 to 0.598. The coverage audit still follows upstream
   HEAD.
+- RISC-V vector instructions from extensions with no docs.riscv.org page
+  (`Zvabd`, `Zvdot4a8i`, `Zvzip`, `Zvfofp4min`, `Zvfofp8min`, `Zvfbdota32f`)
+  link to their `riscv-unified-db` YAML file. Before, they linked to the V
+  spec page, which does not describe them.
 
 ## [0.0.13], 2026-10-27
 
