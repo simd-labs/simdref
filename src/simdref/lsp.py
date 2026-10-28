@@ -149,6 +149,24 @@ _A64_SCALAR_RE = re.compile(r"(?:x(?:[0-9]|[12][0-9]|30)|w(?:[0-9]|[12][0-9]|30)
 _A64_SCALAR_FP_RE = re.compile(r"[bhsdq](?:[0-9]|[12][0-9]|3[01])\Z")
 # A bare v register is a vector spelling ARM and RISC-V share.
 _A64_VECTOR_BARE_RE = re.compile(r"v(?:[0-9]|[12][0-9]|3[01])\Z")
+# SVE predicate register with an optional /z or /m qualifier ("p0/z").
+_A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
+
+
+def _av_class(arrangement: str) -> str:
+    """The arrangement class of an SVE Z register ("z0.4h" -> "avh").
+
+    The element suffix (b/h/s/d/q) disambiguates Z-register rows that differ
+    only in the lane width, like LD1W's Z0.D and Z0.S register lists. V and
+    non-Z arrangements stay bare "av", so an Advanced SIMD line never ties a
+    same-lane SVE row.
+    """
+    if not arrangement.casefold().startswith("z"):
+        return "av"
+    element = re.search(r"\.(\d*)([bhsdq])", arrangement, re.IGNORECASE)
+    return f"av{element.group(2).casefold()}" if element else "av"
+
+
 _ARM32_SCALAR_RE = re.compile(r"(?:r(?:[0-9]|1[0-5])|ip|pc)\Z")
 # ARM has "sp" and "fp"; RISC-V shares both spellings and adds these scalar aliases.
 _RISCV_SCALARS = frozenset(
@@ -282,6 +300,14 @@ def _classify_line(
             strong.add("x86")
         elif prefixed and reg:
             strong.add("x86")
+        elif (bare := re.fullmatch(r"\{([^}]*)\}", op)) and (
+            _A64_ARRANGEMENT_RE.fullmatch(bare.group(1).strip().casefold().split(",", 1)[0].strip())
+            or bare.group(1).strip().casefold().startswith("za")
+        ):
+            # An SVE register list ("{z0.b}") or ZA tile list votes AArch64.
+            strong.add("arm")
+        elif _A64_PRED_RE.fullmatch(name):
+            strong.add("arm")
         elif not name or "(" in op or "[" in op or "{" in op:
             continue
         elif _A64_ARRANGEMENT_RE.fullmatch(name) or _A64_SCALAR_RE.fullmatch(name) or name == "wsp":
@@ -357,6 +383,17 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         return "i"
     if "{1to" in op:
         return "mbc"
+    if "arm" in arch:
+        list_match = re.fullmatch(r"\{([^}]*)\}", op.strip())
+        if list_match:
+            # An SVE brace operand is a register list ("{z0.b}") or ZA tiles.
+            first = list_match.group(1).strip().casefold().split(",", 1)[0].strip()
+            if first.startswith("za"):
+                return "za"
+            if _A64_ARRANGEMENT_RE.fullmatch(first):
+                return _av_class(first)
+        if _A64_PRED_RE.fullmatch(name):
+            return "pred"
     if "{" in op:
         op = re.sub(r"\{[^}]*\}", "", op).strip()
         name = op.lstrip("*").lstrip("%").casefold()
@@ -381,7 +418,9 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if not intel and op.startswith("*"):
         return "m"
     if "arm" in arch:
-        if _A64_ARRANGEMENT_RE.fullmatch(name) or _A64_VECTOR_BARE_RE.fullmatch(name):
+        if _A64_ARRANGEMENT_RE.fullmatch(name):
+            return _av_class(name)
+        if _A64_VECTOR_BARE_RE.fullmatch(name):
             return "av"
         if _A64_SCALAR_FP_RE.fullmatch(name):
             return name[0]
@@ -402,7 +441,8 @@ _IMMEDIATE_ACCEPT = frozenset({"i", "lit0", "lit1"})
 _LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
 _CLASS_KIND = dict(
     [(c, "register") for c in ("r8", "r16", "r32", "r64")]
-    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "av", "dfp", "pred")]
+    + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "dfp", "pred", "za")]
+    + [(c, "vector") for c in ("av", "avb", "avh", "avs", "avd", "avq")]
     + [(c, "memory") for c in ("m", "moffs", "mbc", "mo", "mpre", "mreg")]
     + [(f"m{bits}", "memory") for bits in set(_INTEL_SIZE_BITS.values())]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
@@ -458,8 +498,14 @@ def _form_accept(op: str) -> frozenset:
     name = re.sub(r"(#\d+)+$", "", op.upper())
     if "<HASH>" in name:
         return _IMMEDIATE_ACCEPT
+    # A ZA tile operand ("<ZAT...>[W1, #0]") is not a plain vector register.
+    if "<ZAT" in name:
+        return frozenset({"za"})
     if re.match(r"V\d+<|^[ZV]\d+\.|^\{", name):
-        return frozenset({"av"})
+        # A Z-register arrangement element ("Z0.S") accepts its class ("avs"),
+        # so the same-lane row outranks the other Z-register rows.
+        element = re.search(r"Z\d+\.\d*([BHSDQ])", name)
+        return frozenset({"av", f"av{element.group(1).casefold()}"} if element else {"av"})
     # Numbered scalar FP placeholders: D0 or S1 style numbers, <BT> or <QT1> style aliases.
     if re.fullmatch(r"[BHSDQ]\d+", name):
         return frozenset({name[0].lower()})

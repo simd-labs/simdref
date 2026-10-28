@@ -44,6 +44,13 @@ SHIFT_ROWS = [
     ("cmp x0, x1, lsl #2", "SUBS (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
     ("ldr x0, [x1, x2, lsl #3]", "LDR (<XTORXZR__11>, [<XNSP_OPTION>, <WORX_CHOICE>"),
 ]
+# An SVE line without ZA tiles picks its exact Z-register-list row.
+SVE_ROWS = [
+    ("ld1b {z0.b}, p0/z, [x0]", "LD1B ({<OPT_SPACE>Z0.B<OPT_SPACE>}, P0/Z, [<XNSP__3>#0])"),
+    ("ld1w {z0.s}, p0/z, [x0]", "LD1W ({<OPT_SPACE>Z0.S<OPT_SPACE>}, P0/Z, [<XNSP__3>#0])"),
+    ("st1d {z0.d}, p0, [x0]", "ST1D ({<OPT_SPACE>Z0.D<OPT_SPACE>}, P0, [<XNSP__3>#0])"),
+    ("ld1b {z0.b}, p0/z, [x1, x2]", "LD1B ({<OPT_SPACE>Z0.B<OPT_SPACE>}, P0/Z, [<XNSP__3>, X2])"),
+]
 
 
 class LeftoverArmFormPickTests(unittest.TestCase):
@@ -93,6 +100,15 @@ class LeftoverArmFormPickTests(unittest.TestCase):
         self.assertIsNotNone(hover)
         self.assertNotIn("<HASH>", hover)
         self.assertIn("LDR (<WTORWZR__4>, [<XNSP_OPTION>, <WORX_CHOICE>", hover)
+
+    def test_sve_lines_pick_their_register_list_row(self):
+        for line, fragment in SVE_ROWS:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover)
+                self.assertIn(fragment, hover)
+                self.assertIsNotNone(hint)
+                self.assertNotIn("<ZAT", hover)
 
 
 if __name__ == "__main__":
