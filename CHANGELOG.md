@@ -5,6 +5,17 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- LSP hover shows the instruction page as editors render Markdown. `Operation`
+  and `Intrinsic Equivalents` are code blocks, and description lines keep their
+  line breaks. The perf table shows `*` in port strings as text, not as
+  emphasis. The `isa` row shows once, also in the terminal view. The footer
+  keeps only the full-page link, because the rows above already give the
+  source URLs.
+
 ## [0.0.13], 2026-10-27
 
 ### Fixed

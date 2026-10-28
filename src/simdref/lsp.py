@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from simdref.display import canonical_url, instruction_markdown, web_deep_link
+from simdref.display import instruction_markdown, web_deep_link
 from simdref.perf import best_cpi, best_latency
 from simdref.queries import linked_instruction_records
 from simdref.search import search_records
@@ -459,13 +459,9 @@ def _hover_markdown(
         matches, width = _lookup_mnemonic(conn, word, line[0])
         instruction = _match_form(matches, operand_count, line, width)
     if instruction is not None:
-        body = instruction_markdown(instruction, conn=conn)
-        links = [f"Full page: {web_deep_link('instruction', instruction.key)}"]
-        if instruction.metadata.get("url"):
-            links.append(canonical_url(instruction.metadata["url"]))
-        if instruction.metadata.get("url-ref"):
-            links.append(canonical_url(instruction.metadata["url-ref"]))
-        return body + "\n\n" + "\n".join(links)
+        # The url and reference rows of the body already carry the source links.
+        link = web_deep_link("instruction", instruction.key)
+        return instruction_markdown(instruction, conn=conn) + f"\n\nFull page: {link}"
     return None
 
 

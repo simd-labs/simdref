@@ -500,16 +500,18 @@ def instruction_markdown(item, conn=None) -> str:
     lines = [f"```asm\n{item.key}\n```"]
     lines.append(f"**isa.** {display_isa(item.isa)}")
     for key, value in instruction_metadata_rows(item):
-        lines.append(f"**{key}.** {value}")
+        if key != "isa":
+            # Escaping a URL would break the editor's autolink.
+            lines.append(f"**{key}.** {value if value.startswith('http') else _md_escape(value)}")
     if item.description:
         shown: set[str] = set()
         for section in _DESCRIPTION_ORDER:
             if section in item.description:
-                lines.append(f"## {section}\n\n{item.description[section].strip()}")
+                lines.append(_section_markdown(section, item.description[section]))
                 shown.add(section)
         for section, body in item.description.items():
             if section not in shown:
-                lines.append(f"## {section}\n\n{body.strip()}")
+                lines.append(_section_markdown(section, body))
     if item.linked_intrinsics:
         lines.append(
             "## instruction to intrinsic mapping\n\n"
@@ -517,6 +519,23 @@ def instruction_markdown(item, conn=None) -> str:
         )
     lines.extend(_perf_markdown_lines(measurement_rows(item)))
     return "\n\n".join(lines)
+
+
+def _md_escape(text: str) -> str:
+    """Show Markdown control characters in catalog text as literal text."""
+    return re.sub(r"([\\`*_\[\]<>|#~])", r"\\\1", text)
+
+
+def _section_markdown(title: str, body: str) -> str:
+    """Code sections as fenced blocks, prose with the catalog line breaks kept."""
+    lang = _CODE_SECTION_LANG.get(title)
+    if lang:
+        return f"## {title}\n\n```{lang}\n{body.strip()}\n```"
+    paragraphs = re.split(r"\n\s*\n", body.strip())
+    text = "\n\n".join(
+        "\\\n".join(_md_escape(line.strip()) for line in para.splitlines()) for para in paragraphs
+    )
+    return f"## {title}\n\n{text}"
 
 
 def _perf_markdown_lines(rows: list[dict]) -> list[str]:
@@ -537,7 +556,9 @@ def _perf_markdown_lines(rows: list[dict]) -> list[str]:
             cells = []
             for column in columns:
                 value = row.get(column, "-")
-                cells.append(display_uarch(str(value)) if column == "uarch" else str(value))
+                cells.append(
+                    _md_escape(display_uarch(str(value)) if column == "uarch" else str(value))
+                )
             table.append("| " + " | ".join(cells) + " |")
         sections.append(f"## {perf_panel_title(kind)}\n\n" + "\n".join(table))
     return sections
@@ -1048,7 +1069,8 @@ def render_instruction_sections(
         table.add_row("architecture", display_architecture(item.architecture))
         table.add_row("isa", display_isa(item.isa))
         for key, value in instruction_metadata_rows(item):
-            table.add_row(key, value)
+            if key != "isa":
+                table.add_row(key, value)
         console.print(
             Panel(
                 table,
