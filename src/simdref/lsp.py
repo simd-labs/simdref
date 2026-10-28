@@ -557,6 +557,22 @@ def _match_form(
     arch, classes, reverse = line[0], line[1], line[2]
     if arch:
         matches = [m for m in matches if m.architecture in arch]
+    # A size keyword may only add information: a sized memory class no row of
+    # the mnemonic accepts ranks as a plain "m", so the pick equals the line
+    # with the keyword removed (VMOVDQU has no M512 row, and "vmovdqu zmm0,
+    # zmmword ptr [rdx]" keeps the unsized load form). The width reward in
+    # _rank still prefers a form that matches the width exactly.
+    if classes and any(c and re.fullmatch(r"m\d+", c) for c in classes):
+        accepted_memory = {
+            accept
+            for form in matches
+            for op in _operands_of_key(form.key)
+            for accept in _form_accept(op)
+        }
+        classes = [
+            "m" if c and re.fullmatch(r"m\d+", c) and c not in accepted_memory else c
+            for c in classes
+        ]
     # The line's classified parts are authoritative: a shift/extend suffix
     # folded into its register operand, so the parsed comma count can lag.
     count = len(classes) if classes else operand_count
