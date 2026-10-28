@@ -2,6 +2,8 @@
 
 The load/store check must match whole mnemonics. A letter prefix classified
 sh1add, sha256sum0, sctrclr, vsetvli and vslideup as loads and stores.
+The grammar must also cover FP, compressed, hypervisor, cache-block and
+prefetch memory operations.
 """
 
 from __future__ import annotations
@@ -59,6 +61,19 @@ _TOOL = _vendor_tool()
         ("vl1re8.v", ["V"], "Loads and Stores"),
         ("vlm.v", ["V"], "Loads and Stores"),
         ("vsm.v", ["V"], "Loads and Stores"),
+        ("flw", ["F"], "Loads and Stores"),
+        ("fsd", ["D"], "Loads and Stores"),
+        ("c.lwsp", ["Zca"], "Loads and Stores"),
+        ("c.sd", ["Zca"], "Loads and Stores"),
+        ("hlv.w", ["H"], "Loads and Stores"),
+        ("hsv.d", ["H"], "Loads and Stores"),
+        ("hlvx.hu", ["H"], "Loads and Stores"),
+        ("cbo.zero", ["Zicbom"], "Loads and Stores"),
+        ("prefetch.r", ["Zicbop"], "Loads and Stores"),
+        ("c.add", ["Zca"], "Arithmetic"),
+        ("c.slli", ["Zca"], "Arithmetic"),
+        ("fadd.s", ["F"], "Arithmetic"),
+        ("fmv.x.w", ["F"], "Arithmetic"),
     ],
 )
 def test_instruction_category(mnemonic: str, isa: list[str], expected: str) -> None:

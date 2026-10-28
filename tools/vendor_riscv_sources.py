@@ -30,8 +30,14 @@ LOAD_STORE_RE = re.compile(
     r"(?:lb|lh|lw|ld|lbu|lhu|lwu|sb|sh|sw|sd"
     r"|(?:lr|sc)\.[wdq]"
     r"|amo[a-z0-9]+\.[bhwdq]"
+    r"|(?:flh|flw|fld|flq|fsh|fsw|fsd|fsq)"
     r"|(?:vl|vs)(?:m|[1248]r|[1248]re\d+|e\d+(?:ff)?|se\d+|(?:ux|ox)ei\d+"
     r"|sseg\d+e\d+|seg\d+e\d+(?:ff)?|(?:ux|ox)seg\d+ei\d+)\.v"
+    r"|c\.(?:flwsp|fswsp|fldsp|fsdsp|flw|fsw|fld|fsd"
+    r"|lbu|lhu|lwsp|ldsp|swsp|sdsp|lh|lw|ld|sb|sh|sw|sd)"
+    r"|hlvx\.(?:hu|wu)|hlv\.(?:b|bu|h|hu|w|wu|d)|hsv\.(?:b|h|w|d)"
+    r"|cbo\.(?:clean|flush|inval|zero)"
+    r"|prefetch\.[irw]"
     r")(?:\.(?:aq|rl|aqrl))?$"
 )
 
