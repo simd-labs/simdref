@@ -27,9 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AArch64 shift and extend suffixes now count as part of the last register operand. `add x0, x1, x2, lsl #2` picks the shifted register form instead of an SVE four operand row.
 - AArch64 index mode and immediate forms now match correctly. `ldr s1, [x11], #4` picks the post index row and `mov w0, #0x10` hovers the MOVZ alias.
 - Intel memory operands now read size keywords. `mov byte ptr [rax], 1` picks the 8 bit form.
-- Shared register names now match only where the mnemonic's forms accept them. `add s0, s1, s2` hovers RISC-V ADD instead of AArch64 ADD.
+- Shared register names no longer match the wrong architecture. A line such as `add s0, s1, s2` shows nothing when no architecture has an accepting form.
 - AArch64 `#` immediates now survive the comment strip. `ldr s1, [x11], #4` keeps the `#4` and picks the post index form.
-- The catalog now fills x86 MOVSD_XMM (XMM, XMM) and ADD (R16, R16) gaps and includes RISC-V scalar instructions. It also maps AArch64 FPFAR rules to scalar FP registers. Shows after `isa update`.
+- The catalog now fills x86 MOVSD_XMM (XMM, XMM) and ADD (R16, R16) gaps and includes RISC-V scalar instructions. It also maps AArch64 FPFAR rules to scalar FP registers. These appear in the next release and then after `isa update`.
 
 ## [0.0.13], 2026-10-27
 
