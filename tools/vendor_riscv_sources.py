@@ -118,6 +118,10 @@ def parse_instruction_file(path: Path, source_url: str) -> dict[str, object]:
         return {}
     description = extract_yaml_block(text, "description")
     operation = extract_yaml_block(text, "operation()")
+    # Keep the encoding block (per-base match strings): the byte-identity
+    # lookup keys rows on it (spec K3).
+    match = re.search(r"^encoding:\s*\n(?P<body>(?:^[ ]+.*\n?)*)", text, re.MULTILINE)
+    encoding = match.group("body").strip("\n") if match else ""
     long_name = extract_yaml_scalar(text, "long_name")
     extension_match = re.search(r"definedBy:\n(?:^[ ]+.*\n)*?^\s+name:\s*(.+)$", text, re.MULTILINE)
     extension = normalize_extension(
@@ -133,6 +137,7 @@ def parse_instruction_file(path: Path, source_url: str) -> dict[str, object]:
         "category": instruction_category(mnemonic, isa),
         "url": instruction_doc_url(isa, source_url),
         "extension": extension,
+        "encoding": encoding,
     }
 
 
@@ -290,6 +295,7 @@ def synthesize_instruction_records(
                     "metadata": metadata,
                     "policy": policy,
                     "masking": masking,
+                    "encoding": str(base.get("encoding") or ""),
                 }
             )
     return records

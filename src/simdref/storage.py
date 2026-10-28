@@ -7,6 +7,7 @@ FTS5 virtual tables for fast full-text search with BM25 ranking.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
 import secrets
@@ -89,7 +90,7 @@ else:
 
 CATALOG_PATH = DATA_DIR / "catalog.msgpack"
 SQLITE_PATH = DATA_DIR / "catalog.db"
-SQLITE_SCHEMA_VERSION = "13"
+SQLITE_SCHEMA_VERSION = "14"
 
 
 def _pack_payload(obj: dict) -> bytes:
@@ -277,7 +278,9 @@ def sqlite_schema_is_current(path: Path = SQLITE_PATH) -> bool:
         if meta is None:
             return False
         row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
-        if row is None or row[0] != SQLITE_SCHEMA_VERSION:
+        # 13 is the last released schema: its rows carry no encoding keys, and
+        # every installed catalog is 13 until a release ships a rebuilt one.
+        if row is None or row[0] not in ("13", SQLITE_SCHEMA_VERSION):
             return False
         expected_columns = {
             "id",
@@ -308,15 +311,27 @@ def sqlite_schema_is_current(path: Path = SQLITE_PATH) -> bool:
             "category",
             "payload",
         }
+        if row[0] != "13":
+            expected_instruction_columns |= {
+                "enc_bits",
+                "enc_mask",
+                "enc_match",
+                "enc_extra",
+                "iform",
+                "split_attrs",
+            }
         actual_instruction_columns = {
             item[1] for item in conn.execute("PRAGMA table_info(instructions_data)").fetchall()
         }
         if expected_instruction_columns != actual_instruction_columns:
             return False
+        required_instruction_indexes = {"idx_instruction_category"}
+        if row[0] != "13":
+            required_instruction_indexes.add("idx_instruction_enc")
         instr_indexes = {
             item[1] for item in conn.execute("PRAGMA index_list(instructions_data)").fetchall()
         }
-        if "idx_instruction_category" not in instr_indexes:
+        if not required_instruction_indexes <= instr_indexes:
             return False
         intr_indexes = {
             item[1] for item in conn.execute("PRAGMA index_list(intrinsics_data)").fetchall()
@@ -390,11 +405,18 @@ def build_sqlite(catalog: Catalog, path: Path = SQLITE_PATH) -> None:
             summary TEXT NOT NULL,
             isa TEXT NOT NULL,
             category TEXT NOT NULL DEFAULT '',
-            payload BLOB NOT NULL
+            payload BLOB NOT NULL,
+            enc_bits INTEGER NOT NULL DEFAULT 0,
+            enc_mask INTEGER NOT NULL DEFAULT 0,
+            enc_match INTEGER NOT NULL DEFAULT 0,
+            enc_extra TEXT NOT NULL DEFAULT '',
+            iform TEXT NOT NULL DEFAULT '',
+            split_attrs TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX idx_instruction_key ON instructions_data (key);
         CREATE INDEX idx_instruction_mnemonic ON instructions_data (mnemonic);
         CREATE INDEX idx_instruction_category ON instructions_data (category);
+        CREATE INDEX idx_instruction_enc ON instructions_data (architecture, enc_bits);
         CREATE VIRTUAL TABLE intrinsics_fts USING fts5(name, signature, description, header, isa, category, instructions, notes, aliases, summary, name_tokens);
         CREATE VIRTUAL TABLE instructions_fts USING fts5(key, mnemonic, form, summary, isa, linked_intrinsics, aliases, key_tokens);
         """
@@ -479,6 +501,7 @@ def build_sqlite(catalog: Catalog, path: Path = SQLITE_PATH) -> None:
     instructions_fts_batch = []
     for record in catalog.instructions:
         payload = _pack_payload(record.to_dict())
+        metadata = record.metadata if isinstance(record.metadata, dict) else {}
         instructions_data_batch.append(
             (
                 record.db_key,
@@ -488,8 +511,14 @@ def build_sqlite(catalog: Catalog, path: Path = SQLITE_PATH) -> None:
                 record.form,
                 record.summary,
                 " ".join(record.isa),
-                record.metadata.get("category", "") if isinstance(record.metadata, dict) else "",
+                metadata.get("category", ""),
                 payload,
+                record.enc_bits,
+                record.enc_mask,
+                record.enc_match,
+                json.dumps(record.enc_extra),
+                metadata.get("iform", ""),
+                metadata.get("split_attrs", ""),
             )
         )
         instructions_fts_batch.append(
@@ -506,7 +535,7 @@ def build_sqlite(catalog: Catalog, path: Path = SQLITE_PATH) -> None:
         )
         if len(instructions_data_batch) >= SQLITE_INSERT_BATCH_SIZE:
             cur.executemany(
-                "INSERT INTO instructions_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO instructions_data (db_key, key, architecture, mnemonic, form, summary, isa, category, payload, enc_bits, enc_mask, enc_match, enc_extra, iform, split_attrs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 instructions_data_batch,
             )
             cur.executemany(
@@ -517,7 +546,7 @@ def build_sqlite(catalog: Catalog, path: Path = SQLITE_PATH) -> None:
             instructions_fts_batch.clear()
     if instructions_data_batch:
         cur.executemany(
-            "INSERT INTO instructions_data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO instructions_data (db_key, key, architecture, mnemonic, form, summary, isa, category, payload, enc_bits, enc_mask, enc_match, enc_extra, iform, split_attrs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             instructions_data_batch,
         )
         cur.executemany(
