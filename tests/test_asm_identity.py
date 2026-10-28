@@ -1,0 +1,573 @@
+"""Tests for simdref.asm_identity (spec C1 lookup half).
+
+Tool-dependent tests skip cleanly when llvm-mc or the XED decoder is absent;
+nothing fakes a pass. The pure-lookup tests need no tools at all.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from simdref.asm_identity import (
+    ToolUnavailableError,
+    _bucketize,
+    _bytes_to_words,
+    _refine_subset,
+    _tool_path,
+    identify,
+)
+from simdref.models import Catalog, InstructionRecord, SourceVersion
+from simdref.storage import build_sqlite
+
+LLVM_MC = _tool_path("SIMDREF_LLVM_MC", "llvm-mc") or ""
+XED = _tool_path("SIMDREF_XED", "xed") or ""
+needs_tools = pytest.mark.skipif(not LLVM_MC, reason="llvm-mc absent (set SIMDREF_LLVM_MC)")
+needs_xed = pytest.mark.skipif(not (LLVM_MC and XED), reason="llvm-mc or xed absent")
+
+
+def _enc_node(name: str, mnemonic: str, entries: list[tuple[int, int, str]]) -> dict:
+    return {
+        "_type": "Instruction.Instruction",
+        "name": name,
+        "operation_id": mnemonic,
+        "assembly": {
+            "symbols": [
+                {"_type": "Instruction.Symbols.Literal", "value": mnemonic},
+                {"_type": "Instruction.Symbols.RuleReference", "rule_id": "SPACE"},
+                {"_type": "Instruction.Symbols.RuleReference", "rule_id": "Xd"},
+            ]
+        },
+        "encoding": {
+            "_type": "Instruction.Encodeset",
+            "width": 32,
+            "values": [
+                {
+                    "_type": "Instruction.Encodeset.Bits",
+                    "range": {"_type": "Range", "start": start, "width": span},
+                    "value": {"_type": "Values.Value", "meaning": None, "value": f"'{value}'"},
+                }
+                for start, span, value in entries
+            ],
+        },
+    }
+
+
+def _arm_catalog(nodes: list[dict], tmp_path: Path) -> Path:
+    from simdref.arm_instructions import parse_arm_instruction_payload
+
+    payload = {
+        "instructions": [{"_type": "Instruction.InstructionSet", "name": "A64", "children": nodes}]
+    }
+    records = parse_arm_instruction_payload(json.dumps(payload))
+    db = tmp_path / "catalog.db"
+    build_sqlite(_catalog(records), db)
+    return db
+
+
+def _catalog(records: list[InstructionRecord]) -> Catalog:
+    return Catalog(
+        intrinsics=[],
+        instructions=records,
+        sources=[SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")],
+        generated_at="2025-01-01",
+    )
+
+
+def _rv_row(mnemonic: str, form: str, bits: int, mask: int, match: int) -> InstructionRecord:
+    return InstructionRecord(
+        mnemonic=mnemonic,
+        form=form,
+        summary="Row.",
+        architecture="riscv",
+        enc_bits=bits,
+        enc_mask=mask,
+        enc_match=match,
+        enc_extra=[["", bits, mask, match]],
+    )
+
+
+# ---------------------------------------------------------------------------
+# pure lookup logic (no tools)
+# ---------------------------------------------------------------------------
+
+
+class TestSubsetRule:
+    def test_covered_candidate_drops(self):
+        fine = (0xFF, 0x12, "fine")
+        coarse = (0xF0, 0x10, "coarse")
+        kept = _refine_subset([fine, coarse])
+        assert [entry[2] for entry in kept] == ["fine"]
+
+    def test_unrelated_candidates_all_stay(self):
+        a = (0xFF, 0x12, "a")
+        b = (0x0F, 0x03, "b")
+        assert len(_refine_subset([a, b])) == 2
+
+    def test_identical_patterns_do_not_cover_each_other(self):
+        a = (0xF0, 0x10, "a")
+        b = (0xF0, 0x10, "b")
+        assert len(_refine_subset([a, b])) == 2
+
+
+class TestBuckets:
+    def test_wildcard_window_expands(self):
+        row = object()
+        buckets = _bucketize([(0xFF00, 0x1200, row)], shift=8)
+        assert list(buckets) == [0x12]
+        assert buckets[0x12] == [(0xFF00, 0x1200, row)]
+
+    def test_free_window_bits_land_in_every_value(self):
+        row = object()
+        buckets = _bucketize([(0x00FF, 0x0012, row)], shift=8)
+        assert len(buckets) == 256
+
+
+class TestBytesToWords:
+    def test_fixup_shapes_zero_only_unknown_bits(self):
+        # Shapes measured from llvm-mc: whole byte, marked byte, binary bits.
+        raw = _bytes_to_words("0x63'A',A,0xb5'A',A")
+        assert raw == bytes([0x63, 0x00, 0xB5, 0x00])
+        raw = _bytes_to_words("0bAAAAAA01,0b101AAAAA")
+        assert raw == bytes([0x01, 0xA0])
+        raw = _bytes_to_words("0x33,0x85,0xc5,0x00")
+        assert raw == bytes([0x33, 0x85, 0xC5, 0x00])
+
+
+# ---------------------------------------------------------------------------
+# end to end through llvm-mc
+# ---------------------------------------------------------------------------
+
+
+@needs_tools
+class TestAarch64Document:
+    def test_ret_line_hits_the_ret_row(self, tmp_path):
+        # encodes RET: 1101011 0 0 10 11111 0000 0 0 xxxxx 00000 (Xd = x30)
+        db = _arm_catalog(
+            [
+                _enc_node(
+                    "RET_64R_branch_reg",
+                    "RET",
+                    [
+                        (25, 7, "1101011"),
+                        (21, 4, "0010"),
+                        (16, 5, "11111"),
+                        (10, 6, "000000"),
+                    ],
+                ),
+                _enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")]),
+            ],
+            tmp_path,
+        )
+        results = identify("ret\nnop", "aarch64", catalog_path=db)
+        assert [r.status for r in results] == ["row", "row"]
+        assert results[0].row.mnemonic == "RET"
+        assert results[1].row.mnemonic == "HINT"
+
+    def test_line_with_no_row_says_so(self, tmp_path):
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        results = identify("ret", "aarch64", catalog_path=db)
+        assert results[0].status == "no-row"
+        assert results[0].reason == "no catalog row"
+
+    def test_rejected_line_carries_the_error(self, tmp_path):
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        results = identify("add x0, x1", "aarch64", catalog_path=db)
+        assert results[0].status == "no-row"
+        assert results[0].reason and results[0].reason != "no catalog row"
+
+    def test_not_an_instruction(self, tmp_path):
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        results = identify("\n# comment\nlabel:\nret", "aarch64", catalog_path=db)
+        assert [r.status for r in results] == [
+            "not-an-instruction",
+            "not-an-instruction",
+            "not-an-instruction",
+            "no-row",
+        ]
+
+
+@needs_tools
+class TestArm32Document:
+    def test_arm32_rows_never_come_from_a64_keys(self, tmp_path):
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        results = identify("mov r0, r1", "arm", catalog_path=db)
+        assert results[0].status == "no-row"
+        assert "arm32" in results[0].reason
+
+
+@needs_tools
+class TestRiscvDocument:
+    def test_opcode_names_the_row_in_a_tie(self, tmp_path):
+        # lr.w and lr.w.aq share one (mask, match); llvm-mc's MCInst opcode
+        # names the row (review F3). Disabling the opcode stage makes both
+        # lines ambiguous and fails this test.
+        db = tmp_path / "catalog.db"
+        build_sqlite(
+            _catalog(
+                [
+                    _rv_row("lr.w", "lr.w", 32, 4193284223, 268443695),
+                    _rv_row("lr.w.aq", "lr.w.aq", 32, 4193284223, 268443695),
+                ]
+            ),
+            db,
+        )
+        results = identify("lr.w a0, (a1)\nlr.w.aq a0, (a1)", "riscv64", catalog_path=db)
+        assert [r.status for r in results] == ["row", "row"]
+        assert [r.row.mnemonic for r in results] == ["lr.w", "lr.w.aq"]
+
+    def test_j_on_rv64_is_c_j_never_c_jal(self, tmp_path):
+        # c.j and c.jal differ in the pattern; c.jal is RV32-only and
+        # c.addiw (RV64) shares its pattern. The manager requirement: 'j' on
+        # RV64 gives c.j; 'c.jal' on RV32 resolves its tie to c.jal.
+        db = tmp_path / "catalog.db"
+        build_sqlite(
+            _catalog(
+                [
+                    _rv_row("c.j", "c.j", 16, 57347, 40961),
+                    _rv_row("c.jal", "c.jal", 16, 57347, 8193),
+                    _rv_row("c.addiw", "c.addiw", 16, 57347, 8193),
+                ]
+            ),
+            db,
+        )
+        results = identify("j 8", "riscv64", catalog_path=db)
+        assert results[0].status == "row"
+        assert results[0].row.mnemonic == "c.j"
+        results = identify("c.jal 8", "riscv32", catalog_path=db)
+        assert results[0].status == "row"
+        assert results[0].row.mnemonic == "c.jal"
+
+    def test_tie_the_opcode_does_not_name_stays_ambiguous(self, tmp_path):
+        db = tmp_path / "catalog.db"
+        build_sqlite(
+            _catalog([_rv_row("foo", "foo", 16, 0, 0), _rv_row("bar", "bar", 16, 0, 0)]),
+            db,
+        )
+        result = identify("mv a0, a1", "riscv64", catalog_path=db)[0]
+        assert result.status == "no-row"
+        assert result.reason.startswith("ambiguous")
+        assert set(result.candidates) == {"riscv:foo", "riscv:bar"}
+
+    def test_both_spellings_byte_identify_to_c_mv(self, tmp_path):
+        # mv a0, a1 and c.mv a0, a1 assemble to the same two bytes; the bytes
+        # are the c.mv encoding, so both lines identify the c.mv row.
+        db = tmp_path / "catalog.db"
+        build_sqlite(
+            _catalog(
+                [
+                    _rv_row("mv", "mv", 16, 0, 0),
+                    _rv_row("c.mv", "c.mv", 16, 0, 0),
+                    _rv_row("sub", "sub", 32, 0, 0),
+                ]
+            ),
+            db,
+        )
+        results = identify("mv a0, a1\nc.mv a0, a1\nsub a0, a1, a2", "riscv64", catalog_path=db)
+        assert [r.status for r in results] == ["row", "row", "row"]
+        assert [r.row.mnemonic for r in results] == ["c.mv", "c.mv", "sub"]
+
+    def test_base_scoped_patterns(self, tmp_path):
+        row = InstructionRecord(
+            mnemonic="slli",
+            form="slli",
+            summary="Row.",
+            architecture="riscv",
+            enc_bits=32,
+            enc_mask=0xFFFFFFFF,
+            enc_match=0x00C58533,  # add a0, a1, a2
+            enc_extra=[
+                ["RV32", 32, 0xFFFFFFFF, 0x00C58533],
+                ["RV64", 32, 0xFFFFFFFF, 0x40C58533],  # sub a0, a1, a2
+            ],
+        )
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog([row]), db)
+        assert identify("add a0, a1, a2", "riscv64", catalog_path=db)[0].status == "no-row"
+        assert identify("sub a0, a1, a2", "riscv32", catalog_path=db)[0].status == "no-row"
+        assert identify("add a0, a1, a2", "riscv32", catalog_path=db)[0].status == "row"
+        assert identify("sub a0, a1, a2", "riscv64", catalog_path=db)[0].status == "row"
+
+    def test_e_family_rows_serve_their_base(self, tmp_path):
+        # RV32E/RV64E keys serve their whole base family (revB probe I).
+        row = InstructionRecord(
+            mnemonic="add",
+            form="add",
+            summary="Row.",
+            architecture="riscv",
+            enc_bits=32,
+            enc_mask=0xFFFFFFFF,
+            enc_match=0x00C58533,
+            enc_extra=[["RV32E", 32, 0xFFFFFFFF, 0x00C58533]],
+        )
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog([row]), db)
+        assert identify("add a0, a1, a2", "riscv32", catalog_path=db)[0].status == "row"
+        assert identify("add a0, a1, a2", "riscv64", catalog_path=db)[0].status == "no-row"
+
+
+@needs_xed
+class TestX86Document:
+    def test_split_attrs_pick_the_sized_row(self, tmp_path):
+        from simdref.asm_identity import _xed_facts
+
+        facts = _xed_facts(["01d8", "4801c3"], XED)  # addl %eax,%ebx / addq %rax,%rbx
+        assert facts[0]["iform"] == facts[1]["iform"], facts
+        iform = facts[0]["iform"]
+        rows = [
+            InstructionRecord(
+                mnemonic="ADD",
+                form="ADD (R32, R32)",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": iform, "split_attrs": json.dumps({"eosz": "2"})},
+            ),
+            InstructionRecord(
+                mnemonic="ADD",
+                form="ADD (R64, R64)",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": iform, "split_attrs": json.dumps({"eosz": "3"})},
+            ),
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        results = identify("addl %eax, %ebx\naddq %rax, %rbx", "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["row", "row"]
+        assert [r.row.form for r in results] == ["ADD (R32, R32)", "ADD (R64, R64)"]
+
+    def test_iform_absent_is_a_reason(self, tmp_path):
+        rows = [
+            InstructionRecord(
+                mnemonic="ADD",
+                form="ADD (R64, R64)",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": "NOT_A_REAL_IFORM", "split_attrs": "{}"},
+            )
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        result = identify("addq %rax, %rbx", "x86", "att", catalog_path=db)[0]
+        assert result.status == "no-row"
+        assert "absent" in result.reason
+
+
+@needs_xed
+class TestX86SplitStages:
+    """Pin each _x86_pick stage (review F2): rows differ only in the stage's
+    attribute and the pick must name the right one."""
+
+    CASES = 0
+
+    def _pick(self, tmp_path, hexes, line, attrs, syntax="att"):
+        from simdref.asm_identity import _xed_facts
+
+        iform = _xed_facts([hexes], XED)[0]["iform"]
+        rows = [
+            InstructionRecord(
+                mnemonic="T",
+                form=label,
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": iform, "split_attrs": json.dumps(a)},
+            )
+            for label, a in attrs
+        ]
+        type(self).CASES += 1
+        db = tmp_path / f"catalog-{self.CASES}.db"
+        build_sqlite(_catalog(rows), db)
+        result = identify(line, "x86", syntax, catalog_path=db)[0]
+        assert result.status == "row", result
+        return result.row.form
+
+    def test_agen_address_forms(self, tmp_path):
+        # baseless, index-only, RIP-relative, disp-only, base forms and
+        # segment-prefixed LEA and memory lines (manager F1).
+        cases = [
+            ("lea (,%r11,4), %rax", "4a8d049d00000000", "IS_D32", "B"),
+            ("lea (,%r11), %rax", "4a8d041d00000000", "I_D32", "B"),
+            ("lea 0x10(%rip), %rax", "488d0510000000", "R_D32", "B"),
+            ("lea 0x1234, %rax", "488d042534120000", "D32", "B"),
+            ("lea 32(%r10), %rax", "498d4220", "B_D8", "B"),
+            ("lea (%r10,%r11), %rax", "4b8d041a", "B_I", "B_D8"),
+            ("lea (%r10,%r11,4), %rax", "4b8d049a", "B_IS", "B_I"),
+            ("lea %fs:(,%r11,4), %rax", "644a8d049d00000000", "IS_D32", "B"),
+            ("lea %fs:0x10(%rip), %rax", "64488d0510000000", "R_D32", "B"),
+            ("mov %fs:(%rax), %rbx", "64488b18", "B", "D32"),
+            ("mov 0x1234, %eax", "8b042534120000", "D32", "B"),
+        ]
+        for line, hexes, target, other in cases:
+            picked = self._pick(
+                tmp_path,
+                hexes,
+                line,
+                [("TARGET", {"agen": target}), ("OTHER", {"agen": other})],
+            )
+            assert picked == "TARGET", (line, picked)
+
+    def test_high8_stage(self, tmp_path):
+        cases = [
+            ("add %ah, %al", "00e0", "H-REG1"),
+            ("add %al, %ah", "00c4", "H-REG0"),
+            ("add %al, %bl", "00c3", "H-EMPTY"),
+        ]
+        attrs = [
+            ("H-REG0", {"high8": "REG0"}),
+            ("H-REG1", {"high8": "REG1"}),
+            ("H-EMPTY", {"high8": ""}),
+        ]
+        for line, hexes, expect in cases:
+            assert self._pick(tmp_path, hexes, line, attrs) == expect, line
+
+    def test_immzero_stage(self, tmp_path):
+        attrs = [("Z-1", {"immzero": "1"}), ("Z-0", {"immzero": "0"})]
+        assert self._pick(tmp_path, "66e500", "in $0, %ax", attrs) == "Z-1"
+        assert self._pick(tmp_path, "66e505", "in $5, %ax", attrs) == "Z-0"
+
+    def test_mask_stage(self, tmp_path):
+        attrs = [("M-1", {"mask": "1"}), ("M-0", {"mask": "0"})]
+        assert (
+            self._pick(tmp_path, "62f16c4958c1", "vaddps %zmm1, %zmm2, %zmm0{%k1}", attrs) == "M-1"
+        )
+        assert self._pick(tmp_path, "62f16c4858c1", "vaddps %zmm1, %zmm2, %zmm0", attrs) == "M-0"
+
+    def test_zeroing_stage(self, tmp_path):
+        attrs = [("Q-1", {"zeroing": "1"}), ("Q-0", {"zeroing": "0"})]
+        assert (
+            self._pick(tmp_path, "62f16cc958c1", "vaddps %zmm1, %zmm2, %zmm0{%k1}{z}", attrs)
+            == "Q-1"
+        )
+        assert (
+            self._pick(tmp_path, "62f16c4958c1", "vaddps %zmm1, %zmm2, %zmm0{%k1}", attrs) == "Q-0"
+        )
+
+    def test_unknown_agen_token_is_a_reason(self, tmp_path):
+        # An unknown or empty agen token reports one no-row reason, never raises.
+        from simdref.asm_identity import _xed_facts
+
+        iform = _xed_facts(["498d4220"], XED)[0]["iform"]
+        cases = [
+            ("B_Z_D32", "no catalog row (unknown agen token 'Z' in 'B_Z_D32')"),
+            ("", "no catalog row (unknown agen token '' in '')"),
+        ]
+        for n, (value, expect) in enumerate(cases):
+            rows = [
+                InstructionRecord(
+                    mnemonic="T",
+                    form=label,
+                    summary="Row.",
+                    architecture="x86",
+                    metadata={"iform": iform, "split_attrs": json.dumps({"agen": value})},
+                )
+                for label in ("BAD-1", "BAD-2")
+            ]
+            db = tmp_path / f"bad-agen-{n}.db"
+            build_sqlite(_catalog(rows), db)
+            result = identify("lea 32(%r10), %rax", "x86", "att", catalog_path=db)[0]
+            assert result.status == "no-row", result
+            assert result.reason == expect
+
+
+def _keyless_db(tmp_path) -> Path:
+    """A schema-13 shaped catalog: 9 instruction columns, no encoding keys."""
+    import sqlite3
+
+    db = tmp_path / "keyless.db"
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute("CREATE TABLE meta (key TEXT, value TEXT)")
+        conn.execute("INSERT INTO meta VALUES ('schema_version', '13')")
+        conn.execute(
+            "CREATE TABLE instructions_data (db_key TEXT, key TEXT, architecture TEXT,"
+            " mnemonic TEXT, form TEXT, summary TEXT, isa TEXT, category TEXT, payload BLOB)"
+        )
+        conn.execute("CREATE INDEX idx_instruction_category ON instructions_data (category)")
+        conn.execute(
+            "CREATE TABLE intrinsics_data (id TEXT, name TEXT, architecture TEXT,"
+            " signature TEXT, description TEXT, header TEXT, isa TEXT, category TEXT,"
+            " subcategory TEXT, arm_arch TEXT, payload BLOB)"
+        )
+        conn.execute("CREATE INDEX idx_intrinsic_arm_arch ON intrinsics_data (arm_arch)")
+        conn.commit()
+    finally:
+        conn.close()
+    return db
+
+
+def test_keyless_catalog_gives_one_reason(tmp_path):
+    # C4: a schema-13 catalog has no encoding keys; every instruction line
+    # reports that one reason. Needs no tools (the keyless path runs first).
+    results = identify(
+        "addq %rax, %rbx\n\n# comment\n", "x86", "att", catalog_path=_keyless_db(tmp_path)
+    )
+    assert [r.status for r in results] == ["no-row", "not-an-instruction", "not-an-instruction"]
+    assert results[0].reason == "catalog lacks encoding keys (schema 13)"
+
+
+@needs_tools
+class TestToolFailureModes:
+    def test_echo_mismatch_reports_every_line(self, tmp_path):
+        # A fake llvm-mc emits one echo block for two source lines: the
+        # line-to-bytes mapping is unverified, so no line gets a row (F4).
+        fake = tmp_path / "fake-mc"
+        fake.write_text(
+            "#!/bin/sh\n"
+            "cat <<'EOF'\n"
+            "    ret                             # encoding: [0xd6,0x5f,0x03,0xd5]\n"
+            "                                    # <MCInst #1 RET>\n"
+            "EOF\n"
+        )
+        fake.chmod(0o755)
+        db = _arm_catalog([_enc_node("RET_64R_branch_reg", "RET", [(25, 7, "1101011")])], tmp_path)
+        results = identify("ret\nret", "aarch64", catalog_path=db, llvm_mc=str(fake))
+        assert [r.status for r in results] == ["no-row", "no-row"]
+        for result in results:
+            assert result.reason.startswith("line mapping unverified"), result.reason
+
+    def test_xed_empty_output_line_is_a_reason(self, tmp_path):
+        # A fake xed decoder printing an empty line must not crash (F4).
+        fake = tmp_path / "fake-xed"
+        fake.write_text("#!/bin/sh\necho\n")
+        fake.chmod(0o755)
+        rows = [
+            InstructionRecord(
+                mnemonic="ADD",
+                form="ADD (R64, R64)",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": "ADD_GPRv_GPRv_01", "split_attrs": "{}"},
+            )
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        result = identify("addq %rax, %rbx", "x86", "att", catalog_path=db, xed=str(fake))[0]
+        assert result.status == "no-row"
+        assert "EMPTY_OUTPUT" in result.reason
+
+    def test_catalog_cache_invalidates_on_rebuild(self, tmp_path):
+        # F4: the cache keys on the file mtime, so a rebuilt catalog at the
+        # same path is re-read.
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        first = identify("nop", "aarch64", catalog_path=db)[0]
+        assert first.status == "row" and first.row.mnemonic == "HINT"
+        _arm_catalog([_enc_node("RET_64R_branch_reg", "RET", [(25, 7, "1101011")])], tmp_path)
+        second = identify("ret", "aarch64", catalog_path=db)[0]
+        assert second.status == "row" and second.row.mnemonic == "RET"
+
+
+def test_missing_tool_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("SIMDREF_LLVM_MC", "")
+    monkeypatch.setattr("simdref.asm_identity._tool_path", lambda *_a, **_k: None)
+    db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+    with pytest.raises(ToolUnavailableError):
+        identify("ret", "aarch64", catalog_path=db)
+
+
+def test_bad_arch_and_syntax_are_rejected():
+    with pytest.raises(ValueError):
+        identify("ret", "mips")
+    with pytest.raises(ValueError):
+        identify("mov", "x86", "gas")
