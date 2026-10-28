@@ -25,6 +25,15 @@ INTRINSIC_SIGNATURE_RE = re.compile(
     re.DOTALL,
 )
 POLICY_SUFFIXES = ("_tumu", "_tum", "_mu", "_tu")
+# Whole mnemonics only: a letter prefix also caught sh1add, sha256*, sctrclr, vsetvli and vslide*.
+LOAD_STORE_RE = re.compile(
+    r"(?:lb|lh|lw|ld|lbu|lhu|lwu|sb|sh|sw|sd"
+    r"|(?:lr|sc)\.[wdq]"
+    r"|amo[a-z0-9]+\.[bhwdq]"
+    r"|(?:vl|vs)(?:m|[1248]r|[1248]re\d+|e\d+(?:ff)?|se\d+|(?:ux|ox)ei\d+"
+    r"|sseg\d+e\d+|seg\d+e\d+(?:ff)?|(?:ux|ox)seg\d+ei\d+)\.v"
+    r")(?:\.(?:aq|rl|aqrl))?$"
+)
 
 
 def git_rev(repo: Path) -> str:
@@ -69,9 +78,7 @@ def instruction_category(mnemonic: str, isa: list[str]) -> str:
         return "Vector Crypto"
     if any(token.startswith("zvfbf") for token in isa_tokens):
         return "BFloat16"
-    if lowered.startswith(
-        ("vl", "vs", "ld", "lb", "lh", "lw", "sd", "sb", "sh", "sw", "lr", "sc", "amo")
-    ):
+    if LOAD_STORE_RE.fullmatch(lowered):
         return "Loads and Stores"
     if lowered.startswith("vm") and ".m" in lowered:
         return "Mask Operations"
