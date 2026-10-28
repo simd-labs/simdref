@@ -59,8 +59,9 @@ jobs:
         run: uv pip install -e .
 
       - name: Vendor RISC-V sources
-        # Mirrors ci.yml:build-catalog. `simdref build` otherwise fetches
-        # these feeds live and is flaky when upstream momentarily 404s.
+        # Mirrors ci.yml:build-catalog, but at upstream HEAD, not at the CI pin.
+        # `simdref build` otherwise fetches these feeds live and is flaky when
+        # upstream momentarily 404s.
         run: |
           git clone --depth 1 https://github.com/riscv/riscv-unified-db /tmp/riscv-unified-db
           git clone --depth 1 https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc /tmp/riscv-rvv-intrinsic-doc

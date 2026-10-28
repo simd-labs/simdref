@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emphasis. The `isa` row shows once, also in the terminal view. The footer
   keeps only the full-page link, because the rows above already give the
   source URLs.
+- CI builds the catalog from a pinned `riscv-unified-db` commit. Upstream
+  added `Zvdot4a8i` with no Operation text, and the RISC-V operation coverage
+  gate fell from 0.606 to 0.598. The coverage audit still follows upstream
+  HEAD.
 
 ## [0.0.13], 2026-10-27
 

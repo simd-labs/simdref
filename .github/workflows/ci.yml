@@ -79,8 +79,16 @@ jobs:
         run: uv pip install -e .
 
       - name: Vendor RISC-V sources
+        # Pin unified-db like vendor/riscv/docs_pages.json: an upstream
+        # extension with no Operation text lowers the operation coverage
+        # gate (Zvdot4a8i at 323862e1: 0.606 -> 0.598). Move the pin on
+        # purpose; coverage.yml follows upstream HEAD and reports the drift.
+        env:
+          RISCV_UDB_COMMIT: 798d6a54d709a1584e7fa81bd8cc4ec7b7803a42
         run: |
-          git clone --depth 1 https://github.com/riscv/riscv-unified-db /tmp/riscv-unified-db
+          git init -q /tmp/riscv-unified-db
+          git -C /tmp/riscv-unified-db fetch -q --depth 1 https://github.com/riscv/riscv-unified-db "$RISCV_UDB_COMMIT"
+          git -C /tmp/riscv-unified-db checkout -q FETCH_HEAD
           git clone --depth 1 https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc /tmp/riscv-rvv-intrinsic-doc
           python tools/vendor_riscv_sources.py
 
