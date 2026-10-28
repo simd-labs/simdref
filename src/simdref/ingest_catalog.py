@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import dataclasses
 import html
 import io
 import json
@@ -16,7 +15,7 @@ from typing import Any, Callable
 from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
-from simdref.display import strip_instruction_decorators
+from simdref.display import _LEADING_INSTR_TAG_RE, strip_instruction_decorators
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
@@ -990,14 +989,15 @@ def parse_arm_sve_instruction_map(
 
 
 def _normalize_uops_form(form: str) -> str:
-    """Strip uops.info display decorators and opcode-map suffixes from a form.
+    """Strip uops.info display tags and opcode-map suffixes from a form.
 
-    ``ADD_01 (R16, R16)``, ``ADD_EVEX_01 (R16, R16)`` and ``MOVSD_XMM_0F10
-    (XMM, XMM)`` name an encoding variant of the plain assembly form; the
-    variant suffix is not part of the form.
+    ``ADD_01 (R16, R16)`` and ``MOVSD_XMM_0F10 (XMM, XMM)`` name one
+    opcode-map variant of the plain assembly form. The ``_EVEX`` marker
+    stays: it keeps EVEX and APX variants on rows of their own, so a hidden
+    APX-first variant never shadows the ordinary row.
     """
     head, sep, tail = form.partition(" ")
-    head = strip_instruction_decorators(head)
+    head = _LEADING_INSTR_TAG_RE.sub("", head)
     head = re.sub(r"_[0-9A-F]{2,4}$", "", head)
     return f"{head}{sep}{tail}".strip()
 
@@ -1005,9 +1005,6 @@ def _normalize_uops_form(form: str) -> str:
 def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
     records: list[InstructionRecord] = []
     by_key: dict[str, InstructionRecord] = {}
-    # Distinct variant values per merge key, in document order. The merged
-    # row gets the union of every label a consumer filters or displays.
-    variant_values: dict[str, dict[str, list[str]]] = {}
     for node in _iter_xml_elements(source, "instruction"):
         mnemonic = _intern_small(
             strip_instruction_decorators(
@@ -1100,69 +1097,15 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
         )
         existing = by_key.get(record.db_key)
         if existing is not None:
-            # Encoding variants share one row; keep the first variant's
+            # Same-key rows are opcode-map variants of one form and carry
+            # identical labels, because the _EVEX marker keeps the EVEX and
+            # APX variants on their own keys. Keep the first variant's
             # measurements and fold in per-uarch data only where it has none.
-            # ISA/extension labels, summaries and display metadata keep the
-            # union of all variants, or the merge drops rows from the ISA
-            # family filters (an AVX512F_128-only row hid the FMA label of
-            # its VEX variant, dropping VFMADD132PD from the AVX filter).
             for arch, entry in arch_details.items():
                 existing.arch_details.setdefault(arch, entry)
-            merged = variant_values.setdefault(
-                record.db_key,
-                {
-                    "isa": list(existing.isa),
-                    "summary": [existing.summary] if existing.summary else [],
-                    "extension": (
-                        [existing.metadata["extension"]]
-                        if existing.metadata.get("extension")
-                        else []
-                    ),
-                    "category": (
-                        [existing.metadata["category"]] if existing.metadata.get("category") else []
-                    ),
-                    "cpl": [existing.metadata["cpl"]] if existing.metadata.get("cpl") else [],
-                },
-            )
-            for field_name, values in (
-                ("isa", record.isa),
-                ("summary", [record.summary] if record.summary else []),
-                (
-                    "extension",
-                    [record.metadata["extension"]] if record.metadata.get("extension") else [],
-                ),
-                (
-                    "category",
-                    [record.metadata["category"]] if record.metadata.get("category") else [],
-                ),
-                ("cpl", [record.metadata["cpl"]] if record.metadata.get("cpl") else []),
-            ):
-                for value in values:
-                    if value not in merged[field_name]:
-                        merged[field_name].append(value)
-            # Single-valued metadata (url, url-ref, iclass, iform,
-            # uops_summary) keeps the first variant and fills gaps only.
-            for meta_key, meta_value in record.metadata.items():
-                existing.metadata.setdefault(meta_key, meta_value)
             continue
         by_key[record.db_key] = record
         records.append(record)
-    if variant_values:
-        for index, rec in enumerate(records):
-            merged = variant_values.get(rec.db_key)
-            if merged is None:
-                continue
-            metadata = dict(rec.metadata)
-            for meta_key in ("extension", "category", "cpl"):
-                if merged[meta_key]:
-                    metadata[meta_key] = "/".join(merged[meta_key])
-            summary = " | ".join(merged["summary"]) or rec.summary
-            records[index] = dataclasses.replace(
-                rec,
-                isa=merged["isa"] or rec.isa,
-                summary=summary,
-                metadata=metadata,
-            )
     return records
 
 

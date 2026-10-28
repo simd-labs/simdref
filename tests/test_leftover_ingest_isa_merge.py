@@ -1,23 +1,34 @@
-"""Encoding-variant merges keep every variant's ISA labels (leftover fix).
+"""Encoding variants of one x86 form stay on rows of their own.
 
-uops.info lists one <instruction> node per encoding variant (EVEX, VEX,
-APX). Variants of one form collapse into one catalog row. The merged row
-must carry the union of the variants' ISA/extension labels, or the ISA
-family filters lose instructions the variant rows still named.
+uops.info lists one <instruction> node per encoding variant (VEX, EVEX,
+APX). The ordinary variant and the EVEX or APX variant differ in ISA labels,
+category and visibility, so each variant keeps its own catalog row and its
+own labels. Only opcode-map variants with identical labels share one row.
+Each test feeds fixture rows copied from the upstream source data through
+the real ingest and, where a reader needs the catalog, a real SQLite build.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
-from simdref.filters import FilterSpec
+from simdref.cli import _emit_filtered_names, _print_search_results_runtime
+from simdref.display import isa_visible
+from simdref.filters import FilterSpec, load_categories_from_db
 from simdref.ingest_catalog import parse_uops_xml
+from simdref.models import Catalog
+from simdref.storage import build_sqlite
 
 # uops.info instruction rows copied from vendor/uops/instructions.xml.
-# The EVEX and VEX encodings of VFMADD132PD share one form: their cores
-# both normalize to "VFMADD132PD (XMM, XMM, XMM)", so they merge into one
-# row. The first variant carries only AVX512F_128; the FMA label comes
-# from the second variant alone.
+# The EVEX and VEX encodings of VFMADD132PD share one assembly form but
+# carry different ISA labels: the EVEX row is AVX512F_128-only, the VEX row
+# carries the FMA label the AVX family filter needs.
 FMA_VARIANTS = """<?xml version="1.0"?>
 <root>
 <instruction asm="{evex} VFMADD132PD" category="VFMA" cpl="3" evex="1"
@@ -36,8 +47,8 @@ FMA_VARIANTS = """<?xml version="1.0"?>
 </root>
 """
 
-# ADCX has an APX EVEX variant and an ADX variant whose labels, categories
-# and summaries all differ.
+# ADCX has a plain ADX variant and an APX EVEX variant. Their labels,
+# categories and summaries differ, so each keeps its own row.
 ADCX_VARIANTS = """<?xml version="1.0"?>
 <root>
 <instruction asm="{load} ADCX" category="ADOX_ADCX" cpl="3" extension="ADOX_ADCX"
@@ -50,44 +61,105 @@ ADCX_VARIANTS = """<?xml version="1.0"?>
 </root>
 """
 
+# The APX EVEX variant of AADD comes first in document order. The ordinary
+# row must stay visible on its own.
+AADD_VARIANTS = """<?xml version="1.0"?>
+<root>
+<instruction asm="{evex} AADD" category="APX" cpl="3" evex="1" extension="APXEVEX"
+ iclass="AADD" iform="AADD_MEMi32_GPR32i32_APX" isa-set="APX_F_RAO_INT" opcode="FC"
+ string="AADD_EVEX (M32, R32)"/>
+<instruction asm="AADD" category="LEGACY" cpl="3" extension="RAO_INT" iclass="AADD"
+ iform="AADD_MEM32_GPR32" isa-set="RAO_INT" opcode="0F38FC"
+ string="AADD (M32, R32)" summary="Aadd 32-bit integer operands."/>
+</root>
+"""
 
-def _fma_row(records):
-    rows = [r for r in records if r.key == "VFMADD132PD (XMM, XMM, XMM)"]
-    assert len(rows) == 1, [r.key for r in records]
-    return rows[0]
+
+_KEEP_DIRS: list[tempfile.TemporaryDirectory] = []
 
 
-class UopsVariantMergeTest(unittest.TestCase):
-    def test_variants_merge_keeps_fma_label(self):
+def _build_conn(records) -> sqlite3.Connection:
+    tmp = tempfile.TemporaryDirectory()
+    _KEEP_DIRS.append(tmp)
+    path = Path(tmp.name) / "catalog.db"
+    build_sqlite(
+        Catalog(
+            intrinsics=[], instructions=records, sources=[], generated_at="2026-10-28T00:00:00Z"
+        ),
+        path,
+    )
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+class UopsVariantRowsTest(unittest.TestCase):
+    def test_variants_stay_separate_rows(self) -> None:
         records = parse_uops_xml(FMA_VARIANTS)
-        row = _fma_row(records)
-        self.assertEqual(row.isa, ["AVX512F_128", "FMA"])
+        self.assertEqual(len(records), 2)
+        by_key = {record.key: record for record in records}
+        self.assertEqual(by_key["VFMADD132PD (XMM, XMM, XMM)"].isa, ["FMA"])
+        self.assertEqual(by_key["VFMADD132PD_EVEX (XMM, XMM, XMM)"].isa, ["AVX512F_128"])
 
-    def test_merged_fma_row_passes_avx_and_fma_filters(self):
-        row = _fma_row(parse_uops_xml(FMA_VARIANTS))
+    def test_list_command_finds_fma_row_under_avx_family(self) -> None:
+        # Check 2: `llm list VFMADD132PD* --isa AVX` keeps one row, and the
+        # ISA field splits into the single labels the reader expects.
+        conn = _build_conn(parse_uops_xml(FMA_VARIANTS))
+        with contextlib.redirect_stdout(io.StringIO()) as buf:
+            emitted = _emit_filtered_names(conn, "VFMADD132PD*", ["AVX"])
+        self.assertEqual(emitted, 1)
+        lines = [json.loads(line) for line in buf.getvalue().splitlines()]
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["name"], "VFMADD132PD (XMM, XMM, XMM)")
+        self.assertEqual(lines[0]["isa"], ["FMA"])
+
+    def test_plain_variant_passes_family_filter(self) -> None:
         spec = FilterSpec()
-        self.assertTrue(spec.matches(row, enabled_families=["AVX"]))
-        self.assertFalse(spec.matches(row, enabled_families=["SSE"]))
+        by_key = {record.key: record for record in parse_uops_xml(FMA_VARIANTS)}
+        self.assertTrue(
+            spec.matches(by_key["VFMADD132PD (XMM, XMM, XMM)"], enabled_families=["AVX"])
+        )
+        self.assertFalse(
+            spec.matches(by_key["VFMADD132PD (XMM, XMM, XMM)"], enabled_families=["SSE"])
+        )
 
-    def test_variants_merge_unions_extension_category_summary(self):
-        rows = [r for r in parse_uops_xml(ADCX_VARIANTS) if r.key == "ADCX (R32, R32)"]
-        self.assertEqual(len(rows), 1)
-        row = rows[0]
-        self.assertEqual(row.isa, ["ADOX_ADCX", "APX_F_ADX"])
-        self.assertIn("ADOX_ADCX", row.metadata["extension"])
-        self.assertIn("APXEVEX", row.metadata["extension"])
-        self.assertIn("ADOX_ADCX", row.metadata["category"])
-        self.assertIn("APX", row.metadata["category"])
-        self.assertIn("Unsigned Integer Addition of Two Operands With Carry Flag.", row.summary)
-        self.assertIn("Add with carry 32-bit integer operands.", row.summary)
-        # Single-valued fields keep the first variant; empty gaps fill.
-        self.assertEqual(row.metadata["iform"], "ADCX_GPR32_32b")
-        self.assertEqual(row.metadata["url"], "uops.info/html-instr/ADCX_EVEX_R32_R32.html")
+    def test_adcx_category_stays_exactly_matchable(self) -> None:
+        # Check 1: the plain ADCX row keeps category ADOX_ADCX as a single
+        # value the exact filters, the SQL IN predicate and the facets match.
+        records = parse_uops_xml(ADCX_VARIANTS)
+        plain = [record for record in records if record.key == "ADCX (R32, R32)"]
+        self.assertEqual(len(plain), 1)
+        row = plain[0]
+        self.assertEqual(row.metadata["category"], "ADOX_ADCX")
+        self.assertEqual(row.metadata["extension"], "ADOX_ADCX")
+        self.assertTrue(FilterSpec().matches(row, enabled_categories=["ADOX_ADCX"]))
+        conn = _build_conn(records)
+        sql_rows = conn.execute(
+            "SELECT key FROM instructions_data WHERE category = ?", ("ADOX_ADCX",)
+        ).fetchall()
+        self.assertEqual([r["key"] for r in sql_rows], ["ADCX (R32, R32)"])
+        categories = {spec.category for spec in load_categories_from_db(conn)}
+        self.assertIn("ADOX_ADCX", categories)
+        self.assertFalse(any("/" in category for category in categories))
 
-    def test_catalog_gap_rows_still_produced(self):
+    def test_apx_first_variant_does_not_hide_plain_row(self) -> None:
+        # Check 3: the merged-into-one AADD row was APX-labelled and hidden;
+        # as separate rows the plain encoding stays visible to the CLI.
+        records = parse_uops_xml(AADD_VARIANTS)
+        by_key = {record.key: record for record in records}
+        self.assertEqual(len(records), 2)
+        self.assertTrue(isa_visible(by_key["AADD (M32, R32)"].isa))
+        self.assertFalse(isa_visible(by_key["AADD_EVEX (M32, R32)"].isa))
+        conn = _build_conn(records)
+        with contextlib.redirect_stdout(io.StringIO()) as buf:
+            count = _print_search_results_runtime(conn, "AADD", 100, as_json=True)
+        self.assertEqual(count, 1)
+        self.assertIn("AADD (M32, R32)", buf.getvalue())
+
+    def test_catalog_gap_rows_still_produced(self) -> None:
         from test_leftover_catalog_gaps import UOPS_FIXTURE
 
-        keys = {r.key for r in parse_uops_xml(UOPS_FIXTURE)}
+        keys = {record.key for record in parse_uops_xml(UOPS_FIXTURE)}
         self.assertIn("MOVSD_XMM (XMM, XMM)", keys)
         self.assertIn("ADD (R16, R16)", keys)
 
