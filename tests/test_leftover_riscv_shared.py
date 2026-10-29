@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 from simdref.lsp import _hover_markdown, _hint_label, _mnemonic_from_asm_line
-from simdref.storage import SQLITE_PATH, open_db
+from simdref.storage import SQLITE_PATH, load_instructions_by_mnemonic_from_db, open_db
 
 _USER_CATALOG = Path.home() / ".local" / "share" / "simdref" / "catalog.db"
 _catalog_env = os.environ.get("SIMDREF_CATALOG", "")
@@ -24,8 +24,9 @@ CATALOG = (
     else (_missing if _catalog_env else (SQLITE_PATH if SQLITE_PATH.is_file() else _USER_CATALOG))
 )
 
-# (line, expected hover fragment or None). None = neither hover nor hint.
-RISCV_SHARED_NONE = [
+# (line). A catalog with the RISC-V scalar rows shows the RISC-V form for each
+# line; a catalog without them shows nothing. No line may name a foreign form.
+RISCV_SHARED_RISCV = [
     "add s0, s1, s2",
     "sub s9, s10, s11",
     "mul s4, s5, s6",
@@ -71,12 +72,32 @@ class RiscvSharedRegisterTests(unittest.TestCase):
         hint = _hint_label(self._db_path, mnemonic, operand_count, operands)
         return hover, hint
 
-    def test_riscv_shared_register_lines_show_nothing(self):
-        for line in RISCV_SHARED_NONE:
+    def _has_riscv_rows(self, mnemonic):
+        return any(
+            form.architecture == "riscv"
+            for form in load_instructions_by_mnemonic_from_db(self._conn, mnemonic)
+        )
+
+    def test_riscv_shared_register_lines_keep_the_riscv_form(self):
+        for line in RISCV_SHARED_RISCV:
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
-                self.assertIsNone(hover)
-                self.assertIsNone(hint)
+                mnemonic = line.split()[0]
+                if self._has_riscv_rows(mnemonic):
+                    self.assertIsNotNone(hover, f"{line} got no hover")
+                    self.assertEqual(hover.splitlines()[1], mnemonic)
+                    self.assertIsNotNone(hint, f"{line} got no hint")
+                else:
+                    self.assertIsNone(hover)
+                    self.assertIsNone(hint)
+
+    def test_x86_line_never_shows_a_riscv_or_arm_form(self):
+        # "%sp" and "%bx" are x86 registers: the line keeps the x86 ADD form
+        # even when the catalog carries RISC-V "add" rows.
+        hover, hint = self._hover_and_hint("add %sp, %bx")
+        self.assertIsNotNone(hover)
+        self.assertRegex(hover.splitlines()[1], r"^ADD \((R\d+|[A-D]X|E[A-D]X)")
+        self.assertIsNotNone(hint)
 
     def test_arm_scalar_fp_lines_keep_their_forms(self):
         for line, fragment in ARM_SCALAR_FP:

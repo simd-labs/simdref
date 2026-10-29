@@ -12,7 +12,7 @@ from pathlib import Path
 
 from simdref import lsp
 from simdref.lsp import _mnemonic_from_asm_line
-from simdref.storage import SQLITE_PATH
+from simdref.storage import SQLITE_PATH, load_instructions_by_mnemonic_from_db, open_db
 
 # The dev-install data dir has no catalog, so fall back to the user-level one.
 # SIMDREF_CATALOG needs "isa update" output at that path, not a missing file:
@@ -25,6 +25,16 @@ CATALOG = (
     if _catalog_env and Path(_catalog_env).is_file()
     else (_missing if _catalog_env else (SQLITE_PATH if SQLITE_PATH.is_file() else _USER_CATALOG))
 )
+
+
+def _riscv_rows(mnemonic: str) -> bool:
+    """True when the catalog carries a RISC-V row for the mnemonic."""
+    with open_db(path=CATALOG) as conn:
+        return any(
+            form.architecture == "riscv"
+            for form in load_instructions_by_mnemonic_from_db(conn, mnemonic)
+        )
+
 
 ASM_TEXT = """# top comment
 .text
@@ -573,7 +583,8 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertEqual([h["label"] for h in hints], ["Add operands."])
 
     def test_riscv_word_ops_do_not_resolve_to_x86(self):
-        # "addw" has no catalog row, and its strip would land on the x86 "add".
+        # A catalog with the RISC-V word rows shows the RISC-V form; without
+        # them the line stays silent. The strip must never land on x86 "add".
         cases = [
             (op, "a0, a1, a2")
             for op in (
@@ -594,8 +605,15 @@ class LspEndToEndTests(unittest.TestCase):
         for op, operands in cases:
             with self.subTest(op=op, operands=operands):
                 self.server.open(ASM_URI, "asm", f"{op} {operands}\n")
-                self.assertEqual(self.server.hints(ASM_URI), [])
-                self.assertIsNone(self.server.hover(ASM_URI, 0, 1))
+                hover = self.server.hover(ASM_URI, 0, 1)
+                hints = self.server.hints(ASM_URI)
+                if _riscv_rows(op):
+                    self.assertIsNotNone(hover, f"{op} {operands} got no hover")
+                    self.assertEqual(hover["contents"]["value"].splitlines()[1], op)
+                    self.assertTrue(hints, f"{op} {operands} got no hint")
+                else:
+                    self.assertEqual(hints, [])
+                    self.assertIsNone(hover)
 
     def test_att_x86_word_ops_still_resolve(self):
         # "%ax" and a bare symbol are not RISC-V registers, so the guard must not fire.
@@ -795,14 +813,24 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertNotIn("T_OPTION", value)
 
     def test_riscv_saved_registers_keep_the_riscv_form(self):
-        # The catalog has no SD or ADDI row, so these lines keep their current
-        # behaviour: no hover and no hint.
+        # A catalog with the RISC-V scalar rows shows the RISC-V form; without
+        # them these lines stay silent. No line names a foreign form.
         uri = "file:///tmp/simdref_lsp_riscv_saved.s"
         text = "addi s0, sp, 16\nsd s1, 8(sp)\n"
         self.server.open(uri, "asm", text)
-        for line in range(2):
-            self.assertIsNone(self.server.hover(uri, line, 1))
-        self.assertEqual(self.server.hints(uri), [])
+        ops = ("addi", "sd")
+        for line, op in enumerate(ops):
+            with self.subTest(op=op):
+                hover = self.server.hover(uri, line, 1)
+                if _riscv_rows(op):
+                    self.assertIsNotNone(hover, f"{op} got no hover")
+                    self.assertEqual(hover["contents"]["value"].splitlines()[1], op)
+                else:
+                    self.assertIsNone(hover)
+        self.assertEqual(
+            [h["position"]["line"] for h in self.server.hints(uri)],
+            [line for line, op in enumerate(ops) if _riscv_rows(op)],
+        )
 
 
 class MissingCatalogTests(unittest.TestCase):
