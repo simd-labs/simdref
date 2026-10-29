@@ -329,8 +329,7 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
     """
     forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
     width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
-    context = arch or frozenset({"x86"})
-    if any(form.architecture in context for form in forms):
+    if any(form.architecture in (arch or frozenset({"x86"})) for form in forms):
         return forms, None
     if arch and "x86" not in arch:
         return [], None
@@ -798,8 +797,7 @@ def _match_form(
                 if re.fullmatch(r"[rv]\d+", c)
             ):
                 width += 1
-            # An Intel size keyword names the memory width; its match outranks
-            # register-width agreement, so the sized form wins.
+            # An Intel size keyword names the memory width.
             if any(re.fullmatch(r"m\d+", c) and c in line_set for c in acc):
                 keyword += 1
         for cls, acc in zip(ordered, accepts):

@@ -711,8 +711,7 @@ def _find_instructions_fast(query: str):
     ensure_runtime()
     with open_db() as conn:
         exact = load_instruction_from_db(conn, query)
-        # A bare-mnemonic exact hit falls through to the form candidates: the
-        # mnemonic's rows are the match, not the one bare key.
+        # A bare-mnemonic exact hit falls through to the form candidates.
         if exact is not None and exact.mnemonic.casefold() != query.strip().casefold():
             return [exact]
         parts = query.split()
