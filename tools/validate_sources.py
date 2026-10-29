@@ -497,6 +497,19 @@ def validate_uops_instructions() -> tuple[int, int]:
             print(f"FAIL uops: empty summary for {label}")
             failures += 1
 
+    # Each parsed row's uarch set must equal the union of the uarch sets of
+    # the raw records mapped to it, so no row can carry uarch data that no
+    # raw record mapped to it has.
+    mapped_uarches: dict[str, set[str]] = {}
+    for index, raw in enumerate(raw_records):
+        mapped_uarches.setdefault(row_keys.get(index, ""), set()).update(raw["arch_details"])
+    for record in parsed:
+        if set(record.arch_details) != mapped_uarches.get(record.db_key, set()):
+            print(
+                f"FAIL uops: uarch set mismatch for {record.metadata.get('iform') or record.form}"
+            )
+            failures += 1
+
     print(
         f"validated uops.info instructions: checked={checked} parsed={len(parsed)} failures={failures}"
     )

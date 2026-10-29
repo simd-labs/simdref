@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -13,6 +14,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VALIDATE_SOURCES_PATH = REPO_ROOT / "tools" / "validate_sources.py"
+UOPS_VARIANT_FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "uops-variant-assignment.json"
 
 UOPS_FIXTURE = """<?xml version="1.0"?>
 <root>
@@ -152,6 +154,45 @@ def _load_rows(module: Any, xml_path: Path) -> Any:
     return module.parse_uops_xml(xml_path)
 
 
+def _variant_name_assignment(rows: Any, assignments: dict[int, str]) -> dict[str, list]:
+    """Pin which raw record each variant row name and its plain sibling carries.
+
+    A variant row name carries a raw-string suffix such as VMOVAPD_29. The
+    plain-named sibling is the row named by the normalized form. Each entry
+    maps the row name to its iform and the ordinals of the raw records the
+    parser assigned to that row.
+    """
+    from simdref.ingest_catalog import _normalize_uops_form
+
+    by_form = {row.form: row for row in rows}
+    ordinals: dict[str, list[int]] = {}
+    for node_index, key in assignments.items():
+        ordinals.setdefault(key, []).append(node_index)
+    pinned: dict[str, list] = {}
+    for row in rows:
+        plain = _normalize_uops_form(row.form)
+        if plain == row.form:
+            continue
+        for form in (row.form, plain):
+            pinned_row = by_form.get(form)
+            if pinned_row is None:
+                continue
+            pinned[form] = [
+                pinned_row.metadata.get("iform", ""),
+                sorted(ordinals.get(pinned_row.db_key, [])),
+            ]
+    return pinned
+
+
+def _rebuild_variant_assignment() -> dict[str, list]:
+    from simdref.ingest_catalog import _parse_uops_xml_keyed
+    from simdref.ingest_sources import fetch_uops_xml
+
+    source, _source_version = fetch_uops_xml()
+    rows, assignments = _parse_uops_xml_keyed(source)
+    return _variant_name_assignment(rows, assignments)
+
+
 def _load_validate_sources() -> Any:
     spec = importlib.util.spec_from_file_location(
         "validate_sources_under_test", VALIDATE_SOURCES_PATH
@@ -251,6 +292,25 @@ class UopsRowValidationTests(unittest.TestCase):
         self.assertGreater(self.last_failures, 0, text)
         self.assertIn("missing measurements for VMOVQ_XMMdq_XMMdq_1", text)
 
+    def test_extra_uarch_on_row_is_flagged(self):
+        # A row that carries uarch data no mapped raw record has must fail,
+        # so unsupported extra uarch data cannot ride along unnoticed.
+        module = _load_validate_sources()
+        with tempfile.TemporaryDirectory() as tmp:
+            xml_path = Path(tmp) / "instructions.xml"
+            xml_path.write_text(UOPS_MEASUREMENT_FIXTURE)
+            rows = _load_rows(module, xml_path)
+            target = next(row for row in rows if row.arch_details)
+            fake = {"measurement": {"TP_loop": "9.99"}, "latencies": []}
+            mutated = dataclasses.replace(
+                target,
+                arch_details={**target.arch_details, "ZZZFAKE": fake},
+            )
+            rows = [mutated if row is target else row for row in rows]
+            text = self._run_validator(module, xml_path, rows)
+        self.assertGreater(self.last_failures, 0, text)
+        self.assertIn("uarch set mismatch for", text)
+
     def test_same_group_sibling_data_swap_is_flagged(self):
         # Swapping two same-group variants' measurements keeps the
         # group-wide data intact. Each raw record must still find the
@@ -286,6 +346,36 @@ class UopsRowValidationTests(unittest.TestCase):
         self.assertEqual(self.last_failures, 0, text)
 
 
+class UopsVariantAssignmentTests(unittest.TestCase):
+    def test_variant_name_assignment_matches_golden_fixture(self):
+        # A parser mutation can swap row names and data while its map
+        # follows the swap. The golden fixture pins the assignment, so a
+        # swap changes the rebuilt map and fails here.
+        from simdref.ingest_sources import SourceUnavailableError
+
+        try:
+            rebuilt = _rebuild_variant_assignment()
+        except SourceUnavailableError as exc:
+            self.skipTest(f"uops.info XML unavailable: {exc}")
+        golden = json.loads(UOPS_VARIANT_FIXTURE_PATH.read_text())
+        if rebuilt != golden:
+            changed = sorted(
+                set(rebuilt) | set(golden),
+                key=lambda form: (rebuilt.get(form) != golden.get(form), form),
+            )
+            detail = "\n".join(
+                f"  {form}: golden={golden.get(form)} rebuilt={rebuilt.get(form)}"
+                for form in changed
+                if rebuilt.get(form) != golden.get(form)
+            )
+            self.fail(
+                "uops variant-name assignment changed. If the change is "
+                "intended, regenerate the golden fixture with one command:\n"
+                "python3 tests/test_source_validation.py --regenerate-uops-variants\n"
+                f"changed rows:\n{detail}"
+            )
+
+
 @unittest.skipUnless(
     os.environ.get("SIMDREF_LIVE") == "1",
     "live-network source validation disabled (set SIMDREF_LIVE=1 to run)",
@@ -319,4 +409,9 @@ class SourceValidationTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    if "--regenerate-uops-variants" in sys.argv:
+        rebuilt = _rebuild_variant_assignment()
+        UOPS_VARIANT_FIXTURE_PATH.write_text(json.dumps(rebuilt, indent=1, sort_keys=True) + "\n")
+        print(f"wrote {len(rebuilt)} rows to {UOPS_VARIANT_FIXTURE_PATH}")
+    else:
+        unittest.main()
