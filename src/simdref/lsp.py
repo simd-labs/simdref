@@ -1374,15 +1374,20 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
     keys = identity_keys([segment for _line, segment in candidates], semicolon_is_comment, conn)
     records = {key: load_instruction_from_db(conn, key) for key in set(keys) if key is not None}
     hints: dict[int, list[str]] = {}  # every instruction on the source line feeds its hint
+    labels: dict[str, str | None] = {}  # one matcher run per distinct segment, not per line
     for (line, segment), key in zip(candidates, keys):
         if not start <= line <= end:
             continue
         record = records.get(key) if key else None
         if record is not None:
             label = _cut_label(record.summary or "")
+        elif segment in labels:
+            label = labels[segment]
         else:
             parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
-            label = _hint_label(db_path, *parsed, intel=semicolon_is_comment) if parsed else None
+            label = labels[segment] = (
+                _hint_label(db_path, *parsed, intel=semicolon_is_comment) if parsed else None
+            )
         if label is not None:
             hints.setdefault(line, []).append(label)
     return [
