@@ -354,7 +354,7 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
             for form in load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
             if form.architecture == "x86"
         ]
-    return (rows, width) if rows else (forms or [], None)
+    return (rows, width) if rows else (forms, None)
 
 
 def _classify_line(

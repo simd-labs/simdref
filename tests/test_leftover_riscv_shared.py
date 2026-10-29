@@ -24,8 +24,7 @@ CATALOG = (
     else (_missing if _catalog_env else (SQLITE_PATH if SQLITE_PATH.is_file() else _USER_CATALOG))
 )
 
-# (line). A catalog with the RISC-V scalar rows shows the RISC-V form for each
-# line; a catalog without them shows nothing. No line may name a foreign form.
+# No line may name a foreign form.
 RISCV_SHARED_RISCV = [
     "add s0, s1, s2",
     "sub s9, s10, s11",
@@ -72,20 +71,17 @@ class RiscvSharedRegisterTests(unittest.TestCase):
         hint = _hint_label(self._db_path, mnemonic, operand_count, operands)
         return hover, hint
 
-    def _has_riscv_rows(self, mnemonic):
-        return any(
-            form.architecture == "riscv"
-            for form in load_instructions_by_mnemonic_from_db(self._conn, mnemonic)
-        )
-
     def test_riscv_shared_register_lines_keep_the_riscv_form(self):
         for line in RISCV_SHARED_RISCV:
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
-                mnemonic = line.split()[0]
-                if self._has_riscv_rows(mnemonic):
+                has_riscv = any(
+                    form.architecture == "riscv"
+                    for form in load_instructions_by_mnemonic_from_db(self._conn, line.split()[0])
+                )
+                if has_riscv:
                     self.assertIsNotNone(hover, f"{line} got no hover")
-                    self.assertEqual(hover.splitlines()[1], mnemonic)
+                    self.assertEqual(hover.splitlines()[1], line.split()[0])
                     self.assertIsNotNone(hint, f"{line} got no hint")
                 else:
                     self.assertIsNone(hover)

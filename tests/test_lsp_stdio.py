@@ -28,7 +28,6 @@ CATALOG = (
 
 
 def _riscv_rows(mnemonic: str) -> bool:
-    """True when the catalog carries a RISC-V row for the mnemonic."""
     with open_db(path=CATALOG) as conn:
         return any(
             form.architecture == "riscv"
