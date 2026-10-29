@@ -615,17 +615,16 @@ class LspEndToEndTests(unittest.TestCase):
                     self.assertIsNone(hover)
 
     def test_att_x86_word_ops_still_resolve(self):
-        # "%ax" and a bare symbol are not RISC-V registers, so the guard must not fire.
-        self.server.open(ASM_URI, "asm", "addw %ax, %bx\nmulw %ax\nmulw sym\n")
+        # "%ax" is not a RISC-V register, so the guard must not fire and the
+        # w-suffix strip resolves to the x86 form. "mulw sym" moved to
+        # test_undecided_line_keeps_the_exact_key: its line is undecided.
+        self.server.open(ASM_URI, "asm", "addw %ax, %bx\nmulw %ax\n")
         add = self.server.hover(ASM_URI, 0, 1)
         self.assertIsNotNone(add, "addw %ax, %bx got no hover")
         self.assertIn("ADD (", add["contents"]["value"])
         mul = self.server.hover(ASM_URI, 1, 1)
         self.assertIsNotNone(mul, "mulw %ax got no hover")
         self.assertIn("MUL (R16)", mul["contents"]["value"])
-        mem = self.server.hover(ASM_URI, 2, 1)
-        self.assertIsNotNone(mem, "mulw sym got no hover")
-        self.assertIn("MUL (", mem["contents"]["value"])
 
     def test_intel_word_ops_still_resolve(self):
         # Intel syntax writes registers bare: the guard is AT&T-only, so a bare
@@ -641,12 +640,24 @@ class LspEndToEndTests(unittest.TestCase):
 
     def test_undecided_line_keeps_a_name_the_strip_cannot_resolve(self):
         # "bl target" carries no register vote and "b" names no x86 row, so the
-        # strip falls back to the exact ARM row. "mulw sym" resolves its strip
-        # and lands on x86 MUL instead.
+        # strip falls back to the exact ARM row.
         self.server.open(ASM_URI, "asm", "bl target\n")
         hover = self.server.hover(ASM_URI, 0, 1)
         self.assertIsNotNone(hover, "bl target got no hover")
         self.assertTrue(hover["contents"]["value"].splitlines()[1].startswith("BL "))
+
+    def test_undecided_line_keeps_the_exact_key(self):
+        # probe5: "mulw sym" carries no register vote, so the exact RISC-V key
+        # wins and the suffix strip must not flip it to x86 MUL. With no key
+        # rows the strip resolves to MUL as it always did.
+        self.server.open(ASM_URI, "asm", "addi a0, a1, a2\nmulw sym\n")
+        hover = self.server.hover(ASM_URI, 1, 1)
+        self.assertIsNotNone(hover, "mulw sym got no hover")
+        fence = hover["contents"]["value"].splitlines()[1]
+        if _riscv_rows("mulw"):
+            self.assertEqual(fence, "mulw")
+        else:
+            self.assertIn("MUL (", fence)
 
     def test_movsbl_is_not_the_string_move(self):
         # movsbl is a sign-extend. It resolves to MOVSX; the suffix strip must

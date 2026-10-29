@@ -316,10 +316,12 @@ def _key_operand_bits(key: str) -> tuple:
 
 def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
     """Return (forms, width). The exact mnemonic wins when one of its rows fits
-    the line's architecture, else an AT&T zero/sign-extend alias (movzbl ->
-    MOVZX), else a dropped AT&T size suffix (addq -> add). A foreign exact key
-    never beats the same-architecture suffix strip. "addw %ax, %bx" resolves to
-    x86 "add" even when the catalog carries a RISC-V "addw" row.
+    the line's architecture or the line is undecided, else an AT&T
+    zero/sign-extend alias (movzbl -> MOVZX), else a dropped AT&T size suffix
+    (addq -> add). On an x86-decided line a foreign exact key never beats the
+    suffix strip: "addw %ax, %bx" resolves to x86 "add" even when the catalog
+    carries a RISC-V "addw" row. On an undecided line the exact key wins as it
+    always did: "mulw sym" keeps its RISC-V row, never x86 MUL.
 
     The alias and the suffix strip run on an x86 or undecided line only: "addw"
     on a RISC-V or ARM32 line must not land on x86 "add". When the strip names
@@ -329,7 +331,13 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
     """
     forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
     width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
-    if any(form.architecture in (arch or frozenset({"x86"})) for form in forms):
+    if not arch:
+        # Undecided line (no register vote, no Intel document): the exact key
+        # wins as it always did. Only an x86-decided line lets the suffix
+        # strip beat a foreign exact key.
+        if forms:
+            return forms, None
+    elif any(form.architecture in arch for form in forms):
         return forms, None
     if arch and "x86" not in arch:
         return [], None
