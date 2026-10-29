@@ -707,6 +707,9 @@ def _select_instruction_variant(catalog, query: str, items):
     return None
 
 
+# shortcut: the name lookup answers only when byte identity has no row
+# (schema-13 catalogs or missing tools); remove it at the schema-14 data
+# release with simdref-llvm-mc on PyPI as a required dependency
 def _find_instructions_fast(query: str):
     ensure_runtime()
     with open_db() as conn:
@@ -1892,6 +1895,21 @@ def _build_llm_payload(
             **({"result": kept[0]} if kept else {"results": []}),
             **meta,
         }
+    # Byte identity wins over the name lookups below: a full assembly line
+    # resolves to the one row its bytes name.
+    from simdref.lsp import identity_keys
+
+    keys = identity_keys([query_str], None, conn)
+    if keys[0]:
+        item = load_instruction_from_db(conn, keys[0])
+        if item is not None:
+            return {
+                "query": query_str,
+                "mode": "exact",
+                "match_kind": "instruction",
+                "results": finish([_llm_instruction_payload(item)]),
+                **meta,
+            }
     instructions = _find_instructions_fast(query_str)
     if instructions:
         return {

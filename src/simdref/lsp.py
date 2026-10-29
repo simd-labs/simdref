@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -739,6 +740,9 @@ def _gate_weak_votes(matches, line: tuple, operands: str, intel: bool, transform
     )
 
 
+# shortcut: the form matcher answers only when byte identity has no row
+# (schema-13 catalogs or missing tools); remove it at the schema-14 data
+# release with simdref-llvm-mc on PyPI as a required dependency
 def _match_form(
     matches,
     operand_count: int | None,
@@ -914,6 +918,116 @@ def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
     return ("", None)
 
 
+# ---------------------------------------------------------------------------
+# byte identity: one llvm-mc run per document, shared by every consumer
+# ---------------------------------------------------------------------------
+
+
+def _document_arch(
+    texts: tuple[str, ...], intel: bool, syntax: bool
+) -> tuple[str, str, tuple[bool, ...]] | None:
+    """Name one arch for the llvm-mc run from the strongest operand votes.
+
+    Returns ``(arch, x86 syntax, keep)`` or None when the votes do not name
+    one arch. ``keep`` marks the lines whose own strong votes fit that arch;
+    every other line falls back to the old matcher.
+    shortcut: arm32 and rv32 documents get no identity rows (arm32 rows carry
+    no byte keys and rv32 runs on the rv64 base), upgrade when the catalogs
+    carry rows that split those bases.
+    """
+    counts: dict[str, int] = {}
+    strongs: list[frozenset] = []
+    arm32 = False
+    for text in texts:
+        parsed = _mnemonic_from_asm_line(text, intel)
+        if parsed is None:
+            strongs.append(frozenset())
+            continue
+        arch, classes, _reverse, weak = _classify_line(parsed[2], intel)
+        strong = frozenset() if weak else arch
+        strongs.append(strong)
+        arm32 = arm32 or ("arm" in strong and "ar" in classes)
+        for bucket in strong:
+            counts[bucket] = counts.get(bucket, 0) + 1
+    if arm32 or not counts:
+        return None
+    top = max(counts.values())
+    winners = [bucket for bucket, count in counts.items() if count == top]
+    if len(winners) != 1:
+        return None
+    name = {"x86": "x86", "arm": "aarch64", "riscv": "riscv64"}.get(winners[0])
+    if name is None:
+        return None
+    keep = tuple(winners[0] in strong or not strong for strong in strongs)
+    return name, ("intel" if syntax else "att"), keep
+
+
+@functools.lru_cache(maxsize=32)
+def _identity_batch(
+    texts: tuple[str, ...], intel: bool, syntax: bool, catalog: str, mtime_ns: int
+) -> tuple[str | None, ...]:
+    from simdref.asm_identity import ToolUnavailableError, identify
+
+    slots: list[str | None] = [None] * len(texts)
+    # A blank text ends as None anyway (a blank line is not an instruction),
+    # and identify() splits with splitlines(), which drops a trailing blank.
+    probed = [index for index, text in enumerate(texts) if text.strip()]
+    picked = _document_arch(tuple(texts[index] for index in probed), intel, syntax)
+    if picked is None:
+        return tuple(slots)
+    arch, x86_syntax, keep = picked
+    try:
+        results = identify(
+            "\n".join(texts[index] for index in probed), arch, x86_syntax, catalog_path=catalog
+        )
+    except (ToolUnavailableError, ValueError, OSError, sqlite3.Error):
+        # No tool, no keys or no row: the old matcher answers these lines.
+        return tuple(slots)
+    if len(results) != len(probed):
+        return tuple(slots)
+    for index, held, result in zip(probed, keep, results):
+        # The text check keeps a row on its own line even if a text carries
+        # its own line break.
+        if held and result.row is not None and result.text == texts[index]:
+            slots[index] = result.row.db_key
+    return tuple(slots)
+
+
+def identity_keys(
+    texts: Sequence[str], intel: bool | None, conn: sqlite3.Connection
+) -> list[str | None]:
+    """Map each text to the catalog db_key its encoded bytes name, or None.
+
+    One shared entry for hover, inlay hints, annotate and the llm query: one
+    llvm-mc run per document batch, cached per document content. A None means
+    byte identity has no row there and the caller's old matcher answers that
+    line unchanged. ``intel`` is the file-type syntax flag; None infers the
+    x86 syntax from the text, and keeps the operand votes neutral so a bare
+    AArch64 or RISC-V line never reads as forced x86.
+    """
+    if not texts:
+        return []
+    items = tuple(texts)
+    if intel is None:
+        joined = "\n".join(items)
+        intel = "%" not in joined and "$" not in joined
+        vote = False
+    else:
+        vote = bool(intel)
+    row = None
+    try:
+        row = conn.execute("PRAGMA database_list").fetchone()
+    except (sqlite3.Error, AttributeError):
+        # A connection that cannot name its catalog gets no identity rows.
+        return [None] * len(items)
+    catalog = row[2] if row and row[2] else str(SQLITE_PATH)
+    try:
+        mtime_ns = Path(catalog).stat().st_mtime_ns
+    except OSError:
+        return [None] * len(items)
+    return list(_identity_batch(items, vote, bool(intel), catalog, mtime_ns))
+
+
 def _hover_markdown(
     conn,
     word: str,
@@ -921,6 +1035,7 @@ def _hover_markdown(
     operand_count: int | None = None,
     operand_text: str = "",
     intel: bool = False,
+    identity_key: str | None = None,
 ) -> str | None:
     intrinsic = load_intrinsic_from_db(conn, word)
     if intrinsic is not None:
@@ -961,49 +1076,56 @@ def _hover_markdown(
 
     if not allow_instruction:
         return None
-    line = _classify_line(operand_text, intel)
-    # The folded shift/extend suffix makes the classified parts shorter than
-    # the parsed comma count; the parts are authoritative for the two count
-    # checks below.
-    if line[1]:
-        operand_count = len(line[1])
-    # One alias step for hover and hint: an AArch64 alias line (mov, cmp,
-    # cmn, tst) is judged on the alias mnemonic's rows before any weak-gate
-    # or catalog-miss decision. An empty alias mnemonic means the operand
-    # text does not decide the form: show nothing.
-    alias = _a64_alias_for_line(word, line[0], operand_text)
-    if alias:
-        word_mn, transform = alias
-    else:
-        word_mn, transform = word, None
-    if not word_mn:
-        return None
-    # Weak votes come from spellings two architectures share (a RISC-V `add
-    # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them once here
-    # so the exact-name path and _match_form both honor the veto.
-    matches = width = None
-    if line[3]:
-        matches, width = _lookup_mnemonic(conn, word_mn, line[0])
-        line = _gate_weak_votes(matches, line, operand_text, intel, transform=transform)
-        if line is None:
-            return None
-    instruction = load_instruction_from_db(conn, word)
-    # An exact name can name a row with a different operand count (a bare
-    # "movsd" is the string move), or a row from the wrong architecture
-    # (a bare "nop" picks AArch64 NOP over x86 in an Intel file).
-    # In both cases, fall back to _match_form so hover and hint agree.
-    if instruction is not None:
-        if line[0] and instruction.architecture not in line[0]:
-            instruction = None
-        elif operand_count is not None and len(_operands_of_key(instruction.key)) != operand_count:
-            instruction = None
+    # Byte identity wins over every matcher pick below: the row is what the
+    # line assembles to. None keeps the old matcher on its exact-name path.
+    instruction = load_instruction_from_db(conn, identity_key) if identity_key else None
     if instruction is None:
-        # Match the form on the source line like _hint_label does, so
-        # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-        if matches is None:
+        line = _classify_line(operand_text, intel)
+        # The folded shift/extend suffix makes the classified parts shorter than
+        # the parsed comma count; the parts are authoritative for the two count
+        # checks below.
+        if line[1]:
+            operand_count = len(line[1])
+        # One alias step for hover and hint: an AArch64 alias line (mov, cmp,
+        # cmn, tst) is judged on the alias mnemonic's rows before any weak-gate
+        # or catalog-miss decision. An empty alias mnemonic means the operand
+        # text does not decide the form: show nothing.
+        alias = _a64_alias_for_line(word, line[0], operand_text)
+        if alias:
+            word_mn, transform = alias
+        else:
+            word_mn, transform = word, None
+        if not word_mn:
+            return None
+        # Weak votes come from spellings two architectures share (a RISC-V `add
+        # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them once here
+        # so the exact-name path and _match_form both honor the veto.
+        matches = width = None
+        if line[3]:
             matches, width = _lookup_mnemonic(conn, word_mn, line[0])
-        match_line = (line[0], transform(line[1]), line[2], line[3]) if transform else line
-        instruction = _match_form(matches, operand_count, match_line, width)
+            line = _gate_weak_votes(matches, line, operand_text, intel, transform=transform)
+            if line is None:
+                return None
+        instruction = load_instruction_from_db(conn, word)
+        # An exact name can name a row with a different operand count (a bare
+        # "movsd" is the string move), or a row from the wrong architecture
+        # (a bare "nop" picks AArch64 NOP over x86 in an Intel file).
+        # In both cases, fall back to _match_form so hover and hint agree.
+        if instruction is not None:
+            if line[0] and instruction.architecture not in line[0]:
+                instruction = None
+            elif (
+                operand_count is not None
+                and len(_operands_of_key(instruction.key)) != operand_count
+            ):
+                instruction = None
+        if instruction is None:
+            # Match the form on the source line like _hint_label does, so
+            # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
+            if matches is None:
+                matches, width = _lookup_mnemonic(conn, word_mn, line[0])
+            match_line = (line[0], transform(line[1]), line[2], line[3]) if transform else line
+            instruction = _match_form(matches, operand_count, match_line, width)
     if instruction is not None:
         # The url and reference rows of the body already carry the source links.
         link = web_deep_link("instruction", instruction.key)
@@ -1228,25 +1350,39 @@ def _hint_label(
     return _cut_label(chosen.summary or "") if chosen else None
 
 
-def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: int) -> list[dict]:
-    db_path = conn.execute("PRAGMA database_list").fetchone()[2]
-    source_lines = [line.rstrip("\r") for line in text.split("\n")]
-    is_c_doc = _is_c_doc(language_id, uri)
-    semicolon_is_comment = _semicolon_is_comment(language_id, uri)
-    if is_c_doc:
-        candidates = [
+def _asm_candidates(text: str, language_id: str, uri: str) -> list[tuple[int, str]]:
+    """The (source line, asm segment) items of a document, for hover and hints.
+
+    C/C++ documents hold assembler in string literals; every other document
+    is its own source lines. Hover and inlay hints call this one function so
+    both judge the same texts.
+    """
+    if _is_c_doc(language_id, uri):
+        return [
             (text.count("\n", 0, offset), segment)
             for offset, body in _asm_literals(text)
             for segment in ASM_SPLIT_RE.split(body.replace("\\t", " "))
         ]
-    else:
-        candidates = list(enumerate(source_lines))
+    return list(enumerate(line.rstrip("\r") for line in text.split("\n")))
+
+
+def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: int) -> list[dict]:
+    db_path = conn.execute("PRAGMA database_list").fetchone()[2]
+    source_lines = [line.rstrip("\r") for line in text.split("\n")]
+    semicolon_is_comment = _semicolon_is_comment(language_id, uri)
+    candidates = _asm_candidates(text, language_id, uri)
+    keys = identity_keys([segment for _line, segment in candidates], semicolon_is_comment, conn)
+    records = {key: load_instruction_from_db(conn, key) for key in set(keys) if key is not None}
     hints: dict[int, list[str]] = {}  # every instruction on the source line feeds its hint
-    for line, segment in candidates:
+    for (line, segment), key in zip(candidates, keys):
         if not start <= line <= end:
             continue
-        parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
-        label = _hint_label(db_path, *parsed, intel=semicolon_is_comment) if parsed else None
+        record = records.get(key) if key else None
+        if record is not None:
+            label = _cut_label(record.summary or "")
+        else:
+            parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
+            label = _hint_label(db_path, *parsed, intel=semicolon_is_comment) if parsed else None
         if label is not None:
             hints.setdefault(line, []).append(label)
     return [
@@ -1334,6 +1470,7 @@ def main() -> int:
             allow_instruction = not is_c_doc or (_in_asm_string(text, line, character))
             operand_count = None
             operand_text = ""
+            segment = None
             if word and allow_instruction:
                 offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
                     text.split("\n")[line], character
@@ -1355,6 +1492,23 @@ def main() -> int:
                             # segment names the real mnemonic.
                             word = parsed[0]
                             operand_count = parsed[1]
+            # Byte identity for the hovered mnemonic's segment, batched over
+            # the whole document. A line holding several asm segments joins
+            # its candidates only when exactly one text matches the segment.
+            identity_key = None
+            if conn and operand_count is not None and segment:
+                candidates = _asm_candidates(text, language_id, uri)
+                keys = identity_keys(
+                    [seg for _line, seg in candidates],
+                    _semicolon_is_comment(language_id, uri),
+                    conn,
+                )
+                wanted = [
+                    key
+                    for (cand_line, cand), key in zip(candidates, keys)
+                    if cand_line == line and key and cand.rstrip("\r") == segment.rstrip("\r")
+                ]
+                identity_key = wanted[0] if len(wanted) == 1 else None
             body = (
                 _hover_markdown(
                     conn,
@@ -1363,6 +1517,7 @@ def main() -> int:
                     operand_count=operand_count,
                     operand_text=operand_text,
                     intel=_semicolon_is_comment(language_id, uri),
+                    identity_key=identity_key,
                 )
                 if conn and word
                 else None
