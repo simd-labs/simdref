@@ -88,9 +88,10 @@ class RiscvSharedRegisterTests(unittest.TestCase):
                     self.assertIsNone(hint)
 
     def test_x86_line_never_shows_a_riscv_or_arm_form(self):
-        # "%sp" and "%bx" are x86 registers: the line keeps the x86 ADD form
-        # even when the catalog carries RISC-V "add" rows.
-        hover, hint = self._hover_and_hint("add %sp, %bx")
+        # "%ax" and "%bx" are x86 registers: the w-strip resolves to the x86
+        # ADD form even though the exact key "addw" is RISC-V. The lookup gate
+        # decides this line, so a reverted gate leaves it silent.
+        hover, hint = self._hover_and_hint("addw %ax, %bx")
         self.assertIsNotNone(hover)
         self.assertRegex(hover.splitlines()[1], r"^ADD \((R\d+|[A-D]X|E[A-D]X)")
         self.assertIsNotNone(hint)
