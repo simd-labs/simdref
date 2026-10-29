@@ -375,6 +375,56 @@ def _columnar_intrinsics(entries: list[dict]) -> dict:
     }
 
 
+def _encoding_entries(catalog: Catalog) -> list[dict]:
+    """Byte-identity rows for browser-side assembly line identification.
+
+    One object per catalog row with encoding data, carrying the columns
+    ``asm_identity`` reads from catalog.db so the web repo can run the same
+    lookup from JSON. Empty when the catalog predates the encoding columns:
+    a schema-13 payload can already carry ``iform`` metadata, so only a
+    bit pattern (enc_bits/enc_mask/enc_match/enc_extra) proves schema 14.
+    ``arch`` uses the asm_identity arch name (catalog ``arm`` rows are
+    AArch64).
+    """
+    if not any(
+        item.enc_bits or item.enc_mask or item.enc_match or item.enc_extra
+        for item in catalog.instructions
+    ):
+        return []
+    entries = []
+    for item in catalog.instructions:
+        iform = item.metadata.get("iform", "")
+        split_attrs = item.metadata.get("split_attrs", "")
+        if not (
+            item.enc_bits
+            or item.enc_mask
+            or item.enc_match
+            or item.enc_extra
+            or iform
+            or split_attrs
+        ):
+            continue
+        entry: dict = {
+            "key": item.db_key,
+            "arch": "aarch64" if item.architecture == "arm" else item.architecture,
+        }
+        if item.enc_bits:
+            entry["enc_bits"] = item.enc_bits
+        if item.enc_mask:
+            entry["enc_mask"] = item.enc_mask
+        if item.enc_match:
+            entry["enc_match"] = item.enc_match
+        if item.enc_extra:
+            entry["enc_extra"] = item.enc_extra
+        if iform:
+            entry["iform"] = iform
+        if split_attrs:
+            entry["split_attrs"] = json.loads(split_attrs)
+        entries.append(entry)
+    entries.sort(key=lambda entry: entry["key"])
+    return entries
+
+
 def _search_meta(
     catalog: Catalog,
     intrinsics_out: list[dict],
@@ -526,6 +576,8 @@ def export_site_data(catalog: Catalog, out_dir: Path) -> None:
     * ``search-index-instructions.json`` -- instruction search entries
     * ``search-index-intrinsics.json`` -- intrinsic search entries
     * ``latency-index.json`` -- per-instruction lat/cpi, keyed by ``db_key``
+    * ``search-index-encodings.json`` -- encoding keys for asm line identity
+      (omitted when the catalog predates the encoding columns, schema 13)
     * ``filter_spec.json`` -- shared ISA/category facets (web + CLI)
     * ``build_stamp.json`` -- version/freshness metadata + ``schema_version``
     * ``detail-chunks/{PREFIX}.json`` -- instruction detail chunks
@@ -551,6 +603,16 @@ def export_site_data(catalog: Catalog, out_dir: Path) -> None:
             legacy.unlink()
 
     _write_json(out_dir / "latency-index.json", latency_index_for_catalog(catalog))
+
+    encodings = _encoding_entries(catalog)
+    encodings_path = out_dir / "search-index-encodings.json"
+    if encodings:
+        _write_json(encodings_path, encodings)
+    else:
+        # A schema-13 re-export must not leave a stale encodings shard behind.
+        for stale in (encodings_path, Path(f"{encodings_path}.gz")):
+            if stale.exists():
+                stale.unlink()
 
     filter_spec = _filter_spec_for_catalog(catalog)
     _write_json(out_dir / "filter_spec.json", filter_spec.to_json())
