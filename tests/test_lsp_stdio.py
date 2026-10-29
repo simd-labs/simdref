@@ -622,6 +622,15 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIsNotNone(addw, "addw ax, bx in nasm got no hover")
         self.assertIn("ADD (", addw["contents"]["value"])
 
+    def test_undecided_line_keeps_a_name_the_strip_cannot_resolve(self):
+        # "bl target" carries no register vote and "b" names no x86 row, so the
+        # strip falls back to the exact ARM row. "mulw sym" resolves its strip
+        # and lands on x86 MUL instead.
+        self.server.open(ASM_URI, "asm", "bl target\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(hover, "bl target got no hover")
+        self.assertTrue(hover["contents"]["value"].splitlines()[1].startswith("BL "))
+
     def test_movsbl_is_not_the_string_move(self):
         # movsbl is a sign-extend. It resolves to MOVSX; the suffix strip must
         # not land on the string op movsb.

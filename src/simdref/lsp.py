@@ -315,21 +315,27 @@ def _key_operand_bits(key: str) -> tuple:
 
 
 def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
-    """Return (forms, width). The exact mnemonic wins, else an AT&T zero/sign-extend
-    alias (movzbl -> MOVZX), else a dropped AT&T size suffix (addq -> add).
+    """Return (forms, width). The exact mnemonic wins when one of its rows fits
+    the line's architecture, else an AT&T zero/sign-extend alias (movzbl ->
+    MOVZX), else a dropped AT&T size suffix (addq -> add). A foreign exact key
+    never beats the same-architecture suffix strip. "addw %ax, %bx" resolves to
+    x86 "add" even when the catalog carries a RISC-V "addw" row.
 
     The alias and the suffix strip run on an x86 or undecided line only: "addw"
-    on a RISC-V or ARM32 line must not land on x86 "add". Rows of other
-    architectures stay in the result; _match_form filters them by the line's
-    candidates.
+    on a RISC-V or ARM32 line must not land on x86 "add". When the strip names
+    no x86 rows, the exact rows stay, so "bl target" keeps its ARM row. Rows of
+    other architectures stay in the result; _match_form filters them by the
+    line's candidates.
     """
     forms = load_instructions_by_mnemonic_from_db(conn, mnemonic)
     width = _ATT_SUFFIX_WIDTH.get(mnemonic[-1:].casefold())
-    if forms:
+    context = arch or frozenset({"x86"})
+    if any(form.architecture in context for form in forms):
         return forms, None
     if arch and "x86" not in arch:
         return [], None
     alias = _ATT_EXTEND_ALIAS.get(mnemonic.casefold())
+    rows = []
     if alias is not None:
         intel, dst_bits, src_bits = alias
         rows = [
@@ -341,12 +347,14 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
         # (R64, M16) only, never the M8 rows the Intel spelling can also name.
         if dst_bits is not None:
             rows = [form for form in rows if _key_operand_bits(form.key) == (dst_bits, src_bits)]
-        return rows, width
-    # movsbl is a sign-extend, not the string op movsb.
-    if not width or _STRING_OP_RE.fullmatch(mnemonic[:-1]):
-        return [], None
-    stripped = load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
-    return [form for form in stripped if form.architecture == "x86"], width
+    elif width and not _STRING_OP_RE.fullmatch(mnemonic[:-1]):
+        # movsbl is a sign-extend, not the string op movsb.
+        rows = [
+            form
+            for form in load_instructions_by_mnemonic_from_db(conn, mnemonic[:-1])
+            if form.architecture == "x86"
+        ]
+    return (rows, width) if rows else (forms or [], None)
 
 
 def _classify_line(
