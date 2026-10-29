@@ -742,9 +742,10 @@ def _match_form(
 
     line is _classify_line's (arch candidates, ordered classes, reverse, weak
     votes). Rows of a non-candidate architecture drop out before ranking; an
-    undecided line keeps every row. Rank: class-set score (accepted +1 / same kind 0 / else
-    -1, a literal scores only on its own value), position score, iN over a
-    literal 0/1, match with the AT&T suffix width, fewer operands, key name.
+    undecided line keeps every row. Rank: Intel size-keyword match, class-set
+    score (accepted +1 / same kind 0 / else -1, a literal scores only on its
+    own value), position score, iN over a literal 0/1, match with the AT&T
+    suffix width, fewer operands, key name.
     The no-same-count fallback uses the same key.
     """
     arch, classes, reverse = line[0], line[1], line[2]
@@ -753,8 +754,8 @@ def _match_form(
     # A size keyword may only add information: a sized memory class no row of
     # the mnemonic accepts ranks as a plain "m", so the pick equals the line
     # with the keyword removed (VMOVDQU has no M512 row, and "vmovdqu zmm0,
-    # zmmword ptr [rdx]" keeps the unsized load form). The width reward in
-    # _rank still prefers a form that matches the width exactly.
+    # zmmword ptr [rdx]" keeps the unsized load form). The keyword reward in
+    # _rank still prefers the form that names the width exactly.
     if classes and any(c and re.fullmatch(r"m\d+", c) for c in classes):
         accepted_memory = {
             accept
@@ -781,7 +782,7 @@ def _match_form(
 
     def _rank(form):
         accepts = [_form_accept(op) for op in _operands_of_key(form.key)]
-        set_score = position = in_over_lit = width = 0
+        set_score = position = in_over_lit = width = keyword = 0
         for acc in accepts:
             if acc in _LITERAL_ACCEPT:
                 set_score += 0 if acc & line_set else -1
@@ -797,9 +798,10 @@ def _match_form(
                 if re.fullmatch(r"[rv]\d+", c)
             ):
                 width += 1
-            # An Intel size keyword names the memory width; reward its match.
+            # An Intel size keyword names the memory width; its match outranks
+            # register-width agreement, so the sized form wins.
             if any(re.fullmatch(r"m\d+", c) and c in line_set for c in acc):
-                width += 1
+                keyword += 1
         for cls, acc in zip(ordered, accepts):
             if cls in acc:
                 position += 1
@@ -808,7 +810,7 @@ def _match_form(
                     in_over_lit += 1
                 elif acc in _LITERAL_ACCEPT:
                     in_over_lit -= 1
-        return (-set_score, -position, -in_over_lit, -width, len(accepts), form.key)
+        return (-keyword, -set_score, -position, -in_over_lit, -width, len(accepts), form.key)
 
     return min(pool, key=_rank)
 
