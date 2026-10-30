@@ -35,6 +35,20 @@ def _riscv_rows(mnemonic: str) -> bool:
         )
 
 
+def _identity_active() -> bool:
+    """Byte identity answers in this run: an llvm-mc tool plus a catalog with
+    the byte-key columns. Read from the environment only, so a mutation of the
+    identity code cannot flip the regime; the other regime is the unchanged
+    old-matcher fallback."""
+    from simdref.asm_identity import _tool_path
+
+    if not _tool_path("SIMDREF_LLVM_MC", "llvm-mc") or not CATALOG.is_file():
+        return False
+    with open_db(path=CATALOG) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(instructions_data)")}
+    return {"enc_mask", "enc_match"}.issubset(columns)
+
+
 ASM_TEXT = """# top comment
 .text
 .globl foo
@@ -516,11 +530,17 @@ class LspEndToEndTests(unittest.TestCase):
             self.assertNotIn("ADD (AL", hover(line))
             self.assertNotIn("ADD (R8", hover(line))
 
-    def test_jmp_to_a_label_picks_the_memory_form(self):
-        # In AT&T a bare ".L2" is a symbol: a memory reference, not a rel8 immediate.
+    def test_jmp_to_a_label_follows_the_active_lookup(self):
+        # llvm-mc encodes bare "jmp .L2" as a direct branch (probed encoding:
+        # [0xeb,A], fixup FK_PCRel_1); only "jmp *.L2" is the memory form
+        # (probed [0xff,0x24,0x25,...]). Byte identity shows the direct row.
+        # The keyless fallback keeps the old matcher unchanged: JMP (M64).
         _, hover = self._att_hover_and_hints()
-        self.assertNotIn("Rel8", hover(4))
-        self.assertIn("JMP (M64)", hover(4))
+        if _identity_active():
+            self.assertNotIn("JMP (M64)", hover(4))
+            self.assertIn("JMP (Rel", hover(4))
+        else:
+            self.assertIn("JMP (M64)", hover(4))
 
     def test_mov_of_a_bare_symbol_picks_a_memory_form(self):
         # "mov symbol, %eax" reads memory: the destination %eax leads the form
@@ -583,7 +603,8 @@ class LspEndToEndTests(unittest.TestCase):
 
     def test_riscv_word_ops_do_not_resolve_to_x86(self):
         # A catalog with the RISC-V word rows shows the RISC-V form; without
-        # them the line stays silent. The strip must never land on x86 "add".
+        # them the line stays silent, except a documented pseudo-op, which byte
+        # identity resolves to the row of its expansion. Never x86 "add".
         cases = [
             (op, "a0, a1, a2")
             for op in (
@@ -600,7 +621,7 @@ class LspEndToEndTests(unittest.TestCase):
             )
         ]
         cases += [(op, "a0, a1, 5") for op in ("addiw", "slliw", "srliw", "sraiw")]
-        cases += [("negw", "a0, a1"), ("addw", "a0, a1, %pcrel_hi(sym)")]
+        cases += [("addw", "a0, a1, %pcrel_hi(sym)")]
         for op, operands in cases:
             with self.subTest(op=op, operands=operands):
                 self.server.open(ASM_URI, "asm", f"{op} {operands}\n")
@@ -613,6 +634,20 @@ class LspEndToEndTests(unittest.TestCase):
                 else:
                     self.assertEqual(hints, [])
                     self.assertIsNone(hover)
+        # "negw a0, a1" is the pseudo-op subw a0, zero, a1 (probed encoding
+        # [0x3b,0x05,0xb0,0x40]), so byte identity shows the SUBW row; the
+        # keyless fallback keeps the old matcher silent. Never x86 "add".
+        self.server.open(ASM_URI, "asm", "negw a0, a1\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        hints = self.server.hints(ASM_URI)
+        if _identity_active():
+            self.assertIsNotNone(hover, "negw a0, a1 got no hover")
+            self.assertNotIn("ADD", hover["contents"]["value"].splitlines()[1])
+            self.assertTrue(hints, "negw a0, a1 got no hint")
+            self.assertEqual(hints[0]["label"], "Subtract word.")
+        else:
+            self.assertEqual(hints, [])
+            self.assertIsNone(hover)
 
     def test_att_x86_word_ops_still_resolve(self):
         # "%ax" is not a RISC-V register, so the guard must not fire and the
