@@ -929,8 +929,9 @@ def _document_arch(
     """Name one arch for the llvm-mc run from the strongest operand votes.
 
     Returns ``(arch, x86 syntax, keep)`` or None when the votes do not name
-    one arch. ``keep`` marks the lines whose own strong votes fit that arch;
-    every other line falls back to the old matcher.
+    one arch. ``keep`` marks the lines whose own strong votes fit that arch
+    and the lines with no strong votes (they ride the document's arch); a
+    line whose strong votes name another arch falls back to the old matcher.
     shortcut: arm32 and rv32 documents get no identity rows (arm32 rows carry
     no byte keys and rv32 runs on the rv64 base), upgrade when the catalogs
     carry rows that split those bases.
@@ -1014,13 +1015,15 @@ def identity_keys(
         vote = False
     else:
         vote = bool(intel)
-    row = None
     try:
         row = conn.execute("PRAGMA database_list").fetchone()
     except (sqlite3.Error, AttributeError):
-        # A connection that cannot name its catalog gets no identity rows.
+        row = None
+    # A connection that cannot name its catalog gets no identity rows: a key
+    # from another database would be loaded against this connection.
+    if not row or not row[2]:
         return [None] * len(items)
-    catalog = row[2] if row and row[2] else str(SQLITE_PATH)
+    catalog = row[2]
     try:
         mtime_ns = Path(catalog).stat().st_mtime_ns
     except OSError:
