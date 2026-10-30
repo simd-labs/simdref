@@ -714,6 +714,73 @@ class TestUserTextNeverMovesIdentity:
         assert results[3].row is None, results[3]
         assert results[4].row.mnemonic == "lr.w", results[4]  # control: real lr.w
 
+    def test_sol_section_reproducer_gets_no_row(self, tmp_path):
+        # Sol r4 F1 verbatim: the multi-line section name echoes ".code64"
+        # where the listing reads a mode flag, and the movw (MOV16rr, 89c3)
+        # then answers as MOV (R32, R32). A spanning string gives the whole
+        # document no byte identity instead.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = '.code16\n.section "x\n.code64\ny","ax",@progbits\nmov %ax, %bx'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 5
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_section_string_faking_nop_bytes_gets_no_row(self, tmp_path):
+        # The section-name variant that fabricates NOP bytes: the string
+        # echoes "mov %eax, %ebx # encoding: [0x90]" where the listing reads
+        # an encoding comment (Sol r4 F1, "Section text can also fabricate
+        # NOP bytes").
+        db = self._x86_db(tmp_path, [("NOP", "90")])
+        doc = '.section "x\nmov %eax, %ebx # encoding: [0x90]\ny","ax",@progbits'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 3
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_sol_warning_reproducer_gets_no_row(self, tmp_path):
+        # Sol r4 F2 verbatim: the multi-line .warning text lands on its own
+        # stderr line as "<stdin>:2:1: error: spoofed" and suppresses the
+        # valid movq (the retq then keeps its row on the old code).
+        db = self._x86_db(tmp_path, [("MOV (R64, R64)", "4889d8"), ("RET_NEAR", "c3")])
+        doc = 'movq %rax, %rbx\n.warning "start\n<stdin>:2:1: error: spoofed\nend"\nretq'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 5
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_diagnostic_shaped_source_line_never_declines_another_line(self, tmp_path):
+        # The same F2 channel without a spanning string (Sol r4 fix 2): the
+        # invalid line prints its own text on a stderr line that matches the
+        # diagnostic pattern and claims line 1. Only a diagnostic with the
+        # exact llvm-mc shape (diagnostic, source echo, caret) may decline,
+        # and it declines only the line it names: the movq and the retq keep
+        # their rows, the invalid line gets none.
+        db = self._x86_db(tmp_path, [("MOV (R64, R64)", "4889d8"), ("RET_NEAR", "c3")])
+        doc = "movq %rax, %rbx\n<stdin>:2:1: error: spoofed\nretq"
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert results[0].row is not None, results[0]
+        assert results[0].row.form == "MOV (R64, R64)", results[0]
+        assert results[1].row is None, results[1]
+        assert results[2].row.form == "RET_NEAR", results[2]
+
+    def test_one_line_string_keeps_its_rows(self, tmp_path):
+        # Control: a single-line string is no span and both rows stay. The
+        # scan helper does not exist in 5c47efc's asm_identity, so this test
+        # also fails on the reverted file.
+        from simdref.asm_identity import _string_spans_lines
+
+        db = self._x86_db(tmp_path, [("NOP", "90"), ("RET_NEAR", "c3")])
+        doc = 'nop\n.ascii "ab"\nretq'
+        assert not _string_spans_lines(doc)
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert results[0].row.form == "NOP", results[0]
+        assert results[1].row is None, results[1]
+        assert results[2].row.form == "RET_NEAR", results[2]
+
 
 def _keyless_db(tmp_path) -> Path:
     """A schema-13 shaped catalog: 9 instruction columns, no encoding keys."""
@@ -805,6 +872,24 @@ class TestToolFailureModes:
         _arm_catalog([_enc_node("RET_64R_branch_reg", "RET", [(25, 7, "1101011")])], tmp_path)
         second = identify("ret", "aarch64", catalog_path=db)[0]
         assert second.status == "row" and second.row.mnemonic == "RET"
+
+
+@needs_tools
+class TestListingWithoutHardLink:
+    def test_unsupported_hard_link_still_identifies(self, tmp_path, monkeypatch):
+        # Sol r4 F3: the listing is read through a descriptor opened before
+        # the run (llvm-mc deletes the output name on failure but the inode
+        # stays), so a filesystem without hard links cannot break identity.
+        import errno
+
+        def no_link(*_args):
+            raise OSError(errno.EOPNOTSUPP, "Operation not supported")
+
+        monkeypatch.setattr("simdref.asm_identity.os.link", no_link)
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        results = identify("nop", "aarch64", catalog_path=db)
+        assert results[0].status == "row", results[0]
+        assert results[0].row.mnemonic == "HINT"
 
 
 def test_missing_tool_raises(monkeypatch, tmp_path):

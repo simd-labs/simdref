@@ -127,6 +127,55 @@ def _tool_path(env_var: str, tool: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+# A real llvm-mc diagnostic block ends in a caret line ("^", "^~~~", "  ^").
+_CARET_RE = re.compile(r"^[ ~]*\^+[~]*$")
+
+
+def _string_spans_lines(document: str) -> bool:
+    """True when a quoted string runs over a line break (outside comments).
+
+    llvm-mc then echoes the string text on its own listing or stderr line,
+    where it reads as a directive, an encoding line or a diagnostic (Sol r4
+    F1/F2), so such a document gets no byte identity at all. Single quotes
+    need no tracking: llvm-mc rejects a single-quoted span ("single quote
+    way too long"), and a semicolon is a statement separator, not a comment,
+    so a string after one still counts."""
+    string = False
+    block = False
+    index = 0
+    size = len(document)
+    while index < size:
+        ch = document[index]
+        if string:
+            if ch == "\\":
+                escaped = document[index + 1 : index + 2]
+                if escaped in ("\n", "\r"):
+                    return True
+                index += 2
+                continue
+            if ch == '"':
+                string = False
+            elif ch in "\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029":
+                return True
+        elif block:
+            if document.startswith("*/", index):
+                block = False
+                index += 2
+                continue
+        elif document.startswith("/*", index):
+            block = True
+            index += 2
+            continue
+        elif ch == '"':
+            string = True
+        elif ch in "#@" or document.startswith("//", index):
+            end = document.find("\n", index)
+            index = size if end < 0 else end
+            continue
+        index += 1
+    return False
+
+
 def _classify_line(text: str) -> str | None:
     """NOT-AN-INSTRUCTION kinds: blank, comment, label, directive."""
     stripped = text.strip()
@@ -210,26 +259,41 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
     # The trailing newline keeps trailing blank source lines in the input
     # (a bare "\n".join swallows them and the whole map fails, review E2).
     # Only the -o stream is parsed: .print writes user text to stdout, so
-    # stdout is never read (Sol r3 P2). llvm-mc deletes the output name when
-    # the run fails; the hard link keeps that run's partial listing.
+    # stdout is never read (Sol r3 P2). The descriptor opened before the run
+    # still reads the listing after a failed run, whose output name llvm-mc
+    # deletes: the inode stays readable (Sol r4 F3), so no hard link.
     with tempfile.TemporaryDirectory() as td:
         out_file = Path(td) / "out.s"
-        out_file.touch()
-        keep_file = Path(td) / "keep.s"
-        os.link(out_file, keep_file)
-        run = subprocess.run(
-            cmd + ["-o", str(out_file)],
-            input="\n".join(work) + "\n",
-            capture_output=True,
-            text=True,
-        )
-        listing = keep_file.read_text()
+        with open(out_file, "w+") as out:
+            run = subprocess.run(
+                cmd + ["-o", str(out_file)],
+                input="\n".join(work) + "\n",
+                capture_output=True,
+                text=True,
+            )
+            out.seek(0)
+            listing = out.read()
 
     errors: dict[int, str] = {}
-    for match in _ERR_RE.finditer(run.stderr):
+    stderr_lines = run.stderr.splitlines()
+    for index, line in enumerate(stderr_lines):
+        match = _ERR_RE.match(line)
+        if match is None or index + 2 >= len(stderr_lines):
+            continue
+        claimed = int(match.group(1))
         # Error lines number the marked document: 2i-1 is the marker of
-        # source line i, 2i is the source line itself.
-        errors.setdefault(int(match.group(1)), match.group(3))
+        # source line i, 2i is the source line itself. Only the exact llvm-mc
+        # diagnostic shape counts: the diagnostic, the echo of the line it
+        # names, then the caret line. A source line or string text can print
+        # a diagnostic-shaped line of its own (Sol r4 F2) and that must never
+        # decline another line.
+        if not 0 < claimed <= len(work):
+            continue
+        if stderr_lines[index + 1].rstrip() != work[claimed - 1].rstrip():
+            continue
+        if not _CARET_RE.match(stderr_lines[index + 2]):
+            continue
+        errors.setdefault(claimed, match.group(3))
     blocks = _parse_echo_blocks(listing)
 
     index_of = {marker.strip(): i for i, marker in enumerate(markers, 1)}
@@ -611,6 +675,14 @@ def identify(
         catalog = _CATALOG_CACHE[cache_key] = _Catalog(catalog_path, arch)
 
     lines = document.splitlines()
+    if _string_spans_lines(document):
+        # One spanning string poisons the listing and the diagnostics of the
+        # whole document (Sol r4 F1/F2): no line gets byte identity and the
+        # old matcher answers every line.
+        return [
+            LineResult(n=n, text=text, status="no-row", reason="quoted string spans lines")
+            for n, text in enumerate(lines, 1)
+        ]
     if catalog.keyless:
         # A schema-13 catalog carries no encoding keys (C4): every
         # instruction line reports that one reason, no tool run needed.
