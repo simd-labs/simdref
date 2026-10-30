@@ -139,6 +139,29 @@ def _classify_line(text: str) -> str | None:
     return None
 
 
+_MODE_DIR_RE = re.compile(r"^\.(code16gcc|code16|code32|code64)\b")
+_MODE_BITS = {"code16": "16", "code16gcc": "16", "code32": "32", "code64": "64"}
+
+
+def _x86_modes(lines: list[str]) -> list[str]:
+    """The mode llvm-mc assembles each line in.
+
+    The `.code16`/`.code16gcc`/`.code32`/`.code64` directives switch the
+    assembler mode (probe-modes C1-C5); the triple x86_64 starts at 64."""
+    mode = "64"
+    modes = []
+    for text in lines:
+        stripped = text.strip()
+        label = _LABEL_RE.match(stripped)
+        if label:
+            stripped = stripped[label.end() :].strip()
+        found = _MODE_DIR_RE.match(stripped)
+        if found:
+            mode = _MODE_BITS[found.group(1)]
+        modes.append(mode)
+    return modes
+
+
 def _parse_echo_blocks(stdout: str) -> list[tuple[str, str | None, str | None]]:
     blocks: list[list] = []
     for line in stdout.splitlines():
@@ -230,6 +253,27 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
 
 _BYTE_RE = re.compile(r"0x([0-9a-fA-F]{2})(?:'A')?$")
 _BITS_RE = re.compile(r"0b([01Aa]{8})$")
+
+
+def _covered_mask(hexbytes: str | None) -> int:
+    """Bit mask of fixup-covered bits (bit i of the little-endian word).
+
+    Mirrors the ``_bytes_to_words`` token shapes. llvm-mc names bits only in
+    the binary shape; a whole byte, a marked byte and an unknown shape name
+    none of their bits, so all 8 count as covered."""
+    if not hexbytes:
+        return 0
+    mask = 0
+    for index, token in enumerate(hexbytes.split(",")):
+        token = token.strip()
+        bits = 0xFF
+        match = _BITS_RE.match(token)
+        if match:
+            bits = sum(1 << (7 - pos) for pos, ch in enumerate(match.group(1)) if ch in "Aa")
+        elif _BYTE_RE.match(token) and not token.endswith("'A'"):
+            bits = 0
+        mask |= bits << (8 * index)
+    return mask
 
 
 def _bytes_to_words(hexbytes: str | None) -> bytes:
@@ -438,9 +482,12 @@ def _agen_facts(d: dict) -> tuple[str, str, int]:
     return base, idx, d["displen"] * 8
 
 
-def _x86_pick(pool: list[Row], d: dict) -> list[Row]:
+def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
     """Narrow an iform pool with the uops.info variant attributes stored on
-    each row against the XED-decoded facts. Data tables on both sides."""
+    each row against the XED-decoded facts. Data tables on both sides.
+
+    ``imm_unknown``: a fixup placeholder covers the immediate (audit A1), so
+    the immzero split cannot narrow and the caller treats its rows as a tie."""
     cur = list(pool)
 
     def filt(stage_ok, pred):
@@ -467,7 +514,7 @@ def _x86_pick(pool: list[Row], d: dict) -> list[Row]:
     )
     imm_zero = d["imm"] == 0
     filt(
-        any("immzero" in row.split_attrs for row in cur),
+        not imm_unknown and any("immzero" in row.split_attrs for row in cur),
         lambda a: a.get("immzero", "1" if imm_zero else "0") == ("1" if imm_zero else "0"),
     )
     masked = any(reg.startswith("K") and reg != "K0" for reg in d["regs"])
@@ -573,7 +620,7 @@ def identify(
         return results
 
     if arch == "x86":
-        _identify_x86(probed, results, catalog, xed)
+        _identify_x86(probed, results, catalog, xed, _x86_modes(lines))
     else:
         _identify_words(probed, results, catalog, arch)
     return results
@@ -601,28 +648,65 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
         if entry["status"] != "OK":
             continue
         raw = _bytes_to_words(entry.get("bytes"))
+        covered = _covered_mask(entry.get("bytes"))
         if arch == "aarch64":
             if len(raw) != 4:
                 result.reason = "no catalog row (not one 32-bit word)"
                 continue
             word = int.from_bytes(raw, "little")
-            bucket = catalog.a64_buckets.get((word >> 24) & 0xFF, ())
-            hits = [(mask, match, row) for mask, match, row in bucket if (word & mask) == match]
-            hits = _refine_subset(hits)
-            rows = [row for _mask, _match, row in hits]
+            if covered:
+                # A fixup placeholder covers pattern bits (audit A4): match
+                # the known bits only, never the zero fill.
+                matched = [
+                    (mask, match, row)
+                    for mask, match, row in catalog.a64_patterns
+                    if ((word ^ match) & mask & ~covered) == 0
+                ]
+            else:
+                bucket = catalog.a64_buckets.get((word >> 24) & 0xFF, ())
+                matched = [
+                    (mask, match, row) for mask, match, row in bucket if (word & mask) == match
+                ]
+            refined = _refine_subset(matched)
+            rows = [row for _mask, _match, row in refined]
+            checks = [(mask, row) for mask, _match, row in matched]
         else:
             if len(raw) not in (2, 4):
                 result.reason = "no catalog row (not a 16/32-bit word)"
                 continue
             word = int.from_bytes(raw, "little")
             patterns = catalog.rv_patterns_for(doc_base)
-            rows = [
-                row
-                for bits, mask, match, row in patterns
-                if bits == len(raw) * 8 and (word & mask) == match
+            entries = [
+                entry4
+                for entry4 in patterns
+                if entry4[0] == len(raw) * 8 and ((word ^ entry4[2]) & entry4[1] & ~covered) == 0
             ]
+            rows = [row for _bits, _mask, _match, row in entries]
             if len(rows) > 1:
                 rows = _rv_tiebreak(rows, entry.get("opcode") or "")
+            checks = [(mask, row) for _bits, mask, _match, row in entries]
+        if covered:
+            # The row is decided without the placeholder only when one row
+            # survives on the known bits and one of its matching patterns
+            # reads no covered bit (audit A4): then the pattern holds for
+            # every value of the placeholder and the row is not a guess.
+            picked = {id(row): row for row in rows}
+            decided = len(picked) == 1 and any(
+                (mask & covered) == 0 and id(row) in picked for mask, row in checks
+            )
+            if decided:
+                result.status = "row"
+                result.row = next(iter(picked.values()))
+            elif not picked:
+                result.reason = "no catalog row"
+            elif len(picked) > 1:
+                result.reason = (
+                    f"no catalog row (fixup placeholder decides between {len(picked)} rows)"
+                )
+                result.candidates = sorted(row.db_key for row in picked.values())
+            else:
+                result.reason = "no catalog row (fixup placeholder covers a pattern field)"
+            continue
         if len(rows) == 1:
             result.status = "row"
             result.row = rows[0]
@@ -633,12 +717,26 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
             result.candidates = [row.db_key for row in rows]
 
 
-def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
-    pending = [(entry, result) for entry, result in zip(probed, results) if entry["status"] == "OK"]
+def _identify_x86(probed, results, catalog: _Catalog, xed: str, modes: list[str]) -> None:
+    pending = []
+    for entry, result in zip(probed, results):
+        if entry["status"] != "OK":
+            continue
+        mode = modes[entry["n"] - 1]
+        if mode != "64":
+            # The decoder runs in 64-bit mode (audit B1); a line another mode
+            # encodes decodes to the wrong facts, so it reports no row.
+            result.reason = f"no catalog row (assembled in {mode}-bit mode)"
+        else:
+            pending.append((entry, result))
     if not pending:
         return
     hexes = [_bytes_to_words(entry.get("bytes")).hex() for entry, _result in pending]
     for (entry, result), facts in zip(pending, _xed_facts(hexes, xed)):
+        # A fixup placeholder covers the immediate value (audit A1): the
+        # pick must not read it, and a row carrying an immzero claim about
+        # it would be a guess either way.
+        covered = bool(_covered_mask(entry.get("bytes")))
         if "error" in facts:
             result.reason = f"no catalog row (XED {facts['error']})"
             continue
@@ -647,9 +745,22 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
             result.reason = f"no catalog row (iform {facts['iform']} absent)"
             continue
         try:
-            rows = _x86_pick(pool, facts) if len(pool) > 1 else pool
+            rows = _x86_pick(pool, facts, imm_unknown=covered) if len(pool) > 1 else pool
         except ValueError as err:
             result.reason = f"no catalog row ({err})"
+            continue
+        if covered:
+            guessed = [row for row in rows if "immzero" in row.split_attrs]
+            if len(rows) == 1 and not guessed:
+                result.status = "row"
+                result.row = rows[0]
+            elif len(rows) > 1:
+                result.reason = (
+                    f"no catalog row (fixup placeholder decides between {len(rows)} rows)"
+                )
+                result.candidates = [row.db_key for row in rows]
+            else:
+                result.reason = "no catalog row (fixup placeholder covers an encoded field)"
             continue
         if len(rows) == 1:
             result.status = "row"

@@ -471,6 +471,100 @@ class TestX86SplitStages:
             assert result.reason == expect
 
 
+@needs_tools
+class TestFixupAndModeDeclines:
+    """Byte identity declines when a fixup placeholder or a wrong decoder
+    mode would decide the row (Sol's blockers D1/D2); the old matcher then
+    answers the line, as with the tools hidden."""
+
+    def test_symbol_immediate_later_set_gets_no_row(self, tmp_path):
+        # Sol's D1 probe verbatim: the fixup-covered imm8 feeds the immzero
+        # split (zero fill reads imm=0), and its echoed width is placeholder
+        # data as well (probe-widths 2).
+        from simdref.asm_identity import _xed_facts
+
+        # shll/addl bytes with the imm zeroed, as the placeholder decodes.
+        iforms = [fact["iform"] for fact in _xed_facts(["c1e000", "83c000"], XED)]
+        rows = [
+            InstructionRecord(
+                mnemonic="T",
+                form=f"{iform}-{zero}",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": iform, "split_attrs": json.dumps({"immzero": zero})},
+            )
+            for iform in iforms
+            for zero in ("1", "0")
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        doc = "shll $symbol, %eax\naddl $symbol, %eax\n.set symbol, 2"
+        results = identify(doc, "x86", "att", catalog_path=db)
+        for result in results[:2]:
+            assert result.row is None, result
+            assert "fixup" in result.reason, result.reason
+
+    def test_code16_mode_gets_no_row(self, tmp_path):
+        # Sol's D2 probe verbatim: .code16 encodes MOV16rr as 89c3, which the
+        # 64-bit decode names MOV (R32, R32).
+        from simdref.asm_identity import _xed_facts
+
+        iform = _xed_facts(["89c3"], XED)[0]["iform"]
+        rows = [
+            InstructionRecord(
+                mnemonic="MOV",
+                form="MOV (R32, R32)",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": iform, "split_attrs": "{}"},
+            )
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        doc = ".code16\nmovw %ax, %bx\npushw %ax"
+        results = identify(doc, "x86", "att", catalog_path=db)
+        for result in results[1:]:
+            assert result.row is None, result
+            assert "16-bit mode" in result.reason, result.reason
+
+    def test_code32_mode_gets_no_row(self, tmp_path):
+        # Sol's mode32 probe verbatim: .code32 pushl encodes 50 (PUSH32r),
+        # which the 64-bit decode names PUSH (R64).
+        from simdref.asm_identity import _xed_facts
+
+        rows = [
+            InstructionRecord(
+                mnemonic="T",
+                form=form,
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": _xed_facts([hexes], XED)[0]["iform"], "split_attrs": "{}"},
+            )
+            for form, hexes in [("PUSH (R64)", "50"), ("MOV (R32, R32)", "89c3")]
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        doc = ".code32\npushl %eax\nmovl %eax, %ebx"
+        results = identify(doc, "x86", "att", catalog_path=db)
+        for result in results[1:]:
+            assert result.row is None, result
+            assert "32-bit mode" in result.reason, result.reason
+
+    def test_fixup_bits_never_pick_a_word_row(self, tmp_path):
+        # A64 adrp (probe-words D2): the fixup covers the immlo bits that
+        # separate these two rows, so the zero fill must not pick one.
+        db = _arm_catalog(
+            [
+                _enc_node("ADRP_op1", "ADRP", [(31, 1, "1")]),
+                _enc_node("ADRP_op1_immlo0", "ADRP", [(31, 1, "1"), (30, 1, "0")]),
+            ],
+            tmp_path,
+        )
+        result = identify("adrp x0, sym", "aarch64", catalog_path=db)[0]
+        assert result.row is None, result
+        assert "fixup" in result.reason, result.reason
+
+
 def _keyless_db(tmp_path) -> Path:
     """A schema-13 shaped catalog: 9 instruction columns, no encoding keys."""
     import sqlite3
