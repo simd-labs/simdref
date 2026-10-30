@@ -630,10 +630,12 @@ def identify(
         catalog = _CATALOG_CACHE[cache_key] = _Catalog(catalog_path, arch)
 
     lines = document.splitlines()
-    if any(line.count('"') % 2 for line in lines):
+    if any(re.sub(r"\\.", "", line).count('"') % 2 for line in lines):
         # One unpaired quote poisons the listing and the diagnostics of the
         # whole document (Sol r4 F1/F2, r5 P2): no line gets byte identity
-        # and the old matcher answers every line. A stray quote in a comment
+        # and the old matcher answers every line. Backslash escapes are
+        # stripped first, so an escaped quote inside a string never counts.
+        # A stray quote in a comment
         # or a character constant falls back too; never a wrong row.
         return [
             LineResult(n=n, text=text, status="no-row", reason="quoted string spans lines")

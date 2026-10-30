@@ -727,6 +727,30 @@ class TestUserTextNeverMovesIdentity:
             assert result.row is None, result
             assert result.reason == "quoted string spans lines", result.reason
 
+    def test_escaped_quote_still_counts_toward_the_span_scan(self, tmp_path):
+        # esc-keep.s verbatim: the .section name spans lines 2-4 through an
+        # escaped quote, and the hidden ".code64" makes the movw (MOV16rr,
+        # 89 c3) answer as MOV (R32, R32) (eosz 2). Backslash escapes are
+        # stripped before the quote count, so line 2's lone unescaped quote
+        # declines the whole document.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = '.code16\n.section "a\\"\n.code64\n\\"","ax",@progbits\nmov %ax, %bx'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 5
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_backslash_backslash_keeps_the_next_line_row(self, tmp_path):
+        # Control: a real escape pair "\\" satisfies its own backslash, so
+        # the closing quote pairs and the mov keeps its row in 64-bit mode.
+        db = self._x86_db(tmp_path, [("MOV (R16, R16)", "6689c3")])
+        doc = '.ascii "a\\\\"\nmov %ax, %bx'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert results[0].row is None, results[0]
+        assert results[1].row is not None, results[1]
+        assert results[1].row.form == "MOV (R16, R16)", results[1]
+
     def test_section_string_faking_nop_bytes_gets_no_row(self, tmp_path):
         # The section-name variant that fabricates NOP bytes: the string
         # echoes "mov %eax, %ebx # encoding: [0x90]" where the listing reads
