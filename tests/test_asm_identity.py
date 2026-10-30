@@ -730,9 +730,9 @@ class TestUserTextNeverMovesIdentity:
     def test_escaped_quote_still_counts_toward_the_span_scan(self, tmp_path):
         # esc-keep.s verbatim: the .section name spans lines 2-4 through an
         # escaped quote, and the hidden ".code64" makes the movw (MOV16rr,
-        # 89 c3) answer as MOV (R32, R32) (eosz 2). Backslash escapes are
-        # stripped before the quote count, so line 2's lone unescaped quote
-        # declines the whole document.
+        # 89 c3) answer as MOV (R32, R32) (eosz 2). llvm-mc's lexer reads
+        # line 2's \" escape as string content, so line 2 alone reports an
+        # unterminated string and the document declines.
         db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
         doc = '.code16\n.section "a\\"\n.code64\n\\"","ax",@progbits\nmov %ax, %bx'
         results = identify(doc, "x86", "att", catalog_path=db)
@@ -792,8 +792,8 @@ class TestUserTextNeverMovesIdentity:
         assert results[2].row.form == "RET_NEAR", results[2]
 
     def test_one_line_string_keeps_its_rows(self, tmp_path):
-        # Control: a one-line string has an even quote count and both rows
-        # stay, so the odd-quote decline never fires on it.
+        # Control: a one-line string closes on its own line and both rows
+        # stay, so the string-span decline never fires on it.
         db = self._x86_db(tmp_path, [("NOP", "90"), ("RET_NEAR", "c3")])
         doc = 'nop\n.ascii "ab"\nretq'
         results = identify(doc, "x86", "att", catalog_path=db)
@@ -805,7 +805,8 @@ class TestUserTextNeverMovesIdentity:
         # Sol r5 P2 verbatim (x86 @PLT): the '@' relocation read as a comment
         # start hid the section string from the scan, its ".code64" echo
         # moved the tracked mode, and the movw (MOV16rr truth) answered as
-        # MOV (R32, R32). The odd quote on line 3 declines the document.
+        # MOV (R32, R32). Line 3 alone leaves its .section string open, so
+        # the document declines.
         db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
         doc = (
             '.code16\nnop\ncall foo@PLT; .section "x\n.code64\ny","ax",@progbits # 5"\nmov %ax, %bx'
@@ -820,7 +821,8 @@ class TestUserTextNeverMovesIdentity:
         # Sol r5 P2 verbatim (AArch64 '#'): the '#' immediate read as a
         # comment start hid the section string from the scan, and its fake
         # 'encoding: [0x1f,0x20,0x03,0xd5]' echo gave the sub line the hint
-        # row. The odd quote on line 1 declines the document.
+        # row. Line 1 alone leaves its .section string open, so the document
+        # declines.
         db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
         doc = (
             'mov x0, #1; .section "x\n'
@@ -836,8 +838,8 @@ class TestUserTextNeverMovesIdentity:
     def test_sol_riscv_relocation_line_gets_no_row(self, tmp_path):
         # Sol r5 P2 verbatim (RISC-V '@'): the '@' relocation read as a
         # comment start hid the section string from the scan, and its fake
-        # 'encoding: [0x82,0x80]' echo gave the add line the c.jr row. The
-        # odd quote on line 1 declines the document.
+        # 'encoding: [0x82,0x80]' echo gave the add line the c.jr row. Line
+        # 1 alone leaves its .section string open, so the document declines.
         db = tmp_path / "catalog.db"
         build_sqlite(
             _catalog([_rv_row("c.jr", "c.jr", 16, 0xFFFF, 0x8082)]),
@@ -853,6 +855,53 @@ class TestUserTextNeverMovesIdentity:
         for result in results:
             assert result.row is None, result
             assert result.reason == "quoted string spans lines", result.reason
+
+    def test_block_balance_reproducer_gets_no_row(self, tmp_path):
+        # block-balance-mode.s verbatim (Sol P1): the quote in the block
+        # comment balances the section-name opener for any counter, so a
+        # string still crosses lines 2-4 and the movw (MOV16rr, 89c3)
+        # answers as MOV (R32, R32) on the quote-count rule. llvm-mc's own
+        # lexer reads line 2 alone as an unterminated string and declines
+        # the whole document.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = '.code16\n/* " */ .section "x\n.code64\ny","ax",@progbits # "\nmov %ax, %bx'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 5
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_char_balance_reproducer_gets_no_row(self, tmp_path):
+        # char-balance-mode.s verbatim (Sol P1): the '"' character constant
+        # balances the section-name opener for any counter, and the movw
+        # (MOV16rr, 89c3) answers as MOV (R32, R32) on the quote-count rule.
+        # llvm-mc's own lexer reads line 2 alone as an unterminated string
+        # and declines the whole document.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = '.code16\n.byte \'"\'; .section "x\n.code64\ny","ax",@progbits # "\nmov %ax, %bx'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 5
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_compiler_document_strings_keep_their_rows(self, tmp_path):
+        # Control: a normal compiler document (.file/.section/.string) holds
+        # only self-contained strings; every quoted line assembles alone
+        # clean, so the instruction rows stay.
+        db = self._x86_db(tmp_path, [("MOV (R64, R64)", "4889d8"), ("RET_NEAR", "c3")])
+        doc = (
+            '.file "hello.c"\n'
+            '.section .note.GNU-stack,"",@progbits\n'
+            "movq %rax, %rbx\n"
+            '.string "ab"\n'
+            "retq"
+        )
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert results[2].row is not None, results[2]
+        assert results[2].row.form == "MOV (R64, R64)", results[2]
+        assert results[4].row is not None, results[4]
+        assert results[4].row.form == "RET_NEAR", results[4]
 
 
 def _keyless_db(tmp_path) -> Path:

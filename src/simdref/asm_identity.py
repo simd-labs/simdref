@@ -597,6 +597,47 @@ def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
 
 _CATALOG_CACHE: dict[tuple[str, str, int], _Catalog] = {}
 
+# The span verdict is lexical, so one run per distinct (arch, line) answers
+# every later document (route B; a one-run .include tree was measured wrong:
+# the lexer's error recovery after an open string crosses include buffers).
+_QUOTE_SPAN_CACHE: dict[tuple[str, str], bool] = {}
+_UNTERM_RE = re.compile(r"^\S+:\d+:\d+: error: unterminated string constant$")
+
+
+def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str | None) -> bool:
+    """True when a quoted line leaves a string open at its end.
+
+    Each quoted line is assembled alone and llvm-mc's own lexer decides
+    (Sol P1): a quote in a comment or a character constant balances a string
+    delimiter for any counter. 'unterminated string constant' at the end of
+    the one-line buffer means the string crosses the line. Any other error
+    on the line alone keeps the document; a spoofed diagnostic that quotes
+    the message can only decline (the safe direction).
+    """
+    quoted = [text for text in lines if '"' in text]
+    if not quoted:
+        return False
+    if llvm_mc is None:
+        llvm_mc = _tool_path("SIMDREF_LLVM_MC", "llvm-mc")
+    if llvm_mc is None:
+        raise ToolUnavailableError("llvm-mc not found (set SIMDREF_LLVM_MC)")
+    cfg = _ARCH_CFG[arch]
+    cmd = [llvm_mc, f"--triple={cfg['triple']}"]
+    if cfg["mattr"]:
+        cmd.append(f"-mattr={cfg['mattr']}")
+    if arch == "x86":
+        cmd.append(_X86_SYNTAX_FLAG[syntax])
+    for text in quoted:
+        key = (arch, text)
+        spans = _QUOTE_SPAN_CACHE.get(key)
+        if spans is None:
+            run = subprocess.run(cmd, input=text + "\n", capture_output=True, text=True)
+            spans = any(_UNTERM_RE.match(line) for line in run.stderr.splitlines())
+            _QUOTE_SPAN_CACHE[key] = spans
+        if spans:
+            return True
+    return False
+
 
 def identify(
     document: str,
@@ -630,13 +671,10 @@ def identify(
         catalog = _CATALOG_CACHE[cache_key] = _Catalog(catalog_path, arch)
 
     lines = document.splitlines()
-    if any(re.sub(r"\\.", "", line).count('"') % 2 for line in lines):
-        # One unpaired quote poisons the listing and the diagnostics of the
+    if _string_spans_lines(lines, arch, syntax, llvm_mc):
+        # One open string poisons the listing and the diagnostics of the
         # whole document (Sol r4 F1/F2, r5 P2): no line gets byte identity
-        # and the old matcher answers every line. Backslash escapes are
-        # stripped first, so an escaped quote inside a string never counts.
-        # A stray quote in a comment
-        # or a character constant falls back too; never a wrong row.
+        # and the older matcher answers every line.
         return [
             LineResult(n=n, text=text, status="no-row", reason="quoted string spans lines")
             for n, text in enumerate(lines, 1)
