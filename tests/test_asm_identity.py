@@ -623,6 +623,98 @@ class TestFixupAndModeDeclines:
         assert "fixup" in result.reason, result.reason
 
 
+@needs_tools
+class TestUserTextNeverMovesIdentity:
+    """User text never decides a mode, a byte string or an opcode (Sol r3
+    P2 and the fix5 audit sites).
+
+    .print writes to stdout, and llvm-mc's output file reprints user names
+    and strings (".set .code16, 1" echoes ".code16 = 1"; .ascii echoes its
+    string). Only tool-generated shapes may be read."""
+
+    def _x86_db(self, tmp_path, specs):
+        from simdref.asm_identity import _xed_facts
+
+        rows = [
+            InstructionRecord(
+                mnemonic=form.split()[0],
+                form=form,
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": _xed_facts([hexes], XED)[0]["iform"], "split_attrs": "{}"},
+            )
+            for form, hexes in specs
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        return db
+
+    def test_sol_print_reproducer_gets_no_row(self, tmp_path):
+        # Sol r3's reproducer verbatim: the printed ".code64" must not move
+        # the tracked mode, so the movw stays a 16-bit decline. On c1c4c9b
+        # the printed flag gives it the wrong MOV (R32, R32) row.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = ".code16\n" + "nop\n" * 1500 + '.print ""\n.print ".code64"\nmovw %ax, %bx'
+        result = identify(doc, "x86", "att", catalog_path=db)[-1]
+        assert result.row is None, result
+        assert "16-bit mode" in result.reason, result.reason
+
+    def test_printed_flag_never_declines_a_64bit_line(self, tmp_path):
+        # The false-decline counterpart: a printed ".code16" in 64-bit mode
+        # must not hide the movq row (Sol r3: tip gave no row here).
+        db = self._x86_db(tmp_path, [("MOV (R64, R64)", "4889d8")])
+        result = identify('.print ".code16"\nmovq %rax, %rbx', "x86", "att", catalog_path=db)[-1]
+        assert result.status == "row", result
+        assert result.row.form == "MOV (R64, R64)", result
+
+    def test_assignment_print_never_sets_the_mode(self, tmp_path):
+        # Audit site 1: '.set .code64, 1' echoes '.code64 = 1', and on
+        # c1c4c9b that assignment print reads as a mode flag in both
+        # directions.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3"), ("ADD (R64, R64)", "4801c3")])
+        wrong_row = identify(
+            ".code16\n.set .code64, 1\nmovw %ax, %bx", "x86", "att", catalog_path=db
+        )[-1]
+        assert wrong_row.row is None, wrong_row
+        assert "16-bit mode" in wrong_row.reason, wrong_row.reason
+        false_decline = identify(".set .code16, 1\naddq %rax, %rbx", "x86", "att", catalog_path=db)[
+            -1
+        ]
+        assert false_decline.status == "row", false_decline
+
+    def test_string_echo_never_fakes_an_encoding_comment(self, tmp_path):
+        # Audit site 2: a macro call expanding to .ascii reprints the string
+        # where the call line's block is read, and on c1c4c9b the string's
+        # 'encoding: [0xc3]' gives the call line the ret row.
+        db = self._x86_db(tmp_path, [("RET_NEAR", "c3")])
+        doc = '.macro m\n.ascii " # encoding: [0xc3]"\n.endm\nm\nretq'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert results[3].row is None, results[3]
+        assert results[4].row is not None, results[4]  # control: real retq
+
+    def test_string_echo_never_fakes_an_mcinst_line(self, tmp_path):
+        # Audit site 3: one string carries fake bytes and a fake MCInst that
+        # names a different tie row; the opcode tie-break must read neither.
+        db = tmp_path / "catalog.db"
+        build_sqlite(
+            _catalog(
+                [
+                    _rv_row("lr.w", "lr.w", 32, 4193284223, 268443695),
+                    _rv_row("lr.w.aq", "lr.w.aq", 32, 4193284223, 268443695),
+                ]
+            ),
+            db,
+        )
+        doc = (
+            ".macro m\n"
+            '.ascii " # encoding: [0xaf,0x22,0x00,0x10] # <MCInst #0 LR_W_AQ x"\n'
+            ".endm\nm\nlr.w a0, (a1)"
+        )
+        results = identify(doc, "riscv64", catalog_path=db)
+        assert results[3].row is None, results[3]
+        assert results[4].row.mnemonic == "lr.w", results[4]  # control: real lr.w
+
+
 def _keyless_db(tmp_path) -> Path:
     """A schema-13 shaped catalog: 9 instruction columns, no encoding keys."""
     import sqlite3
@@ -667,7 +759,12 @@ class TestToolFailureModes:
         fake = tmp_path / "fake-mc"
         fake.write_text(
             "#!/bin/sh\n"
-            "cat <<'EOF'\n"
+            "out=\n"
+            "while [ $# -gt 0 ]; do\n"
+            '  if [ "$1" = "-o" ]; then out="$2"; shift 2; else shift; fi\n'
+            "done\n"
+            '[ -n "$out" ] || exit 1\n'
+            "cat > \"$out\" <<'EOF'\n"
             "    ret                             # encoding: [0xd6,0x5f,0x03,0xd5]\n"
             "                                    # <MCInst #1 RET>\n"
             "EOF\n"

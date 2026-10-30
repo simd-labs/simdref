@@ -29,6 +29,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -62,8 +63,12 @@ _HIGH8_REGS = frozenset({"AH", "BH", "CH", "DH"})
 
 _COMMENT_STARTS = ("#", "//", "/*", "@", ";")
 _ERR_RE = re.compile(r"^<stdin>:(\d+):(\d+): (?:error|warning): (.*)$", re.M)
-_ENC_RE = re.compile(r"encoding: \[([^\]]*)\]")
-_INST_RE = re.compile(r"<MCInst #\d+ (\S+)")
+# The encoding comment llvm-mc appends ends its echo line. Requiring the end
+# keeps a string echo (".ascii \" # encoding: [0x90]\"") from faking bytes.
+_ENC_RE = re.compile(r"encoding: \[([^\]]*)\]\s*$")
+# The MCInst dump is a comment continuation line. Requiring the line start
+# keeps a string echo from faking the opcode (RV tie-break input).
+_INST_RE = re.compile(r"^\s*# <MCInst #\d+ (\S+)")
 _CONT_RE = re.compile(r"^\s+(#|//|@|;)")
 _LABEL_RE = re.compile(r"^[\w.$]+:")
 
@@ -139,22 +144,24 @@ def _classify_line(text: str) -> str | None:
     return None
 
 
-# One x86 mode flag; the output re-emits it when the assembler executes it.
-# The "(?=\s|$)" keeps a label named ".code16:" from reading as a flag.
-_MODE_DIR_RE = re.compile(r"^\.(code16gcc|code16|code32|code64)(?=\s|$)")
+# One x86 mode flag; the output file re-emits it when the assembler executes
+# it. Only the bare echo counts: a label (".code16:") and a symbol assignment
+# print (".code16 = 1", from ".set .code16, 1") echo user-chosen names at the
+# line start in the same stream, and user text must never set the mode.
+_MODE_DIR_RE = re.compile(r"^\.(code16gcc|code16|code32|code64)$")
 _MODE_BITS = {"code16": "16", "code16gcc": "16", "code32": "32", "code64": "64"}
 
 
-def _parse_echo_blocks(stdout: str) -> list[tuple[str, str | None, str | None, str]]:
+def _parse_echo_blocks(listing: str) -> list[tuple[str, str | None, str | None, str]]:
     """Output blocks, each with the mode llvm-mc assembled it in.
 
-    The output stream re-emits every active `.code` flag in execution order
+    The output file re-emits every active `.code` flag in execution order
     (probe-modeflags A-H: a flag in an `.if 0` body, a macro body or a
     comment does not emit), so the mode comes from what the assembler did,
     never from the source text."""
     blocks: list[list] = []
     mode = "64"  # the x86_64 triple starts in 64-bit mode
-    for line in stdout.splitlines():
+    for line in listing.splitlines():
         if _CONT_RE.match(line):
             if not blocks:
                 blocks.append(["", None, None, mode])
@@ -202,14 +209,28 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
         work.append(text)
     # The trailing newline keeps trailing blank source lines in the input
     # (a bare "\n".join swallows them and the whole map fails, review E2).
-    run = subprocess.run(cmd, input="\n".join(work) + "\n", capture_output=True, text=True)
+    # Only the -o stream is parsed: .print writes user text to stdout, so
+    # stdout is never read (Sol r3 P2). llvm-mc deletes the output name when
+    # the run fails; the hard link keeps that run's partial listing.
+    with tempfile.TemporaryDirectory() as td:
+        out_file = Path(td) / "out.s"
+        out_file.touch()
+        keep_file = Path(td) / "keep.s"
+        os.link(out_file, keep_file)
+        run = subprocess.run(
+            cmd + ["-o", str(out_file)],
+            input="\n".join(work) + "\n",
+            capture_output=True,
+            text=True,
+        )
+        listing = keep_file.read_text()
 
     errors: dict[int, str] = {}
     for match in _ERR_RE.finditer(run.stderr):
         # Error lines number the marked document: 2i-1 is the marker of
         # source line i, 2i is the source line itself.
         errors.setdefault(int(match.group(1)), match.group(3))
-    blocks = _parse_echo_blocks(run.stdout)
+    blocks = _parse_echo_blocks(listing)
 
     index_of = {marker.strip(): i for i, marker in enumerate(markers, 1)}
     seen: dict[int, int] = {}
