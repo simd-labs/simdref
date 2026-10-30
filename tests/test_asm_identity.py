@@ -768,18 +768,67 @@ class TestUserTextNeverMovesIdentity:
         assert results[2].row.form == "RET_NEAR", results[2]
 
     def test_one_line_string_keeps_its_rows(self, tmp_path):
-        # Control: a single-line string is no span and both rows stay. The
-        # scan helper does not exist in 5c47efc's asm_identity, so this test
-        # also fails on the reverted file.
-        from simdref.asm_identity import _string_spans_lines
-
+        # Control: a one-line string has an even quote count and both rows
+        # stay, so the odd-quote decline never fires on it.
         db = self._x86_db(tmp_path, [("NOP", "90"), ("RET_NEAR", "c3")])
         doc = 'nop\n.ascii "ab"\nretq'
-        assert not _string_spans_lines(doc)
         results = identify(doc, "x86", "att", catalog_path=db)
         assert results[0].row.form == "NOP", results[0]
         assert results[1].row is None, results[1]
         assert results[2].row.form == "RET_NEAR", results[2]
+
+    def test_sol_x86_relocation_line_gets_no_row(self, tmp_path):
+        # Sol r5 P2 verbatim (x86 @PLT): the '@' relocation read as a comment
+        # start hid the section string from the scan, its ".code64" echo
+        # moved the tracked mode, and the movw (MOV16rr truth) answered as
+        # MOV (R32, R32). The odd quote on line 3 declines the document.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = (
+            '.code16\nnop\ncall foo@PLT; .section "x\n.code64\ny","ax",@progbits # 5"\nmov %ax, %bx'
+        )
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 6
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_sol_aarch64_immediate_line_gets_no_row(self, tmp_path):
+        # Sol r5 P2 verbatim (AArch64 '#'): the '#' immediate read as a
+        # comment start hid the section string from the scan, and its fake
+        # 'encoding: [0x1f,0x20,0x03,0xd5]' echo gave the sub line the hint
+        # row. The odd quote on line 1 declines the document.
+        db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)
+        doc = (
+            'mov x0, #1; .section "x\n'
+            "sub x0, x1, x2 // encoding: [0x1f,0x20,0x03,0xd5]\n"
+            'y","ax",@progbits // "\nret'
+        )
+        results = identify(doc, "aarch64", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 4
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
+
+    def test_sol_riscv_relocation_line_gets_no_row(self, tmp_path):
+        # Sol r5 P2 verbatim (RISC-V '@'): the '@' relocation read as a
+        # comment start hid the section string from the scan, and its fake
+        # 'encoding: [0x82,0x80]' echo gave the add line the c.jr row. The
+        # odd quote on line 1 declines the document.
+        db = tmp_path / "catalog.db"
+        build_sqlite(
+            _catalog([_rv_row("c.jr", "c.jr", 16, 0xFFFF, 0x8082)]),
+            db,
+        )
+        doc = (
+            'call foo@plt; .section "x\n'
+            "add a0, a1, a2 # encoding: [0x82,0x80]\n"
+            'y","ax",@progbits # "\nret'
+        )
+        results = identify(doc, "riscv64", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 4
+        for result in results:
+            assert result.row is None, result
+            assert result.reason == "quoted string spans lines", result.reason
 
 
 def _keyless_db(tmp_path) -> Path:

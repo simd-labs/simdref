@@ -131,51 +131,6 @@ def _tool_path(env_var: str, tool: str) -> str | None:
 _CARET_RE = re.compile(r"^[ ~]*\^+[~]*$")
 
 
-def _string_spans_lines(document: str) -> bool:
-    """True when a quoted string runs over a line break (outside comments).
-
-    llvm-mc then echoes the string text on its own listing or stderr line,
-    where it reads as a directive, an encoding line or a diagnostic (Sol r4
-    F1/F2), so such a document gets no byte identity at all. Single quotes
-    need no tracking: llvm-mc rejects a single-quoted span ("single quote
-    way too long"), and a semicolon is a statement separator, not a comment,
-    so a string after one still counts."""
-    string = False
-    block = False
-    index = 0
-    size = len(document)
-    while index < size:
-        ch = document[index]
-        if string:
-            if ch == "\\":
-                escaped = document[index + 1 : index + 2]
-                if escaped in ("\n", "\r"):
-                    return True
-                index += 2
-                continue
-            if ch == '"':
-                string = False
-            elif ch in "\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029":
-                return True
-        elif block:
-            if document.startswith("*/", index):
-                block = False
-                index += 2
-                continue
-        elif document.startswith("/*", index):
-            block = True
-            index += 2
-            continue
-        elif ch == '"':
-            string = True
-        elif ch in "#@" or document.startswith("//", index):
-            end = document.find("\n", index)
-            index = size if end < 0 else end
-            continue
-        index += 1
-    return False
-
-
 def _classify_line(text: str) -> str | None:
     """NOT-AN-INSTRUCTION kinds: blank, comment, label, directive."""
     stripped = text.strip()
@@ -675,10 +630,11 @@ def identify(
         catalog = _CATALOG_CACHE[cache_key] = _Catalog(catalog_path, arch)
 
     lines = document.splitlines()
-    if _string_spans_lines(document):
-        # One spanning string poisons the listing and the diagnostics of the
-        # whole document (Sol r4 F1/F2): no line gets byte identity and the
-        # old matcher answers every line.
+    if any(line.count('"') % 2 for line in lines):
+        # One unpaired quote poisons the listing and the diagnostics of the
+        # whole document (Sol r4 F1/F2, r5 P2): no line gets byte identity
+        # and the old matcher answers every line. A stray quote in a comment
+        # or a character constant falls back too; never a wrong row.
         return [
             LineResult(n=n, text=text, status="no-row", reason="quoted string spans lines")
             for n, text in enumerate(lines, 1)
