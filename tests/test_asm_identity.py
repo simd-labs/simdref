@@ -665,3 +665,199 @@ def test_bad_arch_and_syntax_are_rejected():
         identify("ret", "mips")
     with pytest.raises(ValueError):
         identify("mov", "x86", "gas")
+
+
+@needs_xed
+class TestLineMapFromToolOutput:
+    """One test per source-line/echo divergence class (review E1/E2).
+
+    Probe lines are verbatim from the website-port review artifacts
+    (review-web/probes/probe_all.py, review-web/reviewer-a/att-clean.s,
+    logs/review-web.log). The review quotes the probe lines
+    'GOT x86:cmp (i32, i32, i32) WANT x86:test (i32, i32)' and
+    'line mapping unverified (echo 3 vs source ...)'.
+    """
+
+    def _db(self, tmp_path, items, name):
+        from simdref.asm_identity import _xed_facts
+
+        rows = []
+        for form, hexes, attrs in items:
+            iform = _xed_facts([hexes], XED)[0]["iform"]
+            rows.append(
+                InstructionRecord(
+                    mnemonic=form.split(" ")[0],
+                    form=form,
+                    summary="Row.",
+                    architecture="x86",
+                    metadata={"iform": iform, "split_attrs": json.dumps(attrs)},
+                )
+            )
+        db = tmp_path / name
+        build_sqlite(_catalog(rows), db)
+        return db
+
+    def test_semicolon_statement_separator_never_shifts_the_map(self, tmp_path):
+        # ';' is a statement separator for llvm-mc x86 AT&T ('; comment line'
+        # from att-clean.s is two statements there), so the test line must
+        # keep its own row and never the cmp row of the line above.
+        db = self._db(
+            tmp_path,
+            [("CMP (R32, R32)", "39c1", {}), ("TEST (R32, R32)", "85c1", {})],
+            "semi.db",
+        )
+        results = identify(
+            "\tcmpl %eax, %ecx\n; comment line\n\ttestl %eax, %ecx\n",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert results[0].row.db_key == "x86:cmp (r32, r32)"
+        assert results[1].status == "no-row"  # llvm-mc's own error
+        assert results[2].row.db_key == "x86:test (r32, r32)", (
+            "GOT x86:cmp (i32, i32, i32) WANT x86:test (i32, i32)"
+        )
+
+    def test_comment_marker_line_with_code_still_identifies(self, tmp_path):
+        # '# comment line' and '// slash comment' (probe_all.py edge docs) drop
+        # on both sides, but a comment marker in front of code is code to
+        # llvm-mc and must not hide the instruction from the map.
+        db = self._db(
+            tmp_path,
+            [
+                ("ADD (R64, R64)", "4801c3", {"eosz": "3"}),
+                ("ADD (R32, R32)", "01c1", {"eosz": "2"}),
+            ],
+            "comments.db",
+        )
+        results = identify(
+            "/* c */ addq %rax, %rbx\n# comment line\n// slash comment\n\taddl %eax, %ecx\n",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert results[0].row.form == "ADD (R64, R64)"
+        assert results[1].reason == "comment"
+        assert results[2].reason == "comment"
+        assert results[3].row.form == "ADD (R32, R32)"
+
+    def test_trailing_blank_lines_keep_their_rows(self, tmp_path):
+        # E2 probe line: 'line mapping unverified (echo 3 vs source ...)'.
+        # The document join dropped the trailing blank lines (find_trigger.py
+        # "trailing-blanks": instr + ["", ""]) and no line got a row.
+        db = self._db(
+            tmp_path,
+            [
+                ("ADD (R64, R64)", "4801c3", {"eosz": "3"}),
+                ("ADD (R32, R32)", "01c1", {"eosz": "2"}),
+            ],
+            "trailing.db",
+        )
+        results = identify(
+            "\taddq %rax, %rbx\n\taddl %eax, %ecx\n\n\n",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert results[0].row.form == "ADD (R64, R64)", (
+            "line mapping unverified (echo 3 vs source ...)"
+        )
+        assert results[1].row.form == "ADD (R32, R32)"
+        assert [results[2].reason, results[3].reason] == ["blank", "blank"]
+
+    def test_crlf_trailing_lines_keep_their_rows(self, tmp_path):
+        # The CRLF goal docs reported 'line mapping unverified (echo 39 vs
+        # source 38)' (logs/review-web.log); the same join drops a trailing
+        # CRLF line.
+        db = self._db(
+            tmp_path,
+            [
+                ("ADD (R64, R64)", "4801c3", {"eosz": "3"}),
+                ("ADD (R32, R32)", "01c1", {"eosz": "2"}),
+            ],
+            "crlf.db",
+        )
+        results = identify(
+            "\taddq %rax, %rbx\r\n\taddl %eax, %ecx\r\n\r\n",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert results[0].row.form == "ADD (R64, R64)", (
+            "line mapping unverified (echo 39 vs source 38)"
+        )
+        assert results[1].row.form == "ADD (R32, R32)"
+        assert results[2].reason == "blank"
+
+    def test_form_feed_terminator_keeps_the_last_line(self, tmp_path):
+        # A form feed is a line terminator for splitlines; the join dropped
+        # the line it ends unless a newline follows.
+        db = self._db(
+            tmp_path,
+            [
+                ("ADD (R64, R64)", "4801c3", {"eosz": "3"}),
+                ("ADD (R32, R32)", "01c1", {"eosz": "2"}),
+            ],
+            "formfeed.db",
+        )
+        results = identify(
+            "\taddq %rax, %rbx\n\taddl %eax, %ecx\n\x0c",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert results[0].row.form == "ADD (R64, R64)"
+        assert results[1].row.form == "ADD (R32, R32)"
+        assert results[2].reason == "blank"
+
+    def test_line_continuation_lines_report_no_row(self, tmp_path):
+        # A backslash continuation (the '.irp x, 1, \' probe line) creates
+        # lines llvm-mc reports only as <instantiation> errors, invisible to
+        # the <stdin> error map: the continuation class must not hide the
+        # rows of the rest of the document.
+        db = self._db(tmp_path, [("NOP", "90", {})], "cont.db")
+        results = identify(
+            ".irp x, 1, \\\n2\n.byte \\x\n.endr\n\tnop\n", "x86", "att", catalog_path=db
+        )
+        assert results[0].reason == "directive"
+        assert results[1].status == "no-row"  # twice echoed marker: unproven
+        assert "line mapping unverified" in results[1].reason
+        assert [results[2].reason, results[3].reason] == ["directive", "directive"]
+        assert results[4].row.db_key == "x86:nop"
+
+    def test_directive_that_emits_no_instruction_keeps_neighbours(self, tmp_path):
+        # '.endm' and a macro body emit no echo block; the instruction after
+        # them must keep its row.
+        db = self._db(
+            tmp_path,
+            [("NOP", "90", {}), ("ADD (R64, R64)", "4801c3", {"eosz": "3"})],
+            "directive.db",
+        )
+        results = identify(
+            ".macro mym\n\tnop\n.endm\n\taddq %rax, %rbx\n",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert [results[0].reason, results[2].reason] == ["directive", "directive"]
+        assert results[1].status == "no-row"  # body emits nothing at definition
+        assert results[3].row.form == "ADD (R64, R64)"
+
+    def test_macro_expansion_maps_to_the_call_line(self, tmp_path):
+        # A macro call emits the expansion's blocks on the call line: one
+        # instruction means the call line carries its bytes, and the body
+        # line reports no row.
+        db = self._db(
+            tmp_path,
+            [("NOP", "90", {}), ("ADD (R32, R32)", "01c1", {"eosz": "2"})],
+            "macro.db",
+        )
+        results = identify(
+            ".macro mym\n\tnop\n.endm\nmym\n\taddl %eax, %ecx\n",
+            "x86",
+            "att",
+            catalog_path=db,
+        )
+        assert results[1].status == "no-row"
+        assert results[3].row.form == "NOP"
+        assert results[4].row.form == "ADD (R32, R32)"

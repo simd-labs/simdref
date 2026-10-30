@@ -183,7 +183,16 @@ def _parse_echo_blocks(stdout: str) -> list[tuple[str, str | None, str | None]]:
 
 
 def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list[dict]:
-    """Run llvm-mc once per document; map each line to bytes or a reason."""
+    """Run llvm-mc once per document; map each line to bytes or a reason.
+
+    The map comes from llvm-mc's own output, never from counting: a unique
+    label (the line marker) stands before every source line and echoes back
+    among the output blocks, so the blocks after marker ``i`` and before the
+    next forward marker belong to source line ``i``. One line can yield
+    several blocks (``;`` statements, label + instruction, macro expansion)
+    or none (comment, macro body, ``.endm``). Only a line with exactly one
+    encoding block and its marker echoed exactly once has proven bytes;
+    every other instruction line reports no row (review E1/E2)."""
     cfg = _ARCH_CFG[arch]
     cmd = [llvm_mc, f"--triple={cfg['triple']}", "-show-encoding", "-show-inst"]
     if cfg["mattr"]:
@@ -191,63 +200,76 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
     if arch == "x86":
         cmd.append(_X86_SYNTAX_FLAG[syntax])
 
-    work = list(lines)
+    # The nonce keeps a user label from posing as a marker.
+    nonce = os.urandom(4).hex()
+    markers = [f".L__simdref_lm_{nonce}_{i}:" for i in range(1, len(lines) + 1)]
+    work: list[str] = []
+    for marker, text in zip(markers, lines):
+        work.append(marker)
+        work.append(text)
+    # The trailing newline keeps trailing blank source lines in the input
+    # (a bare "\n".join swallows them and the whole map fails, review E2).
+    run = subprocess.run(cmd, input="\n".join(work) + "\n", capture_output=True, text=True)
+
     errors: dict[int, str] = {}
-    stdout = ""
-    last_errs: dict[int, str] = {}
-    for _ in range(3):  # blank failing lines and re-run, at most 3 passes
-        run = subprocess.run(cmd, input="\n".join(work), capture_output=True, text=True)
-        stdout = run.stdout
-        last_errs = {}
-        for match in _ERR_RE.finditer(run.stderr):
-            last_errs.setdefault(int(match.group(1)), match.group(3))
-        for line_no, text in last_errs.items():
-            errors.setdefault(line_no, text)
-        if not last_errs:
-            break
-        for line_no in last_errs:
-            work[line_no - 1] = ""
+    for match in _ERR_RE.finditer(run.stderr):
+        # Error lines number the marked document: 2i-1 is the marker of
+        # source line i, 2i is the source line itself.
+        errors.setdefault(int(match.group(1)), match.group(3))
+    blocks = _parse_echo_blocks(run.stdout)
+
+    index_of = {marker.strip(): i for i, marker in enumerate(markers, 1)}
+    seen: dict[int, int] = {}
+    buckets: dict[int, list] = {}
+    current = 0
+    for block in blocks:
+        marker = index_of.get(block[0].strip())
+        if marker is None:
+            buckets.setdefault(current, []).append(block)
+            continue
+        seen[marker] = seen.get(marker, 0) + 1
+        # Only a forward marker moves the attribution: a marker echoed again
+        # comes from a macro or .rept body expansion, and those blocks belong
+        # to the line that triggered the expansion, never to the body line.
+        if marker > current:
+            current = marker
 
     results: list[dict] = []
     for i, text in enumerate(lines, 1):
         kind = _classify_line(text)
-        if i in errors:
-            results.append({"n": i, "text": text, "status": "REJECTED", "error": errors[i]})
-        elif kind is not None:
+        error = errors.get(2 * i)
+        if error is not None:
+            results.append({"n": i, "text": text, "status": "REJECTED", "error": error})
+            continue
+        bucket = buckets.get(i, [])
+        enc = [block for block in bucket if block[2] is not None]
+        proven = seen.get(i) == 1 and errors.get(2 * i - 1) is None
+        if kind in ("blank", "label", "directive"):
+            # These kinds are certain from the text; a leaked block from a
+            # line with a swallowed marker never becomes this line's row.
             results.append({"n": i, "text": text, "status": "NOT-AN-INSTRUCTION", "kind": kind})
-        else:
-            results.append({"n": i, "text": text, "status": "PENDING"})
-
-    # Lockstep: source lines map one-to-one to echo blocks, except comments
-    # (dropped) and lines that failed in the final pass (no echo).
-    echoed = [
-        i
-        for i, text in enumerate(lines, 1)
-        if _classify_line(text) != "comment" and i not in last_errs
-    ]
-    blocks = _parse_echo_blocks(stdout)
-    pending = [r for r in results if r["status"] == "PENDING"]
-    if len(blocks) == len(echoed):
-        for index, block in zip(echoed, blocks):
-            result = results[index - 1]
-            if result["status"] != "PENDING":
-                continue
-            _echo, opcode, hexbytes = block
-            if opcode is not None:
-                result["status"] = "OK"
-                result["bytes"] = hexbytes
-                result["opcode"] = opcode
-            else:
-                result["status"] = "NOT-AN-INSTRUCTION"
-                result["kind"] = "echo-no-inst"
-    else:
-        # An unverified line-to-bytes mapping is not byte identity (review F4):
-        # every unmapped line reports the mismatch instead of guessing order.
-        for result in pending:
-            result["status"] = "REJECTED"
-            result["error"] = (
-                f"line mapping unverified (echo {len(blocks)} vs source {len(echoed)})"
+            continue
+        if len(enc) == 1 and proven:
+            _echo, opcode, hexbytes = enc[0]
+            results.append(
+                {"n": i, "text": text, "status": "OK", "bytes": hexbytes, "opcode": opcode}
             )
+            continue
+        if not enc and kind is not None:
+            results.append({"n": i, "text": text, "status": "NOT-AN-INSTRUCTION", "kind": kind})
+            continue
+        if not enc and len(bucket) == 1:
+            results.append(
+                {"n": i, "text": text, "status": "NOT-AN-INSTRUCTION", "kind": "echo-no-inst"}
+            )
+            continue
+        if not proven:
+            reason = f"line mapping unverified (marker echoes {seen.get(i, 0)})"
+        elif len(enc) > 1:
+            reason = f"line mapping unverified ({len(enc)} instruction blocks on one line)"
+        else:
+            reason = "line mapping unverified (no instruction echo for the line)"
+        results.append({"n": i, "text": text, "status": "REJECTED", "error": reason})
     return results
 
 
