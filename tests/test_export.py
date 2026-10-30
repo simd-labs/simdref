@@ -276,15 +276,6 @@ def test_encodings_shard_matches_records(tmp_path: Path):
     assert by_key[x86.db_key]["split_attrs"] == {"immzero": "1"}
 
 
-def test_encodings_shard_absent_without_bit_patterns(tmp_path: Path):
-    # iform metadata alone must not open the shard: a schema-13 catalog can
-    # carry it (x86 iform predates the encoding columns), and for schema 13
-    # the export contract is "no file".
-    export_site_data(build_fixture_catalog(), tmp_path)
-    assert not (tmp_path / "search-index-encodings.json").exists()
-    assert (tmp_path / "search-index-instructions.json").exists()
-
-
 def test_encodings_shard_absent_without_encoding_data(tmp_path: Path):
     # No bit patterns anywhere, as on a schema-13 catalog: no file, no error.
     catalog = build_fixture_catalog()
