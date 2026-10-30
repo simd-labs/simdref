@@ -885,6 +885,18 @@ class TestUserTextNeverMovesIdentity:
             assert result.row is None, result
             assert result.reason == "quoted string spans lines", result.reason
 
+    def test_lone_line_error_does_not_hide_a_later_spanning_string(self, tmp_path):
+        # A quoted line whose lone error is not a string error keeps the
+        # document (probe B8), and the batch restart must still judge the
+        # later line that leaves its string open: without the restart the
+        # first error keeps the document and the open string answers rows.
+        db = self._x86_db(tmp_path, [("MOV (R32, R32)", "89c3")])
+        doc = '.bogus "x"\n.byte "abc\nmovl %eax, %ebx'
+        results = identify(doc, "x86", "att", catalog_path=db)
+        assert [r.status for r in results] == ["no-row"] * 3
+        for result in results:
+            assert result.reason == "quoted string spans lines", result.reason
+
     def test_compiler_document_strings_keep_their_rows(self, tmp_path):
         # Control: a normal compiler document (.file/.section/.string) holds
         # only self-contained strings; every quoted line assembles alone

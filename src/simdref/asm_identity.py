@@ -597,24 +597,33 @@ def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
 
 _CATALOG_CACHE: dict[tuple[str, str, int], _Catalog] = {}
 
-# The span verdict is lexical, so one run per distinct (arch, line) answers
-# every later document (route B; a one-run .include tree was measured wrong:
-# the lexer's error recovery after an open string crosses include buffers).
+# The span verdict is lexical, so one llvm-mc run over one .include per
+# quoted line answers every line at once. Trust the first error of a run
+# only: no line before it errored (and a line whose lexer state crosses
+# buffers always errors itself), while lines after it ride the error
+# recovery (an open string crosses include buffers and swallows following
+# lines, probe B4), so the batch restarts after the erroring line.
 _QUOTE_SPAN_CACHE: dict[tuple[str, str], bool] = {}
-_UNTERM_RE = re.compile(r"^\S+:\d+:\d+: error: unterminated string constant$")
+_UNTERM = "unterminated string constant"
+_ERR_LINE_RE = re.compile(r"^(\S+):(\d+):(\d+): error: (.*)$")
 
 
 def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str | None) -> bool:
     """True when a quoted line leaves a string open at its end.
 
-    Each quoted line is assembled alone and llvm-mc's own lexer decides
-    (Sol P1): a quote in a comment or a character constant balances a string
-    delimiter for any counter. 'unterminated string constant' at the end of
-    the one-line buffer means the string crosses the line. Any other error
-    on the line alone keeps the document; a spoofed diagnostic that quotes
-    the message can only decline (the safe direction).
+    Each quoted line is assembled in its own one-line buffer and llvm-mc's
+    own lexer decides (Sol P1): a quote in a comment or a character constant
+    balances a string delimiter for any counter. 'unterminated string
+    constant' at the end of the one-line buffer means the string crosses the
+    line. Any other error on the line alone keeps the document; a spoofed
+    diagnostic that quotes the message can only decline (the safe direction).
     """
-    quoted = [text for text in lines if '"' in text]
+    quoted = []
+    seen = set()
+    for text in lines:
+        if '"' in text and text not in seen:
+            seen.add(text)
+            quoted.append(text)
     if not quoted:
         return False
     if llvm_mc is None:
@@ -627,15 +636,51 @@ def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str |
         cmd.append(f"-mattr={cfg['mattr']}")
     if arch == "x86":
         cmd.append(_X86_SYNTAX_FLAG[syntax])
+    pending = []
     for text in quoted:
-        key = (arch, text)
-        spans = _QUOTE_SPAN_CACHE.get(key)
-        if spans is None:
-            run = subprocess.run(cmd, input=text + "\n", capture_output=True, text=True)
-            spans = any(_UNTERM_RE.match(line) for line in run.stderr.splitlines())
-            _QUOTE_SPAN_CACHE[key] = spans
+        spans = _QUOTE_SPAN_CACHE.get((arch, text))
         if spans:
             return True
+        if spans is None:
+            pending.append(text)
+    with tempfile.TemporaryDirectory() as td:
+        paths = []
+        for index, text in enumerate(pending):
+            path = Path(td) / f"q{index}.s"
+            path.write_text(text + "\n")
+            paths.append(path)
+        owner = {str(path): index for index, path in enumerate(paths)}
+        start = 0
+        while start < len(pending):
+            top = Path(td) / "top.s"
+            top.write_text("".join(f'.include "{path}"\n' for path in paths[start:]))
+            run = subprocess.run(cmd + [str(top)], capture_output=True, text=True)
+            errors = []
+            for line in run.stderr.splitlines():
+                match = _ERR_LINE_RE.match(line)
+                if match:
+                    errors.append((owner.get(match.group(1)), match.group(4)))
+            if not errors:
+                for text in pending[start:]:
+                    _QUOTE_SPAN_CACHE[(arch, text)] = False
+                return False
+            anchor = errors[0][0]
+            if anchor is None:
+                # shortcut: a diagnostic outside our include files (a quoted
+                # .include of a real file that errors there), decline like a
+                # spoof; upgrade when that shows up in real documents
+                return True
+            # The anchor line parsed with no error before it, so its error
+            # set is its lone run's set (probe B6: a lone-line error before
+            # the string must not hide it). 'unterminated string constant'
+            # anywhere in that set is the lone verdict for the line.
+            spans = any(index == anchor and message == _UNTERM for index, message in errors)
+            _QUOTE_SPAN_CACHE[(arch, pending[anchor])] = spans
+            if spans:
+                return True
+            for text in pending[start:anchor]:
+                _QUOTE_SPAN_CACHE[(arch, text)] = False
+            start = anchor + 1
     return False
 
 
