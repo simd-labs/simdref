@@ -550,6 +550,64 @@ class TestFixupAndModeDeclines:
             assert result.row is None, result
             assert "32-bit mode" in result.reason, result.reason
 
+    def _mode_catalog(self, tmp_path):
+        # MOV16rr assembles to 89c3, which the 64-bit decode names MOV (R32, R32).
+        from simdref.asm_identity import _xed_facts
+
+        rows = [
+            InstructionRecord(
+                mnemonic="MOV",
+                form="MOV (R32, R32)" if hexes == "89c3" else "NOP",
+                summary="Row.",
+                architecture="x86",
+                metadata={"iform": iform, "split_attrs": "{}"},
+            )
+            for hexes in ("89c3", "90")
+            for iform in [_xed_facts([hexes], XED)[0]["iform"]]
+        ]
+        db = tmp_path / "catalog.db"
+        build_sqlite(_catalog(rows), db)
+        return db
+
+    def _assert_no_row_in_mode(self, tmp_path, doc, mode):
+        # The line assembles in a non-64 mode; the 64-bit decoder must not
+        # name its row, and the old matcher answers it instead.
+        db = self._mode_catalog(tmp_path)
+        result = identify(doc, "x86", "att", catalog_path=db)[-1]
+        assert result.row is None, result
+        assert f"{mode}-bit mode" in result.reason, result.reason
+
+    def test_mode_in_inactive_if_body_gets_no_row(self, tmp_path):
+        # Sol's blocker P2 verbatim: the .code64 sits in a skipped .if 0
+        # body, so the movw assembles in 16-bit mode (llvm-mc MOV16rr, 89c3).
+        self._assert_no_row_in_mode(tmp_path, ".code16\n.if 0\n.code64\n.endif\nmovw %ax, %bx", 16)
+
+    def test_mode_in_macro_body_gets_no_row(self, tmp_path):
+        # The .code64 is macro body text only; the movw runs in 16-bit mode.
+        self._assert_no_row_in_mode(
+            tmp_path, ".code16\n.macro up\n.code64\n.endm\nmovw %ax, %bx", 16
+        )
+
+    def test_mode_in_comment_gets_no_row(self, tmp_path):
+        # The .code64 is block-comment text; the movw runs in 16-bit mode.
+        self._assert_no_row_in_mode(tmp_path, ".code16\n/*\n.code64\n*/\nmovw %ax, %bx", 16)
+
+    def test_mode_after_semicolon_statement_gets_no_row(self, tmp_path):
+        # The "; .code16" statement executes after the nop: the nop keeps its
+        # row (64-bit mode) and the movw runs in 16-bit mode.
+        db = self._mode_catalog(tmp_path)
+        results = identify("nop; .code16\nmovw %ax, %bx", "x86", "att", catalog_path=db)
+        assert results[0].row is not None, results[0]
+        assert results[-1].row is None, results[-1]
+        assert "16-bit mode" in results[-1].reason, results[-1].reason
+
+    def test_mode_in_inactive_else_branch_gets_no_row(self, tmp_path):
+        # The .code64 sits in the skipped .else branch; the movl runs in
+        # 32-bit mode (llvm-mc MOV32rr).
+        self._assert_no_row_in_mode(
+            tmp_path, ".code16\n.if 1\n.code32\n.else\n.code64\n.endif\nmovl %eax, %ebx", 32
+        )
+
     def test_fixup_bits_never_pick_a_word_row(self, tmp_path):
         # A64 adrp (probe-words D2): the fixup covers the immlo bits that
         # separate these two rows, so the zero fill must not pick one.

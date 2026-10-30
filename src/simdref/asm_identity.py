@@ -139,37 +139,30 @@ def _classify_line(text: str) -> str | None:
     return None
 
 
-_MODE_DIR_RE = re.compile(r"^\.(code16gcc|code16|code32|code64)\b")
+# One x86 mode flag; the output re-emits it when the assembler executes it.
+# The "(?=\s|$)" keeps a label named ".code16:" from reading as a flag.
+_MODE_DIR_RE = re.compile(r"^\.(code16gcc|code16|code32|code64)(?=\s|$)")
 _MODE_BITS = {"code16": "16", "code16gcc": "16", "code32": "32", "code64": "64"}
 
 
-def _x86_modes(lines: list[str]) -> list[str]:
-    """The mode llvm-mc assembles each line in.
+def _parse_echo_blocks(stdout: str) -> list[tuple[str, str | None, str | None, str]]:
+    """Output blocks, each with the mode llvm-mc assembled it in.
 
-    The `.code16`/`.code16gcc`/`.code32`/`.code64` directives switch the
-    assembler mode (probe-modes C1-C5); the triple x86_64 starts at 64."""
-    mode = "64"
-    modes = []
-    for text in lines:
-        stripped = text.strip()
-        label = _LABEL_RE.match(stripped)
-        if label:
-            stripped = stripped[label.end() :].strip()
-        found = _MODE_DIR_RE.match(stripped)
-        if found:
-            mode = _MODE_BITS[found.group(1)]
-        modes.append(mode)
-    return modes
-
-
-def _parse_echo_blocks(stdout: str) -> list[tuple[str, str | None, str | None]]:
+    The output stream re-emits every active `.code` flag in execution order
+    (probe-modeflags A-H: a flag in an `.if 0` body, a macro body or a
+    comment does not emit), so the mode comes from what the assembler did,
+    never from the source text."""
     blocks: list[list] = []
+    mode = "64"  # the x86_64 triple starts in 64-bit mode
     for line in stdout.splitlines():
         if _CONT_RE.match(line):
             if not blocks:
-                blocks.append(["", None, None])
+                blocks.append(["", None, None, mode])
         else:
-            blocks.append([line.rstrip(), None, None])
+            found = _MODE_DIR_RE.match(line.strip())
+            if found:
+                mode = _MODE_BITS[found.group(1)]
+            blocks.append([line.rstrip(), None, None, mode])
         block = blocks[-1]
         if block[1] is None:
             match = _INST_RE.search(line)
@@ -250,9 +243,16 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
             results.append({"n": i, "text": text, "status": "NOT-AN-INSTRUCTION", "kind": kind})
             continue
         if len(enc) == 1 and proven:
-            _echo, opcode, hexbytes = enc[0]
+            _echo, opcode, hexbytes, mode = enc[0]
             results.append(
-                {"n": i, "text": text, "status": "OK", "bytes": hexbytes, "opcode": opcode}
+                {
+                    "n": i,
+                    "text": text,
+                    "status": "OK",
+                    "bytes": hexbytes,
+                    "opcode": opcode,
+                    "mode": mode,
+                }
             )
             continue
         if not enc and kind is not None:
@@ -642,7 +642,7 @@ def identify(
         return results
 
     if arch == "x86":
-        _identify_x86(probed, results, catalog, xed, _x86_modes(lines))
+        _identify_x86(probed, results, catalog, xed)
     else:
         _identify_words(probed, results, catalog, arch)
     return results
@@ -739,12 +739,12 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
             result.candidates = [row.db_key for row in rows]
 
 
-def _identify_x86(probed, results, catalog: _Catalog, xed: str, modes: list[str]) -> None:
+def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
     pending = []
     for entry, result in zip(probed, results):
         if entry["status"] != "OK":
             continue
-        mode = modes[entry["n"] - 1]
+        mode = entry["mode"]
         if mode != "64":
             # The decoder runs in 64-bit mode (audit B1); a line another mode
             # encodes decodes to the wrong facts, so it reports no row.
