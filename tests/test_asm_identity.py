@@ -7,6 +7,7 @@ nothing fakes a pass. The pure-lookup tests need no tools at all.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,28 @@ LLVM_MC = _tool_path("SIMDREF_LLVM_MC", "llvm-mc") or ""
 XED = _tool_path("SIMDREF_XED", "xed") or ""
 needs_tools = pytest.mark.skipif(not LLVM_MC, reason="llvm-mc absent (set SIMDREF_LLVM_MC)")
 needs_xed = pytest.mark.skipif(not (LLVM_MC and XED), reason="llvm-mc or xed absent")
+
+
+def _arm32_ok() -> bool:
+    """The llvm-mc on hand must know the armv7 target. The simdref-llvm-mc
+    wheel ships a reduced llvm-mc with only the targets simdref encodes most
+    (x86, AArch64, RISC-V); arm32 falls back to the old matcher there."""
+    if not LLVM_MC:
+        return False
+    try:
+        run = subprocess.run(
+            [LLVM_MC, "--triple=armv7-unknown-linux-gnueabihf", "-show-encoding"],
+            input="",
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return run.returncode == 0
+
+
+needs_arm32 = pytest.mark.skipif(not _arm32_ok(), reason="llvm-mc lacks the armv7 target")
 
 
 def _enc_node(name: str, mnemonic: str, entries: list[tuple[int, int, str]]) -> dict:
@@ -189,7 +212,7 @@ class TestAarch64Document:
         ]
 
 
-@needs_tools
+@needs_arm32
 class TestArm32Document:
     def test_arm32_rows_never_come_from_a64_keys(self, tmp_path):
         db = _arm_catalog([_enc_node("HINT_hints", "HINT", [(22, 10, "1101010100")])], tmp_path)

@@ -41,6 +41,11 @@ dependencies = [
   "PyYAML>=6.0.3,<7",
   "rapidfuzz>=3.14,<4",
   "rich>=15,<16",
+  # Pinned to the LLVM the catalog build used. Wheels exist only for
+  # manylinux x86_64 aarch64, macOS arm64 x86_64 and win_amd64, so the
+  # marker keeps the dependency off every other platform (musl included),
+  # where pip must see no candidate instead of failing to resolve.
+  'simdref-llvm-mc==23.1.4; (sys_platform == "linux" and (platform_machine == "x86_64" or platform_machine == "aarch64")) or (sys_platform == "darwin" and (platform_machine == "arm64" or platform_machine == "x86_64")) or (sys_platform == "win32" and platform_machine == "AMD64")',
   "textual>=8.2,<9",
   "typer>=0.27,<1",
 ]

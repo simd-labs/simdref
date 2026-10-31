@@ -961,7 +961,7 @@ wheels = [
 
 [[package]]
 name = "simdref"
-version = "0.0.12"
+version = "0.0.14"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -972,6 +972,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rapidfuzz" },
     { name = "rich" },
+    { name = "simdref-llvm-mc", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
     { name = "textual" },
     { name = "typer" },
 ]
@@ -986,8 +987,21 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.3,<7" },
     { name = "rapidfuzz", specifier = ">=3.14,<4" },
     { name = "rich", specifier = ">=15,<16" },
+    { name = "simdref-llvm-mc", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')", specifier = "==23.1.4" },
     { name = "textual", specifier = ">=8.2,<9" },
     { name = "typer", specifier = ">=0.27,<1" },
+]
+
+[[package]]
+name = "simdref-llvm-mc"
+version = "23.1.4"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/bf/b594e26949d1a3d1ab323a2e5ffea90d4eb871dee955d3e825e0b33e01f8/simdref_llvm_mc-23.1.4-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:1686f746c5aec9303e2cf89b1f7bc9f3fc41dd8dba820d5efb592e56adf44e8a", size = 3885702, upload-time = "2026-10-30T16:38:20.521Z" },
+    { url = "https://files.pythonhosted.org/packages/18/a3/346eecb44db322b888a25d5024623d687e5d997a73a42acfaac3e74aecf5/simdref_llvm_mc-23.1.4-py3-none-macosx_11_0_arm64.whl", hash = "sha256:18d6a762eba2abc71f1cc69cb52e62d87c0022bd87120c66f5dc67b577a4e247", size = 3897802, upload-time = "2026-10-30T16:38:22.123Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/0f/ce6aac023cb0d9f0bcbf0e89926f8c5681d1c7317d160cf404113a2fa5ef/simdref_llvm_mc-23.1.4-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:aa633d364b9e5b8621013191b56cfabdc31a157971e685908964c8aea3742c22", size = 4656612, upload-time = "2026-10-30T16:38:23.861Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/80/9b1c9461287499bbeec843a76b30d6f15ae1b0a134b41ec75d2b0bbf9b24/simdref_llvm_mc-23.1.4-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9e90fa9029d78c4053ed0cd47514a4457d7cd0213c025db7103e27e7f3c82ed0", size = 4736110, upload-time = "2026-10-30T16:38:25.418Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/b5/519bab5b773d2be614a198819b502b2bb8b1a0bf919faca9efe1359255b2/simdref_llvm_mc-23.1.4-py3-none-win_amd64.whl", hash = "sha256:4d0c55bd3927d0e73e9ca7ce1010aa453776f93d3c72d6ac5432d0bd369fbbe8", size = 4419478, upload-time = "2026-10-30T16:38:27.274Z" },
 ]
 
 [[package]]

@@ -17,9 +17,9 @@ No mnemonic or iform table and no fallback matcher (spec R2): a line ends
 as one row, or with a reason why there is none.
 
 Tool paths: ``SIMDREF_LLVM_MC`` / ``SIMDREF_XED`` override
-``simdref_llvm_mc.path(...)`` when that package is importable (it ships both
-tools later). Until then point the env vars at a 23.1.4 ``llvm-mc`` and the
-XED decode CLI.
+``simdref_llvm_mc.path(...)``. That pinned dependency ships both tools on
+the platforms it has wheels for; everywhere else point the env vars at a
+23.1.4 ``llvm-mc`` and the XED decode CLI.
 """
 
 from __future__ import annotations
