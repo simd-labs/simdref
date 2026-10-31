@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.14], 2026-10-31
+
+### Added
+
+- LSP hover and inlay hints resolve each assembly line to one catalog row by
+  its encoded bytes: llvm-mc encodes the line, and XED decodes x86 bytes.
+  Both tools come from the pinned `simdref-llvm-mc` dependency where its
+  wheels ship. `SIMDREF_LLVM_MC` and `SIMDREF_XED` override the bundled
+  tools. Platforms without wheels keep the operand matcher.
+- Catalog schema 14 stores the encoding keys this lookup reads. These
+  appear in the next release and then after `isa update`.
+
 ### Fixed
 
+- `simdref export` writes gzip files with mtime 0. Two exports of the same
+  catalog now give identical bytes.
+- The catalog loaders skip record fields they do not know, such as
+  `enc_id`. Before, a newer catalog raised a `TypeError` on load.
 - LSP hover shows the instruction page as editors render Markdown. `Operation`
   and `Intrinsic Equivalents` are code blocks, and description lines keep their
   line breaks. The perf table shows `*` in port strings as text, not as
