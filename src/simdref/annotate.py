@@ -460,7 +460,9 @@ class PerfSummary:
 def _per_arch_value(details: dict[str, Any], value_fn) -> float | None:
     for v in value_fn(details):
         try:
-            return float(v)
+            # Latency ranges render as "min-max" strings (simdref#50); the
+            # float view takes the min so aggregates stay numeric.
+            return float(str(v).split("-", 1)[0])
         except (TypeError, ValueError):
             continue
     return None

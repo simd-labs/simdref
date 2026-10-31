@@ -68,6 +68,37 @@ class PerfTests(unittest.TestCase):
         latencies = [{"cycles_mem": "0"}]
         self.assertEqual(latency_cycle_values(latencies), ["0"])
 
+    def test_latency_cycle_values_reads_min_max_pair(self):
+        # simdref#50: uops.info divide/sqrt rows carry only a min/max range.
+        latencies = [
+            {"min_cycles": "13", "max_cycles": "15", "min_cycles_is_upper_bound": "1"},
+            {"min_cycles": "13", "max_cycles": "15", "min_cycles_is_upper_bound": "1"},
+        ]
+        self.assertEqual(latency_cycle_values(latencies), ["13-15"])
+
+    def test_latency_cycle_values_min_max_equal(self):
+        self.assertEqual(latency_cycle_values([{"min_cycles": "7", "max_cycles": "7"}]), ["7"])
+
+    def test_latency_cycle_values_min_only(self):
+        self.assertEqual(latency_cycle_values([{"min_cycles": "7"}]), ["7"])
+
+    def test_latency_cycle_values_drops_upper_bound_zero_mem_range(self):
+        latencies = [{"min_cycles_mem": "0", "min_cycles_mem_is_upper_bound": "1"}]
+        self.assertEqual(latency_cycle_values(latencies), [])
+
+    def test_min_max_pair_flows_to_every_output(self):
+        # simdref#50: the perf-root fix must reach every caller output: the
+        # string picks, the variant summary and the float annotate view.
+        from simdref.annotate import _latency_for, _per_arch_value
+
+        details = {"latencies": [{"min_cycles": "13", "max_cycles": "15"}]}
+        arch_details = {"MTL-P": details}
+        self.assertEqual(best_latency(arch_details), "13-15")
+        self.assertEqual(best_latency_labeled(arch_details).value, "13-15")
+        lat, _ = variant_perf_summary(arch_details)
+        self.assertEqual(lat, "13-15")
+        self.assertEqual(_per_arch_value(details, _latency_for), 13.0)
+
     def test_best_numeric_picks_smallest(self):
         self.assertEqual(best_numeric(["5", "3", "7"]), "3")
         self.assertEqual(best_numeric(["1.5", "2.0"]), "1.5")

@@ -62,8 +62,11 @@ def latency_cycle_values(latencies: list[dict[str, Any]]) -> list[str]:
     """Collect unique cycle-count strings from a list of latency dicts.
 
     Each *latency* dict may contain keys like ``cycles``, ``cycles_mem``,
-    ``cycles_addr``, or ``cycles_addr_index``.  Values are collected in
-    order, skipping duplicates.
+    ``cycles_addr``, or ``cycles_addr_index``. uops.info divide/sqrt
+    measurements carry a ``min_cycles`` / ``max_cycles`` pair instead (and
+    ``_mem`` / ``_addr`` / ``_addr_index`` variants); a pair renders as one
+    range string (``"13"`` when equal, ``"13-15"`` otherwise). Values are
+    collected in order, skipping duplicates.
 
     Returns:
         De-duplicated list of cycle-count strings (may be empty).
@@ -79,6 +82,23 @@ def latency_cycle_values(latencies: list[dict[str, Any]]) -> list[str]:
                 # uops.info convention: cycles_mem=0 with the upper-bound flag
                 # is a "not measured" marker, not a real zero-cycle latency.
                 continue
+            if value not in values:
+                values.append(value)
+        for suffix in ("", "_mem", "_addr", "_addr_index"):
+            low = latency.get("min_cycles" + suffix, "")
+            high = latency.get("max_cycles" + suffix, "")
+            if not low and not high:
+                continue
+            low_only = low or high
+            if (
+                suffix == "_mem"
+                and latency.get("min_cycles_mem_is_upper_bound") == "1"
+                and _is_numeric(low_only)
+                and float(low_only) == 0
+            ):
+                # Same not-measured convention as cycles_mem=0 above.
+                continue
+            value = f"{low}-{high}" if low and high and low != high else low_only
             if value not in values:
                 values.append(value)
     return values
