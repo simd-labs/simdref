@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Byte identity can identify an instruction whose form has no catalog row,
+  for example register-register `vmovapd`. `isa annotate`, LSP hover and
+  inlay hints, and `simdref llm query` then report no measured row by name.
+  They no longer join the line to a neighbour form. The operand matcher
+  still answers where byte identity could not run.
+
 ## [0.0.14], 2026-10-31
 
 ### Added

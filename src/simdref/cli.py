@@ -1897,9 +1897,21 @@ def _build_llm_payload(
         }
     # Byte identity wins over the name lookups below: a full assembly line
     # resolves to the one row its bytes name.
-    from simdref.lsp import identity_keys
+    from simdref.lsp import NO_CATALOG_ROW, identity_keys
 
     keys = identity_keys([query_str], None, conn)
+    if keys[0] == NO_CATALOG_ROW:
+        # Identified form the catalog lacks (issue #49): report the miss by
+        # name, never join the line to a neighbour form's row.
+        mnemonic = query_str.split(None, 1)[0]
+        return {
+            "query": query_str,
+            "mode": "exact",
+            "match_kind": "instruction",
+            "detail": f"{mnemonic}: no measured row",
+            "results": [],
+            **meta,
+        }
     if keys[0]:
         item = load_instruction_from_db(conn, keys[0])
         if item is not None:

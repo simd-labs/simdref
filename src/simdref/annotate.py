@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any, Iterable, Iterator
 
 from simdref import perf
-from simdref.lsp import identity_keys
+from simdref.lsp import NO_CATALOG_ROW, identity_keys
 from simdref.models import InstructionRecord
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
 
@@ -690,6 +690,24 @@ def _annotate_instruction(
     """Return the rendered output line and an optional JSON record."""
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
+    if identity_key == NO_CATALOG_ROW:
+        # Byte identity identified the form and the catalog has no row for
+        # it (issue #49: uops.info carries no AVX reg-reg VMOVAPD/VMOVUPS):
+        # report the miss by name, never guess a neighbour form below.
+        if stats is not None:
+            stats["no_row"] = stats.get("no_row", 0) + 1
+        no_row: dict[str, Any] = {
+            "mnemonic": parsed.mnemonic,
+            "known": False,
+            "no_measured_row": True,
+        }
+        if parsed.address is not None:
+            no_row["address"] = f"0x{parsed.address:x}"
+        if parsed.source_file:
+            no_row["source_file"] = parsed.source_file
+        if parsed.source_line is not None:
+            no_row["source_line"] = parsed.source_line
+        return f"{parsed.raw}   # {parsed.mnemonic}: no measured row", no_row
     # Byte identity wins over the form pick: the record is what the line
     # assembles to, and an empty row keeps the old pick unchanged.
     record = load_instruction_from_db(conn, identity_key) if identity_key else None

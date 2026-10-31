@@ -963,6 +963,14 @@ def _document_arch(
     return name, ("intel" if syntax else "att"), keep
 
 
+# identity_keys slot value when byte identity ran on a schema-14 catalog and
+# identified the instruction, but the catalog has no row for that form. Not a
+# db_key: callers show the line as having no measured row and never fall back
+# to the legacy pick. The legacy pick stays only where byte identity could
+# not run (missing tools, a schema-13 catalog, a declined document).
+NO_CATALOG_ROW = "?:no-catalog-row"
+
+
 @functools.lru_cache(maxsize=32)
 def _identity_batch(
     texts: tuple[str, ...], intel: bool, syntax: bool, catalog: str, mtime_ns: int
@@ -989,22 +997,36 @@ def _identity_batch(
     for index, held, result in zip(probed, keep, results):
         # The text check keeps a row on its own line even if a text carries
         # its own line break.
-        if held and result.row is not None and result.text == texts[index]:
+        if not held or result.text != texts[index]:
+            continue
+        if result.row is not None:
             slots[index] = result.row.db_key
+        elif result.reason == "no catalog row" or result.reason.startswith(
+            ("no catalog row (iform ", "no catalog row (splits emptied ")
+        ):
+            # Byte identity identified the form and the catalog lacks its row
+            # (e.g. uops.info carries no AVX reg-reg VMOVAPD): mark the miss.
+            # A fixup placeholder or a foreign decode mode keeps the line on
+            # the old matcher: the row can exist, it is just not byte-proven.
+            slots[index] = NO_CATALOG_ROW
     return tuple(slots)
 
 
 def identity_keys(
     texts: Sequence[str], intel: bool | None, conn: sqlite3.Connection
 ) -> list[str | None]:
-    """Map each text to the catalog db_key its encoded bytes name, or None.
+    """Map each text to the catalog db_key its encoded bytes name, or a mark.
 
     One shared entry for hover, inlay hints, annotate and the llm query: one
     llvm-mc run per document batch, cached per document content. A None means
-    byte identity has no row there and the caller's old matcher answers that
-    line unchanged. ``intel`` is the file-type syntax flag; None infers the
-    x86 syntax from the text, and keeps the operand votes neutral so a bare
-    AArch64 or RISC-V line never reads as forced x86.
+    byte identity could not run for the line (tools missing, a schema-13
+    catalog, a document byte identity declined, or a line that votes another
+    arch) and the caller's old matcher answers that line unchanged.
+    NO_CATALOG_ROW means byte identity identified the instruction and the
+    catalog has no row for that form: the caller reports no measured row and
+    never guesses a neighbour form. ``intel`` is the file-type syntax flag;
+    None infers the x86 syntax from the text, and keeps the operand votes
+    neutral so a bare AArch64 or RISC-V line never reads as forced x86.
     """
     if not texts:
         return []
@@ -1079,6 +1101,10 @@ def _hover_markdown(
 
     if not allow_instruction:
         return None
+    if identity_key == NO_CATALOG_ROW:
+        # Byte identity identified the form and the catalog has no row for
+        # it: say so by name, never guess a neighbour form below.
+        return f"`{word}`: no measured row"
     # Byte identity wins over every matcher pick below: the row is what the
     # line assembles to. None keeps the old matcher on its exact-name path.
     instruction = load_instruction_from_db(conn, identity_key) if identity_key else None
@@ -1375,14 +1401,22 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
     semicolon_is_comment = _semicolon_is_comment(language_id, uri)
     candidates = _asm_candidates(text, language_id, uri)
     keys = identity_keys([segment for _line, segment in candidates], semicolon_is_comment, conn)
-    records = {key: load_instruction_from_db(conn, key) for key in set(keys) if key is not None}
+    records = {
+        key: load_instruction_from_db(conn, key)
+        for key in set(keys)
+        if key is not None and key != NO_CATALOG_ROW
+    }
     hints: dict[int, list[str]] = {}  # every instruction on the source line feeds its hint
     labels: dict[str, str | None] = {}  # one matcher run per distinct segment, not per line
     for (line, segment), key in zip(candidates, keys):
         if not start <= line <= end:
             continue
         record = records.get(key) if key else None
-        if record is not None:
+        if key == NO_CATALOG_ROW:
+            # Identified form the catalog lacks: name it, never the old pick.
+            parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
+            label = f"{parsed[0]}: no measured row" if parsed else None
+        elif record is not None:
             label = _cut_label(record.summary or "")
         elif segment in labels:
             label = labels[segment]
