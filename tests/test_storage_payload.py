@@ -271,3 +271,39 @@ def test_download_from_release_replaces_readonly_target(tmp_path: Path, monkeypa
     assert (dest.stat().st_mode & 0o777) == 0o400
     assert db.read_bytes() == b"new-payload"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["catalog.db", "catalog.msgpack"]
+
+
+def test_db_load_drops_unknown_record_fields(tmp_path: Path):
+    """A catalog a newer simdref built can carry record fields this version
+    does not know (enc_id). Loads must skip them, not raise TypeError."""
+    import sqlite3
+
+    from simdref.storage import load_instruction_from_db, open_db
+
+    db = tmp_path / "catalog.db"
+    build_sqlite(build_fixture_catalog(), db)
+    conn = sqlite3.connect(db)
+    marked = 0
+    rows = conn.execute("SELECT db_key, payload FROM instructions_data").fetchall()
+    for db_key, blob in rows:
+        data = _unpack_payload(blob)
+        data["enc_id"] = 1
+        conn.execute(
+            "UPDATE instructions_data SET payload = ? WHERE db_key = ?",
+            (_pack_payload(data), db_key),
+        )
+        marked += 1
+    conn.commit()
+    conn.close()
+    assert marked  # positive control: no marked rows would pass vacuously
+
+    rebuilt = load_catalog_from_db(db)
+    assert len(rebuilt.instructions) == marked
+
+    conn = open_db(db)
+    try:
+        record = load_instruction_from_db(conn, rows[0][0])
+    finally:
+        conn.close()
+    assert record is not None
+    assert not hasattr(record, "enc_id")

@@ -8,7 +8,7 @@ holding thousands of records.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 from simdref.pdfrefs import apply_legacy_pdf_metadata, normalize_pdf_refs
@@ -204,14 +204,16 @@ class InstructionRecord:
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "InstructionRecord":
         data = dict(payload)
-        data.pop("metrics", None)
-        data.pop("operands", None)
         data.setdefault("architecture", "x86")
         data.setdefault("description", {})
         metadata = dict(data.get("metadata") or {})
         data["metadata"] = metadata
         data["pdf_refs"] = normalize_pdf_refs(data.get("pdf_refs"), metadata)
-        return cls(**data)
+        # Keep only known fields. A catalog a newer simdref built can carry
+        # fields this version does not know (enc_id); so did legacy payloads
+        # (metrics, operands). Otherwise the load dies with a TypeError.
+        known = {item.name for item in fields(cls)}
+        return cls(**{key: value for key, value in data.items() if key in known})
 
 
 @dataclass(slots=True)

@@ -172,7 +172,7 @@ def load_catalog_from_db(path: Path = SQLITE_PATH) -> Catalog:
             for row in conn.execute("SELECT payload FROM intrinsics_data ORDER BY name")
         ]
         instructions = [
-            InstructionRecord(**_unpack_payload(row["payload"]))
+            InstructionRecord.from_dict(_unpack_payload(row["payload"]))
             for row in conn.execute("SELECT payload FROM instructions_data ORDER BY db_key")
         ]
         sources = load_sources_from_db(conn)
@@ -609,7 +609,7 @@ def load_instruction_from_db(conn: sqlite3.Connection, key: str) -> InstructionR
     ).fetchone()
     if not row:
         return None
-    return InstructionRecord(**_unpack_payload(row["payload"]))
+    return InstructionRecord.from_dict(_unpack_payload(row["payload"]))
 
 
 def load_instructions_by_mnemonic_from_db(
@@ -619,7 +619,7 @@ def load_instructions_by_mnemonic_from_db(
         "SELECT payload FROM instructions_data WHERE mnemonic = ? ORDER BY architecture, key",
         (mnemonic,),
     ).fetchall()
-    return [InstructionRecord(**_unpack_payload(row["payload"])) for row in rows]
+    return [InstructionRecord.from_dict(_unpack_payload(row["payload"])) for row in rows]
 
 
 def load_instructions_by_mnemonic_prefix_from_db(
@@ -635,7 +635,7 @@ def load_instructions_by_mnemonic_prefix_from_db(
         """,
         (prefix, limit),
     ).fetchall()
-    return [InstructionRecord(**_unpack_payload(row["payload"])) for row in rows]
+    return [InstructionRecord.from_dict(_unpack_payload(row["payload"])) for row in rows]
 
 
 def _fts_match_query(query: str) -> str:
@@ -745,4 +745,4 @@ def search_instruction_candidates_from_db(
     )
     binds.append(limit)
     rows = conn.execute(sql, binds).fetchall()
-    return [InstructionRecord(**_unpack_payload(row["payload"])) for row in rows]
+    return [InstructionRecord.from_dict(_unpack_payload(row["payload"])) for row in rows]
