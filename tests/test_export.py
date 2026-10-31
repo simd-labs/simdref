@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import random
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,30 @@ def test_schema_version_is_int(tmp_path: Path):
     export_site_data(_tiny_catalog(), tmp_path)
     stamp = json.loads((tmp_path / "build_stamp.json").read_text())
     assert isinstance(stamp["schema_version"], int)
+
+
+def test_gzip_output_is_reproducible(tmp_path: Path, monkeypatch):
+    # gzip headers carry the write time by default; mtime=0 keeps two exports
+    # of the same payloads byte-identical. The stamp time is frozen because
+    # built_at would differ legitimately between the two runs.
+    import simdref.export as export_module
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 1, 1, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(export_module, "datetime", _FrozenDateTime)
+    first, second = tmp_path / "first", tmp_path / "second"
+    export_site_data(_tiny_catalog(), first)
+    export_site_data(_tiny_catalog(), second)
+    gz_files = sorted(item.relative_to(first) for item in first.rglob("*.gz"))
+    assert gz_files  # positive control: an empty tree would pass vacuously
+    for relative in gz_files:
+        assert (first / relative).read_bytes() == (second / relative).read_bytes(), relative
+        # The header mtime field must read 0. Without it two exports in the
+        # same second would pass the byte compare even without the fix.
+        assert (first / relative).read_bytes()[4:8] == b"\x00\x00\x00\x00", relative
 
 
 @pytest.fixture(scope="module")

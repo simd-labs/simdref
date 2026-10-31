@@ -27,6 +27,7 @@ import re
 import shutil
 from collections import defaultdict
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from simdref import __version__
@@ -536,7 +537,6 @@ def _intrinsic_chunks(catalog: Catalog) -> dict[str, dict]:
 
 
 def _build_stamp(catalog: Catalog) -> dict:
-    from datetime import datetime, timezone
     import subprocess
 
     git_sha = ""
@@ -564,7 +564,8 @@ def _build_stamp(catalog: Catalog) -> dict:
 def _write_json(path: Path, payload) -> None:
     raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     path.write_bytes(raw)
-    with gzip.open(str(path) + ".gz", "wb", compresslevel=6) as fh:
+    # mtime=0: reproducible bytes. gzip.open has no mtime parameter.
+    with gzip.GzipFile(str(path) + ".gz", "wb", compresslevel=6, mtime=0) as fh:
         fh.write(raw)
 
 
