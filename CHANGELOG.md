@@ -5,10 +5,13 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.15], 2026-10-31
 
 ### Fixed
 
+- `isa annotate` and the perf tables show the latency of rows whose source
+  gives a min/max range, for example `VDIVSD` on MTL-P and ADL-P. These
+  rows showed `lat=-` before.
 - Byte identity can identify an instruction whose form has no catalog row,
   for example register-register `vmovapd`. `isa annotate`, LSP hover and
   inlay hints, and `simdref llm query` then report no measured row by name.
