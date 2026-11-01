@@ -285,12 +285,14 @@ def _hover_markdown(
 
     if not allow_instruction:
         return None
-    instruction = load_instruction_from_db(conn, word)
+    # Match the form on the source line like _hint_label does, so
+    # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row. A bare
+    # A64 record (key == mnemonic) must not shadow the x86 forms of the same
+    # mnemonic: only a word with no line context falls back to the exact key.
+    matches, width = _lookup_mnemonic(conn, word)
+    instruction = _match_form(matches, operand_count, operand_text, width, intel)
     if instruction is None:
-        matches, width = _lookup_mnemonic(conn, word)
-        # Match the form on the source line like _hint_label does, so
-        # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-        instruction = _match_form(matches, operand_count, operand_text, width, intel)
+        instruction = load_instruction_from_db(conn, word)
     if instruction is not None:
         body = instruction_markdown(instruction, conn=conn)
         links = [f"Full page: {web_deep_link('instruction', instruction.key)}"]
