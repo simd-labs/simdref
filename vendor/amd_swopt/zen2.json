@@ -1,0 +1,7893 @@
+{
+ "source": "amd-swopt",
+ "source_kind": "modeled",
+ "source_version": "1.00",
+ "core": "ZEN2",
+ "architecture": "x86",
+ "citation_url": "https://docs.amd.com/v/u/en-US/56305",
+ "workbook": "Family 17h Models 30h and Greater Instruction Latencies version_1.00.xlsx",
+ "rows": [
+  {
+   "mnemonic": "AAA",
+   "form": "",
+   "latency": "3",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.3"
+  },
+  {
+   "mnemonic": "AAD",
+   "form": "",
+   "latency": "5",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "AAS",
+   "form": "",
+   "latency": "6",
+   "cpuid": "general",
+   "amd_ops_per_cycle": ""
+  },
+  {
+   "mnemonic": "ADC",
+   "form": "reg,reg/mem",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ADCX",
+   "form": "reg,reg/mem",
+   "latency": "1",
+   "cpuid": "ADX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADD",
+   "form": "reg,reg/mem",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ADOX",
+   "form": "reg,reg/mem",
+   "latency": "1",
+   "cpuid": "ADX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADDPD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADDPS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADDSD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADDSS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADDSUBPD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ADDSUBPS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AESDEC",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "AES",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AESDECLAST",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "AES",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AESENC",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "AES",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AESENCLAST",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "AES",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AESIMC",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "AES",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AESKEYGENASSIST",
+   "form": "xmm1,xmm2,imm",
+   "latency": "4",
+   "cpuid": "AES",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "AND",
+   "form": "reg,reg/mem",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ANDN",
+   "form": "reg32/64,reg32/64,mem32/64",
+   "latency": "1",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ANDN",
+   "form": "reg32/64,reg32/64,reg32/64",
+   "latency": "1",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ANDNPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ANDNPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ANDPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ANDPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BEXTR",
+   "form": "reg,reg,reg",
+   "latency": "1",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BLENDPD",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BLENDPS",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BLENDVPD",
+   "form": "xmm1,xmm2,<xmm0>",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BLENDVPS",
+   "form": "xmm1,xmm2,<xmm0>",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BLSI",
+   "form": "reg32/64,reg32/64",
+   "latency": "2",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BLSI",
+   "form": "reg,mem",
+   "latency": "2",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BLSMSK",
+   "form": "reg32/64,reg32/64",
+   "latency": "2",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BLSR",
+   "form": "reg32/64,reg32/64",
+   "latency": "2",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BSF",
+   "form": "",
+   "latency": "3",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "BSR",
+   "form": "",
+   "latency": "4",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.25"
+  },
+  {
+   "mnemonic": "BSWAP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BT",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "BTC",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BTR",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BTS",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "BZHI",
+   "form": "reg,reg/mem,reg",
+   "latency": "1",
+   "cpuid": "BMI2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CALL (near)",
+   "form": "imm16/32",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CALL (near)",
+   "form": "reg16/32/64",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CBW",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CDQ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CDQE",
+   "form": "",
+   "latency": "1",
+   "cpuid": "AMD64",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CLC",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CLD",
+   "form": "",
+   "latency": "3",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.3"
+  },
+  {
+   "mnemonic": "CLFLUSH",
+   "form": "",
+   "latency": "complex",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CLFLUSHOPT",
+   "form": "",
+   "latency": "complex",
+   "cpuid": "CLFLUSHOPT",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CLZERO",
+   "form": "mem8",
+   "latency": "complex",
+   "cpuid": "CLZERO",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CMC",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVB",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVBE",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMOVL",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMOVLE",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMOVNB",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVNBE",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMOVNL",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMOVNLE",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMOVNO",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVNP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVNS",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVNZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVO",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVS",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMOVZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CMPccPD",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMPccPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMPccSD",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMPccSS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CMPXCHG",
+   "form": "",
+   "latency": "3",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.33333333333333331"
+  },
+  {
+   "mnemonic": "CMPXCHG16B",
+   "form": "",
+   "latency": "?",
+   "cpuid": "CMPXCHG16B",
+   "amd_ops_per_cycle": ""
+  },
+  {
+   "mnemonic": "CMPXCHG8B",
+   "form": "",
+   "latency": "?",
+   "cpuid": "CMPXCHG8B",
+   "amd_ops_per_cycle": ""
+  },
+  {
+   "mnemonic": "COMISD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "COMISS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CQO",
+   "form": "",
+   "latency": "1",
+   "cpuid": "AMD64",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CRC32",
+   "form": "reg32,reg32",
+   "latency": "3",
+   "cpuid": "SSE4.2",
+   "amd_ops_per_cycle": "0.33"
+  },
+  {
+   "mnemonic": "CVTDQ2PD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTDQ2PS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPD2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPD2PI",
+   "form": "mmx1,xmm1",
+   "latency": "4",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPD2PS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPI2PD",
+   "form": "xmm1,mmx1",
+   "latency": "4",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPI2PS",
+   "form": "xmm1,mmx1",
+   "latency": "4",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CVTPS2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPS2PD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTPS2PI",
+   "form": "mmx1,xmm1",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTSD2SI",
+   "form": "reg32,xmm1",
+   "latency": "4",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTSD2SS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "CVTSI2SD",
+   "form": "xmm1,reg32",
+   "latency": "4",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTSI2SS",
+   "form": "xmm1,reg32",
+   "latency": "4",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTSS2SD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTSS2SI",
+   "form": "reg32,xmm1",
+   "latency": "4",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTTPD2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTTPD2PI",
+   "form": "mmx1,xmm1",
+   "latency": "4",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTTPS2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTTPS2PI",
+   "form": "mmx1,xmm1",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTTSD2SI",
+   "form": "reg32,xmm1",
+   "latency": "4",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CVTTSS2SI",
+   "form": "reg32,xmm1",
+   "latency": "4",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "CWD",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "CWDE",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "DEC",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "DIV",
+   "form": "reg/mem16",
+   "latency": "17",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "5.8823529411764705E-2"
+  },
+  {
+   "mnemonic": "DIV",
+   "form": "reg/mem32",
+   "latency": "25",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.04"
+  },
+  {
+   "mnemonic": "DIV",
+   "form": "reg/mem64",
+   "latency": "41",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2.4390243902439025E-2"
+  },
+  {
+   "mnemonic": "DIV",
+   "form": "reg/mem8",
+   "latency": "12",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "8.3333333333333329E-2"
+  },
+  {
+   "mnemonic": "DIVPD",
+   "form": "xmm1,xmm2",
+   "latency": "13",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "0.15384615384615385"
+  },
+  {
+   "mnemonic": "DIVPS",
+   "form": "xmm1,xmm2",
+   "latency": "10",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "0.2"
+  },
+  {
+   "mnemonic": "DIVSD",
+   "form": "xmm1,xmm2",
+   "latency": "13",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "0.15384615384615385"
+  },
+  {
+   "mnemonic": "DIVSS",
+   "form": "xmm1,xmm2",
+   "latency": "10",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "0.2"
+  },
+  {
+   "mnemonic": "EMMS",
+   "form": "",
+   "latency": "0",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "EXTRACTPS",
+   "form": "reg32,xmm2,imm",
+   "latency": "2",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "EXTRQ",
+   "form": "xmm1,imm8,imm8",
+   "latency": "2",
+   "cpuid": "SSE4A",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "EXTRQ",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSE4A",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FABS",
+   "form": "",
+   "latency": "2",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FADD",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FADDP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FCHS",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FCOM",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FCOMI",
+   "form": "",
+   "latency": "2",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FCOMIP",
+   "form": "",
+   "latency": "2",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FCOMP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FCOMPP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FDECSTP",
+   "form": "",
+   "latency": "0",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "FDIV",
+   "form": "",
+   "latency": "15",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "6.6666666666666666E-2"
+  },
+  {
+   "mnemonic": "FDIVP",
+   "form": "",
+   "latency": "15",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "6.6666666666666666E-2"
+  },
+  {
+   "mnemonic": "FDIVR",
+   "form": "",
+   "latency": "15",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "6.6666666666666666E-2"
+  },
+  {
+   "mnemonic": "FDIVRP",
+   "form": "",
+   "latency": "15",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "6.6666666666666666E-2"
+  },
+  {
+   "mnemonic": "FFREE",
+   "form": "",
+   "latency": "0",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "FIADD",
+   "form": "",
+   "latency": "9",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FICOM",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FICOMP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FIDIV",
+   "form": "",
+   "latency": "19",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "5.2631578947368418E-2"
+  },
+  {
+   "mnemonic": "FIDIVR",
+   "form": "",
+   "latency": "19",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "5.2631578947368418E-2"
+  },
+  {
+   "mnemonic": "FILD",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FIMUL",
+   "form": "",
+   "latency": "9",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "FINCSTP",
+   "form": "",
+   "latency": "0",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "FIST",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FISTP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FISTTP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FISUB",
+   "form": "",
+   "latency": "9",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FISUBR",
+   "form": "",
+   "latency": "9",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLD",
+   "form": "mem32/64",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "FLD",
+   "form": "Sti",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "FLD1",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLDL2E",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLDL2T",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLDLG2",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLDLN2",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLDPI",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FLDZ",
+   "form": "",
+   "latency": "4",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FMUL",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "FMULP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "FNOP",
+   "form": "",
+   "latency": "0",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "FSQRT",
+   "form": "",
+   "latency": "22",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "4.5454545454545456E-2"
+  },
+  {
+   "mnemonic": "FST",
+   "form": "mem32/64",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FST",
+   "form": "Sti",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FSTP",
+   "form": "mem32/64",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FSTP",
+   "form": "Sti",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FSUB",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FSUBP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FSUBR",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FSUBRP",
+   "form": "",
+   "latency": "5",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FTST",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FUCOM",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FUCOMI",
+   "form": "",
+   "latency": "2",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FUCOMIP",
+   "form": "",
+   "latency": "2",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FUCOMP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FUCOMPP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FXAM",
+   "form": "",
+   "latency": "1",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "FXCH",
+   "form": "",
+   "latency": "0",
+   "cpuid": "X87",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "HADDPD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "HADDPS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "HSUBPD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "HSUBPS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "IDIV",
+   "form": "reg16",
+   "latency": "17",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "5.8823529411764705E-2"
+  },
+  {
+   "mnemonic": "IDIV",
+   "form": "reg32",
+   "latency": "25",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.04"
+  },
+  {
+   "mnemonic": "IDIV",
+   "form": "reg64",
+   "latency": "41",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2.4390243902439025E-2"
+  },
+  {
+   "mnemonic": "IDIV",
+   "form": "reg8",
+   "latency": "15",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "6.6666666666666666E-2"
+  },
+  {
+   "mnemonic": "IMUL",
+   "form": "reg64",
+   "latency": "3,4",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "IMUL",
+   "form": "reg8/16/32",
+   "latency": "3,4",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "INC",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "INSERTPS",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "INSERTQ",
+   "form": "xmm1,xmm2,imm8,imm8",
+   "latency": "4",
+   "cpuid": "SSE4A",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "INSERTQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE4A",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "Jcc",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "JCXZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "JECXZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "JMP (near)",
+   "form": "imm8/16/32",
+   "latency": "",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "JMP (near)",
+   "form": "reg16/32/64",
+   "latency": "",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "JRCXZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "AMD64",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LDDQU",
+   "form": "xmm1,mem128",
+   "latency": "",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LEA",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "LEA",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LEAVE",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LFENCE",
+   "form": "",
+   "latency": "",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "LOOP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LOOPE",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LOOPNE",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LOOPNZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LOOPZ",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "LZCNT",
+   "form": "reg,reg",
+   "latency": "1",
+   "cpuid": "ABM",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MAXPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MAXPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MAXSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MAXSS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MINPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MINPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MINSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MINSS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MONITOR",
+   "form": "",
+   "latency": "variable",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "variable"
+  },
+  {
+   "mnemonic": "MONITORX",
+   "form": "",
+   "latency": "variable",
+   "cpuid": "MONITORX",
+   "amd_ops_per_cycle": "variable"
+  },
+  {
+   "mnemonic": "MOV",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVAPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVAPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVBE",
+   "form": "reg,mem",
+   "latency": "1",
+   "cpuid": "MOVBE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "mem32/64,mmx1",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "mmx1,mem32/64",
+   "latency": "0",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "mmx1,reg32/64",
+   "latency": "2",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "reg32/64,mmx1",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "reg32,xmm1",
+   "latency": "2",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "xmm1,reg32",
+   "latency": "2",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVDDUP",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVDQ2Q",
+   "form": "mmx1,xmm1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVDQA",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVDQU",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVHLPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVHPD",
+   "form": "mem64,xmm1",
+   "latency": "2",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVHPD",
+   "form": "xmm1,mem64",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVHPS",
+   "form": "mem64,xmm1",
+   "latency": "2",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVHPS",
+   "form": "xmm1,mem64",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVLHPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVLPD",
+   "form": "mem64,xmm1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVLPD",
+   "form": "xmm1,mem64",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVLPS",
+   "form": "mem64,xmm1",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVLPS",
+   "form": "xmm1,mem64",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVMSKPD",
+   "form": "reg,xmm1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVMSKPS",
+   "form": "reg,xmm1",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTDQ",
+   "form": "mem128,xmm1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTDQA",
+   "form": "xmm1,mem128",
+   "latency": "0",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVNTI",
+   "form": "mem32/64,reg32/64",
+   "latency": "",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTPD",
+   "form": "mem128,xmm1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTPS",
+   "form": "mem128,xmm1",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTQ",
+   "form": "mem64,mmx1",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTSD",
+   "form": "mem64,xmm1",
+   "latency": "1",
+   "cpuid": "SSE4A",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVNTSS",
+   "form": "memem32,xmm1",
+   "latency": "1",
+   "cpuid": "SSE4A",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "mem32/64,mmx1",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "mmx1,mem32/64",
+   "latency": "0",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "mmx1,reg32/64",
+   "latency": "2",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "reg32/64,mmx1",
+   "latency": "2",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVQ2DQ",
+   "form": "xmm1,mmx1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVSHDUP",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVSLDUP",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MOVSS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVSX",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVSXD",
+   "form": "",
+   "latency": "1",
+   "cpuid": "AMD64",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVUPD",
+   "form": "xmm1,xmm2",
+   "latency": "0",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVUPS",
+   "form": "xmm1,xmm2",
+   "latency": "0",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MOVZX",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "MPSADBW",
+   "form": "xmm1,xmm2,imm",
+   "latency": "4.5",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "MUL",
+   "form": "reg64",
+   "latency": "3,4",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MUL",
+   "form": "reg8/16/32",
+   "latency": "3,4",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MULPD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MULPS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MULSD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MULSS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "MULX",
+   "form": "reg,reg,reg/mem",
+   "latency": "3,4",
+   "cpuid": "BMI2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "MWAIT",
+   "form": "",
+   "latency": "variable",
+   "cpuid": "SSE3",
+   "amd_ops_per_cycle": "variable"
+  },
+  {
+   "mnemonic": "MWAITX",
+   "form": "",
+   "latency": "variable",
+   "cpuid": "MONITORX",
+   "amd_ops_per_cycle": "variable"
+  },
+  {
+   "mnemonic": "NEG",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "NOP",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "NOT",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "OR",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ORPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ORPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PABSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PABSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PABSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKSSDW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKSSDW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKSSWB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKSSWB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKUSDW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKUSWB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PACKUSWB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PADDB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDQ",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDSB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDSW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDUSB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDUSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDUSW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDUSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PADDW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PALIGNR",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PAND",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PAND",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PANDN",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PANDN",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PAVGB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PAVGB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PAVGW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PAVGW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PBLENDVB",
+   "form": "xmm1,xmm2,<xmm0>",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PBLENDW",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PCLMULQDQ",
+   "form": "xmm1,xmm2,imm",
+   "latency": "5",
+   "cpuid": "CLMUL",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "PCMPEQB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPEQB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPEQD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPEQD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPEQQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPEQW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPEQW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPESTRI",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "SSE4.2",
+   "amd_ops_per_cycle": "0.33333333333333331"
+  },
+  {
+   "mnemonic": "PCMPESTRM",
+   "form": "xmm1,xmm2,imm",
+   "latency": "4",
+   "cpuid": "SSE4.2",
+   "amd_ops_per_cycle": "0.33333333333333331"
+  },
+  {
+   "mnemonic": "PCMPGTB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPGTB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPGTD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPGTD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPGTQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPGTW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPGTW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PCMPISTRI",
+   "form": "xmm1,xmm2,imm",
+   "latency": "2",
+   "cpuid": "SSE4.2",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "PCMPISTRM",
+   "form": "xmm1,xmm2,imm",
+   "latency": "2",
+   "cpuid": "SSE4.2",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "PEXTRB",
+   "form": "reg,xmm1,imm",
+   "latency": "2",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PEXTRD",
+   "form": "reg,xmm1,imm",
+   "latency": "2",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PEXTRW",
+   "form": "reg32,xmm1,imm8",
+   "latency": "2",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PEXTRW",
+   "form": "reg,xmm2,imm",
+   "latency": "2",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHADDD",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHADDSW",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHADDW",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHMINPOSUW",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHSUBD",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHSUBSW",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PHSUBW",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRB",
+   "form": "xmm1,mem8,imm8",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRB",
+   "form": "xmm1,reg32,imm8",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRD",
+   "form": "xmm1,mem32/64,imm8",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRD",
+   "form": "xmm1,reg32,imm8",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRQ",
+   "form": "xmm1,mem64,imm8",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRQ",
+   "form": "xmm1,reg64,imm8",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRW",
+   "form": "xmm1,mem16,imm8",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRW",
+   "form": "xmm1,reg32,imm8",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRW",
+   "form": "mmx1,mem16,imm8",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PINSRW",
+   "form": "mmx1,reg32,imm8",
+   "latency": "3",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMADDUBSW",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMADDWD",
+   "form": "mmx1,mmx2",
+   "latency": "3",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMADDWD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMAXSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXSW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXUB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXUB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXUD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMAXUW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINSW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINUB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINUB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINUD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMINUW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVMSKB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMOVMSKB",
+   "form": "reg32,xmm1",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMOVSXBD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVSXBQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVSXBW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVSXDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVSXWD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVSXWQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVZXBD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVZXBQ",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVZXBW",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVZXDQ",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVZXWD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMOVZXWQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PMULDQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULHRSW",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULHUW",
+   "form": "mmx1,mmx2/mem",
+   "latency": "3",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULHUW",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULHW",
+   "form": "mmx1,mmx2",
+   "latency": "3",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULHW",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULLD",
+   "form": "xmm1,xmm2",
+   "latency": "4",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULLW",
+   "form": "mmx1,mmx2",
+   "latency": "3",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULLW",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULUDQ",
+   "form": "mmx1,mmx2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PMULUDQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "POP",
+   "form": "reg",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "POPCNT",
+   "form": "reg,reg/mem",
+   "latency": "1",
+   "cpuid": "POPCNT",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "POR",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "POR",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PSADBW",
+   "form": "mmx1,mmx2",
+   "latency": "3",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSADBW",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSHUFB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSHUFD",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSHUFHW",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSHUFLW",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSHUFW",
+   "form": "mmx1,mmx2,imm8",
+   "latency": "1",
+   "cpuid": "SSE | MmxExt",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSIGNB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSIGND",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSIGNW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSSE3",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PSLLD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSLLD",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSLLDQ",
+   "form": "xmm1,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSLLQ",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSLLQ",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSLLW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSLLW",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRAD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRAD",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRAW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRAW",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLD",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLDQ",
+   "form": "xmm1,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLQ",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLQ",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSRLW",
+   "form": "xmm1,xmm/imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PSUBB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBQ",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBSB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBSW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBUSB",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBUSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBUSW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBUSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PSUBW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "PTEST",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHBW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHBW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHDQ",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHQDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHWD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKHWD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLBW",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLBW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLDQ",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLQDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLWD",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUNPCKLWD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "PUSH",
+   "form": "reg",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "PUSHA",
+   "form": "",
+   "latency": "8",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.125"
+  },
+  {
+   "mnemonic": "PXOR",
+   "form": "mmx1,mmx2",
+   "latency": "1",
+   "cpuid": "MMX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "PXOR",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "RCL",
+   "form": "reg/mem,CL/Imm",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "RCPPS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "RCPSS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "RCR",
+   "form": "reg/mem,CL/Imm",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "RDFSBASE",
+   "form": "",
+   "latency": "ucode",
+   "cpuid": "FSGSBASE",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "RDGSBASE",
+   "form": "",
+   "latency": "ucode",
+   "cpuid": "FSGSBASE",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "RDPRU",
+   "form": "",
+   "latency": "ucode",
+   "cpuid": "RDPRU",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "RDRAND",
+   "form": "",
+   "latency": "variable",
+   "cpuid": "RDRAND",
+   "amd_ops_per_cycle": "variable"
+  },
+  {
+   "mnemonic": "RDSEED",
+   "form": "",
+   "latency": "variable",
+   "cpuid": "RDSEED",
+   "amd_ops_per_cycle": "variable"
+  },
+  {
+   "mnemonic": "RET",
+   "form": "imm16",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "RET",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "ROL",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ROR",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "RORX",
+   "form": "reg,reg/mem,imm`",
+   "latency": "1",
+   "cpuid": "BMI2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "ROUNDPD",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "ROUNDPS",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "ROUNDSD",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "ROUNDSS",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "SSE4.1",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "RSQRTPS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "RSQRTSS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SAHF",
+   "form": "",
+   "latency": "2",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SAL",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SAR",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SARX",
+   "form": "reg,reg/mem,reg",
+   "latency": "1",
+   "cpuid": "BMI2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SBB",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "SETcc",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SETcc",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SHA1MSG1",
+   "form": "xmm,xmm/mem",
+   "latency": "2",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SHA1MSG2",
+   "form": "xmm,xmm/mem",
+   "latency": "1",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SHA1NEXTE",
+   "form": "xmm,xmm/mem",
+   "latency": "1",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "SHA1RNDS4",
+   "form": "xmm1,xmm2/mem,imm8",
+   "latency": "6",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "0.25"
+  },
+  {
+   "mnemonic": "SHA256MSG1",
+   "form": "xmm,xmm/mem",
+   "latency": "2",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SHA256MSG2",
+   "form": "xmm,xmm/mem",
+   "latency": "3",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "SHA256RNDS2",
+   "form": "xmm,xmm/mem,xmm0",
+   "latency": "4",
+   "cpuid": "SHA",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "SHL",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SHLX",
+   "form": "reg,reg/mem,reg",
+   "latency": "1",
+   "cpuid": "BMI2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SHR",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SHRX",
+   "form": "",
+   "latency": "1",
+   "cpuid": "BMI2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SHUFPD",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SHUFPS",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SQRTPD",
+   "form": "xmm1,xmm2",
+   "latency": "20",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "0.05"
+  },
+  {
+   "mnemonic": "SQRTPS",
+   "form": "xmm1,xmm2",
+   "latency": "14",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "7.1428571428571425E-2"
+  },
+  {
+   "mnemonic": "SQRTSD",
+   "form": "xmm1,xmm2",
+   "latency": "20",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "0.05"
+  },
+  {
+   "mnemonic": "SQRTSS",
+   "form": "xmm1,xmm2",
+   "latency": "14",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "7.1428571428571425E-2"
+  },
+  {
+   "mnemonic": "STAC",
+   "form": "",
+   "latency": "ucode",
+   "cpuid": "SMAP",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "STC",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SUB",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "SUBPD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SUBPS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SUBSD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "SUBSS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "TEST",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "TZCNT",
+   "form": "reg16/32/64,reg16/32/64",
+   "latency": "2",
+   "cpuid": "BMI",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "UCOMISD",
+   "form": "xmm1,xmm2,ymm3,imm",
+   "latency": "2",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "UCOMISS",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "2",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "UNPCKHPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "UNPCKHPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "UNPCKLPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "UNPCKLPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDSUBPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDSUBPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDSUBPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VADDSUBPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VAESDEC",
+   "form": "",
+   "latency": "4",
+   "cpuid": "AES and AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VAESDECLAST",
+   "form": "",
+   "latency": "4",
+   "cpuid": "AES and AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VAESENC",
+   "form": "",
+   "latency": "4",
+   "cpuid": "AES and AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VAESENCLAST",
+   "form": "",
+   "latency": "4",
+   "cpuid": "AES and AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VAESIMC",
+   "form": "",
+   "latency": "4",
+   "cpuid": "AES and AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VAESKEYGENASSIST",
+   "form": "",
+   "latency": "4",
+   "cpuid": "AES and AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VANDNPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDNPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDNPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDNPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VANDPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VBLENDPD",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDPD",
+   "form": "ymm1,ymm2,ymm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDPS",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDPS",
+   "form": "ymm1,ymm2,ymm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDVPD",
+   "form": "xmm1,xmm2,xmm3,xmm4",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDVPD",
+   "form": "ymm1,ymm2,ymm3,ymm4",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDVPS",
+   "form": "xmm1,xmm2,xmm3,xmm4",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBLENDVPS",
+   "form": "ymm1,ymm2,ymm3,ymm4",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBROADCASTF128",
+   "form": "ymm1,mem128",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBROADCASTI128",
+   "form": "ymm1,mem128",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBROADCASTSD",
+   "form": "ymm1,mem64",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBROADCASTSD",
+   "form": "ymm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBROADCASTSS",
+   "form": "xmm1,xmm2/mem32",
+   "latency": "0",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VBROADCASTSS",
+   "form": "ymm1,xmm2/mem32",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCMPccPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCMPccPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCMPccPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCMPccPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCMPccSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCMPccSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCOMISD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCOMISS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTDQ2PD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTDQ2PD",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTDQ2PS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTDQ2PS",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPD2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPD2DQ",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPD2PS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPD2PS",
+   "form": "ymm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPH2PS",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "F16C",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPH2PS",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "F16C",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2DQ",
+   "form": "ymm1,ymm2",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2PD",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2PD",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2PH",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "F16C",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2PH",
+   "form": "ymm1,xmm2,imm",
+   "latency": "4",
+   "cpuid": "F16C",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTSD2SI",
+   "form": "reg,xmm1",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTSD2SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCVTSI2SD",
+   "form": "xmm1,xmm2,reg",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTSI2SS",
+   "form": "xmm1,xmm2,reg",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTSS2SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCVTSS2SI",
+   "form": "reg,xmm1",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTTPD2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTTPD2DQ",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VCVTTPS2DQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTTPS2DQ",
+   "form": "ymm1,ymm2",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTTSD2SI",
+   "form": "reg,xmm1",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VCVTTSS2SI",
+   "form": "reg,xmm1",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VDIVPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "13",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.15384615384615385"
+  },
+  {
+   "mnemonic": "VDIVPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "13",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.15384615384615385"
+  },
+  {
+   "mnemonic": "VDIVPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "10",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.2"
+  },
+  {
+   "mnemonic": "VDIVPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "10",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.2"
+  },
+  {
+   "mnemonic": "VDIVSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "13",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.15384615384615385"
+  },
+  {
+   "mnemonic": "VDIVSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "10",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.2"
+  },
+  {
+   "mnemonic": "VEXTRACTF128",
+   "form": "",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VEXTRACTF128",
+   "form": "",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VEXTRACTPS",
+   "form": "CL/Imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD132SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD213SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADD231SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB132SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB213SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUB231SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD132SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD213SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMADD231SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB132SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB213SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231PD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231PD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231PS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231PS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231SD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231SD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231SS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VFNMSUB231SS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "5",
+   "cpuid": "FMA",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VHADDPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VHADDPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VHADDPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VHADDPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VHSUBPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VHSUBPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "VHSUBPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VHSUBPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "VINSERTF128",
+   "form": "ymm1,ymm2,xmm3,imm",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VINSERTI128",
+   "form": "ymm1,ymm2,xmm3,imm",
+   "latency": "2",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VINSERTPS",
+   "form": "xmm1,xmm2,xmm3,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VLDDQU",
+   "form": "xmm1,mem128",
+   "latency": "",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VLDDQU",
+   "form": "ymm1,mem256",
+   "latency": "",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMASKMOVPD",
+   "form": "xmm1,xmm2,mem128",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMASKMOVPD",
+   "form": "ymm1,ymm2,mem256",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMASKMOVPS",
+   "form": "xmm1,xmm2,mem128",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMASKMOVPS",
+   "form": "ymm1,ymm2,mem256",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMAXPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMAXPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMAXPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMAXPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMAXSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMAXSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMINPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMINPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMINPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMINPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMINSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMINSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVAPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVAPD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVAPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVAPS",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVD",
+   "form": "reg,xmm1",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVD",
+   "form": "xmm1,reg32",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVDDUP",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVDDUP",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVDQA",
+   "form": "xmm1,xmm2",
+   "latency": "0",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVDQA",
+   "form": "ymm1,ymm2",
+   "latency": "0",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVDQU",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVDQU",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVHLPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVHPD",
+   "form": "mem64,xmm1",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVHPD",
+   "form": "xmm1,xmm2,mem64",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVHPS",
+   "form": "mem64,xmm1",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVHPS",
+   "form": "xmm1,xmm2,mem64",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVLHPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVLPD",
+   "form": "mem64,xmm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVLPD",
+   "form": "xmm1,xmm2,mem64",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVLPS",
+   "form": "mem64,xmm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVLPS",
+   "form": "xmm1,xmm2,mem64",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVMSKPD",
+   "form": "reg,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVMSKPD",
+   "form": "reg,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVMSKPS",
+   "form": "reg,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVMSKPS",
+   "form": "reg,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVNTDQ",
+   "form": "mem128,xmm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVNTDQ",
+   "form": "mem256,ymm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVNTDQA",
+   "form": "xmm1,mem128",
+   "latency": "0",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVNTDQA",
+   "form": "ymm1,mem256",
+   "latency": "0",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVNTPD",
+   "form": "mem128,xmm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVNTPD",
+   "form": "mem256,ymm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVNTPS",
+   "form": "mem128,xmm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVNTPS",
+   "form": "mem256,ymm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVSHDUP",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVSHDUP",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVSLDUP",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVSLDUP",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVSS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VMOVUPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVUPD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMOVUPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMOVUPS",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VMPSADBW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "ucode",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "VMPSADBW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "ucode",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "VMULPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMULPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMULPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMULPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMULSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VMULSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VORPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VORPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VORPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VORPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPABSB",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPABSB",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPABSD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPABSD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPABSW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPABSW",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPACKSSDW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKSSDW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKSSWB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKSSWB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKUSDW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKUSDW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKUSWB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPACKUSWB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPADDB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDSB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDSB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDUSB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDUSB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDUSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDUSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPADDW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPALIGNR",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPALIGNR",
+   "form": "ymm1,ymm2,ymm3,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPAND",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPAND",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPANDN",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPANDN",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPAVGB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPAVGB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPAVGW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPAVGW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBLENDD",
+   "form": "xmm,xmm,xmm/mem,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBLENDD",
+   "form": "ymm,ymm,ymm/mem,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBLENDVB",
+   "form": "xmm1,xmm2,xmm3,xmm4",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPBLENDVB",
+   "form": "ymm1,ymm2,ymm3,ymm4",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPBLENDW",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPBLENDW",
+   "form": "ymm1,ymm2,ymm3,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPBROADCASTB",
+   "form": "xmm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTB",
+   "form": "ymm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTW",
+   "form": "xmm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTW",
+   "form": "ymm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTD",
+   "form": "xmm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTD",
+   "form": "ymm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTQ",
+   "form": "xmm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPBROADCASTQ",
+   "form": "ymm,xmm/mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPEQW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPCMPGTW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERM2F128",
+   "form": "ymm1,xmm2,xmm3,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPERM2I128",
+   "form": "ymm1,xmm2,xmm3,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "ymm1,ymm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "ymm1,ymm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPEXTRB",
+   "form": "reg,xmm1,imm8",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPEXTRD",
+   "form": "reg,xmm1,imm8",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPEXTRQ",
+   "form": "reg,xmm1,imm8",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPEXTRW",
+   "form": "reg,xmm1,imm8",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPHMINPOSUW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPHSUBW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "VPHSUBW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "0.33"
+  },
+  {
+   "mnemonic": "VPINSRB",
+   "form": "xmm1,mem8,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPINSRB",
+   "form": "xmm1,reg32,xmm2,imm8",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPINSRD",
+   "form": "xmm1,mem32,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPINSRD",
+   "form": "xmm1,reg32,xmm2,imm8",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPINSRQ",
+   "form": "xmm1,mem64,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPINSRQ",
+   "form": "xmm1,reg64,xmm2,imm8",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPINSRW",
+   "form": "xmm1,mem16,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPINSRW",
+   "form": "xmm1,reg32,xmm2,imm8",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMADDUBSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMADDUBSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "4",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMADDWD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMADDWD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "4",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMASKMOVD",
+   "form": "xmm,xmm,mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMASKMOVD",
+   "form": "ymm,ymm,mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMASKMOVQ",
+   "form": "xmm,xmm,mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMASKMOVQ",
+   "form": "ymm,ymm,mem",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXSB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXSB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXSD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXUB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXUB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXUD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXUD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXUW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMAXUW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINSB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINSB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINSD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINUB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINUB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINUD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINUD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINUW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMINUW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVMSKB",
+   "form": "reg,xmm1",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMOVMSKB",
+   "form": "reg,ymm1",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXBD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXBD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXBQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXBQ",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXBW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXBW",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXDQ",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXWD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXWD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXWQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVSXWQ",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXBD",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXBD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXBQ",
+   "form": "xmm1,xmm2,imm8",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXBQ",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXBW",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXBW",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXDQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXDQ",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXWD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXWD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXWQ",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMOVZXWQ",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMULDQ",
+   "form": "xmm1,xmm2",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULDQ",
+   "form": "ymm1,ymm2",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULHRSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULHRSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULHUW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULHUW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULHW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULHW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULLD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "4",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPMULLD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULLW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULLW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULUDQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPMULUDQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPOR",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPOR",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VPSADBW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSADBW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSHUFB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFD",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFD",
+   "form": "ymm1,ymm2,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFHW",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFHW",
+   "form": "ymm1,ymm2,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFLW",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSHUFLW",
+   "form": "ymm1,ymm2,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSIGNB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSIGNB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSIGND",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSIGND",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSIGNW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSIGNW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPSLLD",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLD",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLDQ",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLDQ",
+   "form": "ymm1,ymm2,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLQ",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLQ",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLVD",
+   "form": "xmm1,xmm2,xmm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLVD",
+   "form": "ymm1,ymm2,ymm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLVQ",
+   "form": "xmm1,xmm2,xmm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLVQ",
+   "form": "ymm1,ymm2,ymm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLW",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSLLW",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRAD",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRAD",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRAVD",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRAVD",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRAW",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRAW",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLD",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLD",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLDQ",
+   "form": "xmm1,xmm2,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLDQ",
+   "form": "ymm1,ymm2,imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLQ",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLQ",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLVD",
+   "form": "xmm1,xmm2,xmm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLVD",
+   "form": "ymm1,ymm2,ymm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLVQ",
+   "form": "xmm1,xmm2,xmm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLVQ",
+   "form": "ymm1,ymm2,ymm3/mem",
+   "latency": "3",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLW",
+   "form": "xmm1,xmm2,xmm3/imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSRLW",
+   "form": "ymm1,ymm2,ymm3/imm",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPSUBB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBSB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBSB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBUSB",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBUSB",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBUSW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBUSW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPSUBW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "3"
+  },
+  {
+   "mnemonic": "VPTEST",
+   "form": "xmm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPTEST",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VPUNPCKHBW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHBW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHDQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHDQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHQDQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHQDQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHWD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHWD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLBW",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLBW",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLDQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLDQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLQDQ",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLQDQ",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLWD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKLWD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX2",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VPXOR",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VRCPPS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VRCPPS",
+   "form": "ymm1,ymm2",
+   "latency": "5",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VRCPSS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VROUNDPD",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VROUNDPD",
+   "form": "ymm1,ymm2,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VROUNDPS",
+   "form": "xmm1,xmm2,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VROUNDPS",
+   "form": "ymm1,ymm2,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VROUNDSD",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VROUNDSS",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VRSQRTPS",
+   "form": "xmm1,xmm2",
+   "latency": "5",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VRSQRTPS",
+   "form": "ymm1,ymm2",
+   "latency": "5",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VRSQRTSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "5",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSHUFPD",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSHUFPD",
+   "form": "ymm1,ymm2,ymm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSHUFPS",
+   "form": "xmm1,xmm2,xmm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSHUFPS",
+   "form": "ymm1,ymm2,ymm3,imm",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSQRTPD",
+   "form": "xmm1,xmm2",
+   "latency": "20",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.1"
+  },
+  {
+   "mnemonic": "VSQRTPD",
+   "form": "ymm1,ymm2",
+   "latency": "20",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.1"
+  },
+  {
+   "mnemonic": "VSQRTPS",
+   "form": "xmm1,xmm2",
+   "latency": "14",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.14285714285714285"
+  },
+  {
+   "mnemonic": "VSQRTPS",
+   "form": "ymm1,ymm2",
+   "latency": "14",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.14285714285714285"
+  },
+  {
+   "mnemonic": "VSQRTSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "20",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.1"
+  },
+  {
+   "mnemonic": "VSQRTSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "14",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "0.14285714285714285"
+  },
+  {
+   "mnemonic": "VSUBPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSUBPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSUBPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSUBPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSUBSD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VSUBSS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "3",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VTESTPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VTESTPD",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VTESTPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VTESTPS",
+   "form": "ymm1,ymm2",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUCOMISD",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VUCOMISS",
+   "form": "xmm1,xmm2",
+   "latency": "2",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "1"
+  },
+  {
+   "mnemonic": "VUNPCKHPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKHPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKHPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKHPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKLPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKLPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKLPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VUNPCKLPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "2"
+  },
+  {
+   "mnemonic": "VXORPD",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VXORPD",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VXORPS",
+   "form": "xmm1,xmm2,xmm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VXORPS",
+   "form": "ymm1,ymm2,ymm3",
+   "latency": "1",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "VZEROUPPER",
+   "form": "",
+   "latency": "0",
+   "cpuid": "AVX",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "WBNOINVD",
+   "form": "",
+   "latency": "ucode",
+   "cpuid": "WBNOINVD",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "WRFSBASE",
+   "form": "reg",
+   "latency": "ucode",
+   "cpuid": "FSGSBASE",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "WRGSBASE",
+   "form": "reg",
+   "latency": "ucode",
+   "cpuid": "FSGSBASE",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "XADD",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.3"
+  },
+  {
+   "mnemonic": "XCHG",
+   "form": "",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "0.5"
+  },
+  {
+   "mnemonic": "XOR",
+   "form": "reg,reg",
+   "latency": "1",
+   "cpuid": "general",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "XORPD",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE2",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "XORPS",
+   "form": "xmm1,xmm2",
+   "latency": "1",
+   "cpuid": "SSE",
+   "amd_ops_per_cycle": "4"
+  },
+  {
+   "mnemonic": "XRSTORS",
+   "form": "mem",
+   "latency": "ucode",
+   "cpuid": "XSAVES",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "XSAVEC",
+   "form": "mem",
+   "latency": "ucode",
+   "cpuid": "XSAVEC",
+   "amd_ops_per_cycle": "ucode"
+  },
+  {
+   "mnemonic": "XSAVES",
+   "form": "mem",
+   "latency": "ucode",
+   "cpuid": "XSAVES",
+   "amd_ops_per_cycle": "ucode"
+  }
+ ]
+}
