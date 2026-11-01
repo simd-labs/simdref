@@ -48,8 +48,9 @@ INTEL_SDM_SIGNATURE_PATHS = (
     Path(__file__).resolve().parent / "base.py",
 )
 
-# Title pattern: ALL-CAPS mnemonic (with optional / separators) before em-dash.
-_TITLE_RE = re.compile(r"^([A-Z][A-Z0-9/_\s]{0,80})\s*\u2014\s*(.+)")
+# Title pattern: mnemonic (with optional / or , separators) before em-dash.
+# Lowercase is allowed only at the end of the mnemonic (CMOVcc, PREFETCHh).
+_TITLE_RE = re.compile(r"^([A-Za-z][A-Za-z0-9/,_\s]{0,80})\s*—\s*(.+)")
 
 # Words that indicate a chapter/section heading, not an instruction.
 _SKIP_WORDS = frozenset({"CHAPTER", "CONTENTS", "APPENDIX", "VOLUME", "INSTRUCTION SET REFERENCE"})
@@ -124,6 +125,10 @@ _ALL_HEADING_NAMES: frozenset[str] = frozenset(
     | set(_SECTION_ALIASES.keys())
     | {s.lower() for s in _DISCARD_SECTIONS}
 )
+
+# Headings the tabular-noise filter must not drop: kept sections only.
+# Discard headings (Instruction Operand Encoding) still count as table noise.
+_NOISE_EXEMPT_HEADINGS: frozenset[str] = _ALL_HEADING_NAMES - {s.lower() for s in _DISCARD_SECTIONS}
 
 # Minimal safety-net for junk lines that appear outside table bounding boxes.
 _JUNK_LINE_RE = re.compile(
@@ -262,6 +267,10 @@ def _line_is_tabular_noise(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
         return True
+    # A kept section heading (for example 64-Bit Mode Exceptions) shares a
+    # prefix with the opcode-table column headers. Keep the heading.
+    if stripped.lower() in _NOISE_EXEMPT_HEADINGS:
+        return False
     return bool(
         _FASTPATH_TABULAR_LINE_RE.match(stripped) or _FASTPATH_TABULAR_CAPTION_RE.match(stripped)
     )
@@ -384,12 +393,33 @@ def parse_instruction_title(text: str) -> tuple[str, str] | None:
     summary = m.group(2).strip()
     if any(word in mnemonic for word in _SKIP_WORDS):
         return None
-    alpha = [c for c in mnemonic if c.isalpha()]
-    if not alpha:
-        return None
-    if sum(1 for c in alpha if c.isupper()) / len(alpha) < 0.9:
+    # PyMuPDF splits tight letter groups into spans with artificial spaces
+    # ("CMOV cc"). Mnemonics contain no spaces, so drop them.
+    mnemonic = re.sub(r"\s+", "", mnemonic)
+    # A lowercase letter is valid only in a trailing run (CMOVcc, PREFETCHh).
+    # The check rejects mixed-case prose at title size (chapter blurbs).
+    if not re.fullmatch(r"[A-Z0-9/,_\s]+[a-z]*", mnemonic):
         return None
     return mnemonic, summary
+
+
+def _mnemonic_variants(mnemonic: str) -> list[str]:
+    """Expand a parsed title mnemonic into variant keys.
+
+    Comma-separated names are independent titles on one page
+    ("MOVDQU,VMOVDQU8/16/32/64"). A slash part that starts with a digit is
+    a bare suffix of the first part ("VMOVDQU8/16/32/64").
+    """
+    variants: list[str] = []
+    for name in mnemonic.split(","):
+        parts = [part.strip() for part in name.split("/")]
+        for idx, part in enumerate(parts):
+            if not part:
+                continue
+            if idx and part[0].isdigit():
+                part = re.sub(r"[0-9]+$", "", parts[0]) + part
+            variants.append(part.upper())
+    return variants
 
 
 def parse_intel_sdm(
@@ -565,10 +595,8 @@ def parse_intel_sdm(
             page_start=page_start + 1,
             page_end=page_end,
         )
-        for part in mnemonic.split("/"):
-            part = part.strip()
-            if part:
-                result[part.upper()] = payload
+        for part in _mnemonic_variants(mnemonic):
+            result[part] = payload
         if interactive_progress and extract_task is not None:
             progress.advance(extract_task)
         elif status is not None and ((idx + 1) % 50 == 0 or idx + 1 == len(title_pages)):
