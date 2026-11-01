@@ -246,3 +246,19 @@ def variant_perf_summary_labeled(
     renderers can show "(measured, SKL)" / "(modeled, neoverse-n1)" suffixes.
     """
     return best_latency_labeled(arch_details), best_cpi_labeled(arch_details)
+
+
+def perf_row_values(details: dict[str, Any]) -> tuple[str, str]:
+    """Return the displayed ``(LAT, CPI)`` for one ``arch_details`` entry.
+
+    This function is the only place that picks the displayed values of a
+    perf row.
+
+    - LAT is the minimum latency over the operand pairs of the row.
+    - CPI is the rule the CLI uses today: ``TP_loop`` when present, else
+      ``TP``, else ``"-"``. ``TP_unrolled`` and ``TP_ports`` are not picked.
+    """
+    lat = best_numeric(latency_cycle_values(details.get("latencies") or []))
+    measurement = details.get("measurement") or {}
+    cpi = measurement.get("TP_loop") or measurement.get("TP") or "-"
+    return lat, cpi

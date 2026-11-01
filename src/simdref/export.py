@@ -41,18 +41,13 @@ from simdref.display import (
     isa_to_sub_isa,
     strip_instruction_decorators,
 )
-from simdref.perf import best_numeric, latency_cycle_values, variant_perf_summary
+from simdref.perf import perf_row_values, variant_perf_summary
 from simdref.pdfrefs import normalize_pdf_refs
 from simdref.storage import derive_arm_arch
 
 # Bumped whenever a JSON output's shape changes in a way the web repo's
 # loader must reject rather than silently misread.
 SCHEMA_VERSION = 1
-
-
-def _latency_value(latencies: list[dict]) -> str:
-    """Best latency value from a list of latency dicts."""
-    return best_numeric(latency_cycle_values(latencies))
 
 
 def _web_measurements(item) -> list[dict]:
@@ -62,12 +57,13 @@ def _web_measurements(item) -> list[dict]:
         measurement = details.get("measurement") or {}
         if not measurement:
             continue
+        lat, cpi = perf_row_values(details)
         rows.append(
             {
                 "uarch": uarch,
                 "ports": measurement.get("ports", "-"),
-                "latency": _latency_value(details.get("latencies") or []),
-                "tpLoop": measurement.get("TP_loop") or measurement.get("TP") or "-",
+                "latency": lat,
+                "tpLoop": cpi,
                 "tpUnrolled": measurement.get("TP_unrolled", "-"),
                 "tpPorts": measurement.get("TP_ports", "-"),
                 "uops": measurement.get("uops", "-"),

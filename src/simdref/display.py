@@ -19,6 +19,7 @@ from rich.table import Table
 
 from simdref.perf import (
     latency_cycle_values,
+    perf_row_values,
     variant_perf_summary,
     variant_perf_summary_labeled,
 )
@@ -633,9 +634,12 @@ def measurement_rows(item) -> list[dict]:
         measurement = details.get("measurement") or {}
         if measurement:
             row = {"uarch": arch, **measurement}
-            values = latency_cycle_values(details.get("latencies") or [])
-            if values:
-                row["latency"] = values[0]
+            lat, cpi = perf_row_values(details)
+            if lat != "-":
+                row["latency"] = lat
+            if cpi != "-" and "TP_loop" not in row:
+                # Fall back to TP so the CPI column shows it.
+                row["TP_loop"] = cpi
             row["source"] = details.get("source_kind") or "measured"
             rows.append(row)
     return rows

@@ -22,9 +22,10 @@ UI_LABELS: Final[dict[str, str]] = {
     "kind_instruction": "Instructions",
     # Microarch aggregation
     "aggregation": "Aggregation",
-    # Perf source labels — "Modeled (Intel)" instead of bare "modeled"
+    # Perf source labels. Modeled data is ARM/RISC-V (llvm-mca); every x86
+    # row is measured.
     "source_measured": "Measured",
-    "source_modeled": "Modeled (Intel)",
+    "source_modeled": "Modeled (ARM/RISC-V)",
     # Toolbar labels
     "arch": "Arch",
     "isa": "ISA",
