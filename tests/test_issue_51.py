@@ -38,6 +38,15 @@ def _rows() -> list[InstructionRecord]:
             mnemonic="LSL", form="LSL (R16, R16)", summary="Load Segment Limit.", architecture="x86"
         ),
         InstructionRecord(
+            mnemonic="JMP", form="JMP (Rel32)", summary="Jump.", architecture="x86"
+        ),
+        InstructionRecord(
+            mnemonic="ADD", form="ADD (R64, R64)", summary="Add 64-bit operands.", architecture="x86"
+        ),
+        InstructionRecord(
+            mnemonic="ADD", form="ADD (X0, X0, X0)", summary="Arm add.", architecture="arm"
+        ),
+        InstructionRecord(
             mnemonic="RET",
             form="RET_NEAR",
             summary="Return From Procedure.",
@@ -186,3 +195,17 @@ def test_detect_isa_reads_the_input_signals():
     assert detect_isa(["add a0, a1, a2"]) == "riscv"
     assert detect_isa(["drv:     file format elf64-x86-64"]) == "x86"
     assert detect_isa(["addq %rax, %rbx"]) is None
+
+
+def test_symbol_annotations_do_not_vote_the_isa(tmp_path, monkeypatch):
+    # Review finding 1 repro: an objdump <symbol> annotation named like a
+    # register must not vote. The two x86 lines take x86 rows, not Arm rows.
+    from simdref.annotate import detect_isa
+
+    assert detect_isa(["jmp 50 <x0+0x50>"]) is None
+    _no_identity(monkeypatch)
+    records = _run_json(tmp_path, "jmp 50 <x0+0x50>\naddq %rax, %rbx\n")
+    assert records[0]["known"] is True
+    assert records[0]["summary"] == "Jump."
+    assert records[1]["known"] is True
+    assert records[1]["summary"] == "Add 64-bit operands."

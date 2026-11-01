@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any, Iterable, Iterator
 
 from simdref import perf
-from simdref.lsp import NO_CATALOG_ROW, identity_keys
+from simdref.lsp import NO_CATALOG_ROW, _CATALOG_ISA, _document_arch, identity_keys
 from simdref.models import InstructionRecord
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
 
@@ -244,6 +244,8 @@ _A64_BCOND_RE = re.compile(
 _A64_SHARED_RE = re.compile(r"(?<![%\w])(?:x(?:[0-9]|[12][0-9]|30)|sp)(?![\w])")
 # RISC-V register names: the ABI names and x31 (AArch64 stops at x30).
 _RISCV_ISA_RE = re.compile(r"(?<![%\w])(?:zero|ra|gp|tp|fp|t[0-6]|a[0-7]|x31)(?![\w])")
+# objdump symbol annotation ("jmp 50 <x0+0x50>"): a target label, never input.
+_SYMBOL_ANNOTATION_RE = re.compile(r"<[^>]*>")
 
 
 def detect_isa(lines: Iterable[str]) -> str | None:
@@ -267,13 +269,30 @@ def detect_isa(lines: Iterable[str]) -> str | None:
         parsed = parse_asm_line(line)
         if parsed.kind != LineKind.INSTRUCTION:
             continue
-        text = f"{parsed.mnemonic} {parsed.operands}"
+        # Strip objdump symbol annotations: "<x0+0x50>" names a target, not
+        # a register (review finding 1).
+        text = _SYMBOL_ANNOTATION_RE.sub(" ", f"{parsed.mnemonic} {parsed.operands}")
         excl_arm += len(_A64_EXCL_RE.findall(text)) + len(_A64_BCOND_RE.findall(text))
         excl_riscv += len(_RISCV_ISA_RE.findall(text))
         shared += len(_A64_SHARED_RE.findall(text))
     if excl_arm or excl_riscv:
         return "arm" if excl_arm >= excl_riscv else "riscv"
     return "arm" if shared else None
+
+
+def _line_isa(text: str) -> str | None:
+    """Name the family one instruction line's own evidence shows.
+
+    detect_isa's register and ``b.<cond>`` votes come first, then the
+    strong operand votes ``_document_arch`` feeds byte identity. Returns
+    None for a neutral line: its family is the stream's.
+    """
+    text = _SYMBOL_ANNOTATION_RE.sub(" ", text)
+    vote = detect_isa([text])
+    if vote:
+        return vote
+    picked = _document_arch((text,), False, False)
+    return _CATALOG_ISA.get(picked[0]) if picked else None
 
 
 def lookup(
@@ -874,11 +893,17 @@ def _annotate_instruction(
     parsed: AsmLine,
     opts: AnnotateOptions,
     conn: sqlite3.Connection,
-    lookup_cache: dict[str, list[InstructionRecord]] | None = None,
+    lookup_cache: dict[tuple[str, str | None], list[InstructionRecord]] | None = None,
     stats: dict[str, int] | None = None,
     identity_key: str | None = None,
+    line_isa: str | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
-    """Return the rendered output line and an optional JSON record."""
+    """Return the rendered output line and an optional JSON record.
+
+    ``line_isa`` names the family the line's own evidence shows (a pinned
+    ``--isa`` counts as one). None marks a neutral line in auto mode: the
+    stream family answers first, then the family that holds rows.
+    """
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
     if identity_key == NO_CATALOG_ROW:
@@ -906,18 +931,27 @@ def _annotate_instruction(
         if stats is not None:
             stats["recognized"] = stats.get("recognized", 0) + 1
     else:
+        isa = line_isa or opts.isa
+        pick_isa = isa
         if lookup_cache is not None:
-            records = lookup_cache.get(parsed.mnemonic)
+            records = lookup_cache.get((parsed.mnemonic, isa))
             if records is None:
                 # Module-level call (not a captured reference) so tests can
                 # keep monkeypatching ``annotate.lookup`` with a fake.
-                records = lookup(parsed.mnemonic, conn, isa=opts.isa)
-                lookup_cache[parsed.mnemonic] = records
+                records = lookup(parsed.mnemonic, conn, isa=isa)
+                lookup_cache[(parsed.mnemonic, isa)] = records
         else:
-            records = lookup(parsed.mnemonic, conn, isa=opts.isa)
+            records = lookup(parsed.mnemonic, conn, isa=isa)
+        if not records and line_isa is None:
+            # A neutral line whose stream family holds no rows gets the rows
+            # of the family that has them (issue #57 batch: jnle, bare b).
+            pick_isa = None
+            records = lookup(parsed.mnemonic, conn, isa=None)
+            if lookup_cache is not None:
+                lookup_cache[(parsed.mnemonic, None)] = records
         if stats is not None and records:
             stats["recognized"] = stats.get("recognized", 0) + 1
-        record = pick_record(records, arch=opts.arch, operands=parsed.operands, isa=opts.isa)
+        record = pick_record(records, arch=opts.arch, operands=parsed.operands, isa=pick_isa)
 
     if record is None:
         if opts.unknown == "drop":
@@ -1015,7 +1049,7 @@ def annotate_stream(
     collecting_json = opts.fmt == "json"
     pending_src_file: str | None = None
     pending_src_line: int | None = None
-    lookup_cache: dict[str, list[InstructionRecord]] = {}
+    lookup_cache: dict[tuple[str, str | None], list[InstructionRecord]] = {}
     arch_out: list[str] = []
 
     parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
@@ -1040,7 +1074,8 @@ def annotate_stream(
         )
         if key
     }
-    if opts.isa not in ("x86", "arm", "riscv"):
+    auto_isa = opts.isa not in ("x86", "arm", "riscv")
+    if auto_isa:
         # auto: the input signals name the ISA, then the document arch from
         # _document_arch; x86 stays the guess when both stay silent.
         opts.isa = (
@@ -1080,7 +1115,14 @@ def annotate_stream(
                 yield parsed.raw + "\n"
             continue
         out_line, record = _annotate_instruction(
-            parsed, opts, conn, lookup_cache, stats, identity_key=identity.get(index)
+            parsed,
+            opts,
+            conn,
+            lookup_cache,
+            stats,
+            identity_key=identity.get(index),
+            # A pin forces one family; auto mode splits the batch per line.
+            line_isa=opts.isa if not auto_isa else _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
         )
         if collecting_json:
             if record is not None:

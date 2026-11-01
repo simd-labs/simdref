@@ -108,6 +108,56 @@ def test_arm_bcond_and_lsl_annotate_together(tmp_path, monkeypatch):
     assert records[1]["summary"] == "Lsl instruction."
 
 
+def test_mixed_batch_serves_each_line_its_own_family(tmp_path, monkeypatch):
+    # Review finding 3 repro (the issue #57 batch): the x86 lines keep x86
+    # rows and the b.* lines keep Arm rows. A --isa pin still forces one family.
+    rows = [
+        InstructionRecord(
+            mnemonic="VPCMPD",
+            form="VPCMPD (K, ZMM, ZMM, I8)",
+            summary="Compare Packed Integer Values Into Mask.",
+            architecture="x86",
+        ),
+        InstructionRecord(
+            mnemonic="JNLE", form="JNLE (Rel32)", summary="Jump If Not Less.", architecture="x86"
+        ),
+        InstructionRecord(
+            mnemonic="VPCOMPRESSD",
+            form="VPCOMPRESSD (M512, K, ZMM)",
+            summary="Store Sparse Packed Doubleword.",
+            architecture="x86",
+        ),
+        InstructionRecord(
+            mnemonic="b.eq", form="B.EQ", summary="Branch conditionally.", architecture="arm"
+        ),
+        InstructionRecord(
+            mnemonic="b.ne", form="B.NE", summary="Branch conditionally.", architecture="arm"
+        ),
+        InstructionRecord(mnemonic="B", form="B (#0)", summary="B instruction.", architecture="arm"),
+    ]
+    text = (
+        "vpcmpd k1, zmm0, zmm1, 1\n"
+        "jnle 20 <x>\n"
+        "vpcompressd ZMMWORD PTR [rsi+rcx*4]{k1}, zmm0\n"
+        "b.eq 0x118 <dotn+0x118>\n"
+        "b.ne 0x4c <dotn+0x4c>\n"
+        "b 0xd4 <dotn+0xd4>\n"
+    )
+    records = _annotate_json(tmp_path, text, rows, monkeypatch)
+    assert [(record["known"], record["summary"]) for record in records] == [
+        (True, "Compare Packed Integer Values Into Mask."),
+        (True, "Jump If Not Less."),
+        (True, "Store Sparse Packed Doubleword."),
+        (True, "Branch conditionally."),
+        (True, "Branch conditionally."),
+        (True, "B instruction."),
+    ]
+    forced_x86 = _annotate_json(tmp_path, text, rows, monkeypatch, isa="x86")
+    assert [record["known"] for record in forced_x86] == [True, True, True, False, False, False]
+    forced_arm = _annotate_json(tmp_path, text, rows, monkeypatch, isa="arm")
+    assert [record["known"] for record in forced_arm] == [False, False, False, True, True, True]
+
+
 def test_x86_prefix_lines_annotate_with_auto_detection(tmp_path, monkeypatch):
     rows = [
         InstructionRecord(
