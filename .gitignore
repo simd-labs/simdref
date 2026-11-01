@@ -7,6 +7,9 @@ vendor/*
 !vendor/riscv/
 vendor/riscv/*
 !vendor/riscv/docs_pages.json
+!vendor/intel_optref/
+vendor/intel_optref/*
+!vendor/intel_optref/rows.json
 data/derived/
 web/
 share/man/

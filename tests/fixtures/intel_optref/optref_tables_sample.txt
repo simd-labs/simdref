@@ -1,0 +1,47 @@
+               Table 7-16. Intel® SSE Single-Precision Floating-Point Instructions
+       Instruction                         Latency1                               Throughput
+                                                • 06_3C   • 06_2A                       • 06_3C   • 06_2A
+                                     • 06_3D                                  • 06_3D
+                           • 06_4E              • 06_45   • 06_2D   • 06_4E             • 06_45   • 06_2D
+         CPUID                       • 06_47                                  • 06_47
+                           • 06_5E              • 06_46   • (06_3   • 06_5E             • 06_46   • (06_3
+                                     • 06_56                                  • 06_56
+                                                • 06_3F     A/3E)                       • 06_3F     A/3E)
+ ADDPS xmm, xmm            4         3          3         3         0.5       1         1         1
+                  1
+ DIVPS xmm, xmm            11        <11        <13       10-14     3         4         6         14(6)
+ SQRTPS xmm, xmm2          13        13         13        14        3         7         7         14(7)
+ MOVMSKPS r64/r32,
+                           2         2          2         2         1         1         1         1
+ xmm
+ LFENCE3                             -          -              -        -          6         5         5           4
+Document #: 356477-051US                                                                              7-18
+
+                                    Table 7-17. General Purpose Instructions
+         Instruction                                Latency1                                Throughput
+                                                         • 06_3C                                   • 06_3C
+                                           • 06_3D                                      • 06_3D
+                                 • 06_4E                 • 06_45   • 06_3A   • 06_4E               • 06_45    • 06_3A
+              CPUID                        • 06_47                                      • 06_47
+                                 • 06_5E                 • 06_46   • 06_3E   • 06_5E               • 06_46    • 06_3E
+                                           • 06_56                                      • 06_56
+                                                         • 06_3F                                   • 06_3F
+ ADC/SBB reg, reg                    1          2              2        2        0.5         1          1           1
+ CLC                                                                0.25      0.33      0.33      0.33
+Document #: 356477-051US                                                                                          7-19
+
+ Table 6-19. Instructions Latency and Throughput Recent Microarchitectures for Intel Atom®
+                                        Processors
+ Instruction                                    Throughput               Latency                MSROM
+                                                    • 06_37H                 • 06_37H             • 06_37H
+                                                    • 4AH                    • 4AH                • 4AH
+                                           • 06_5CH          • 06_5CH                 • 06_5CH
+                                                    • 4CH                    • 4CH,               • 4CH
+                                           • 5FH             • 5FH                    • 5FH
+                                                    • 4DH                    • 4DH                • 4DH
+                                           • 7AH             • 7AH                    • 7AH
+                                                    • 5AH                    • 5AH                • 5AH
+                                                    • 5DH                    • 5DH                • 5DH
+ ADC/SBB r32, imm8                              1         2         2              2        N           N
+ BSWAP r32                                      1         1         1              1        N           N
+Document #: 356477-051US                                                                              6-44
