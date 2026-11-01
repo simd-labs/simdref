@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Verbatim excerpts from vendor/uops/instructions.xml (uops.info instructions.xml).
+     Only the microarch blocks used by tests/test_issue_57_cpi.py are kept.
+     VPCOMPRESSD (M512, K, ZMM): lines 612293-612296, 612347-612352.
+     VPCOMPRESSB (M512, K, ZMM): lines 611490-611493, 611524-611529.
+     RET_NEAR: lines 1249116-1249119, 1249148-1249154. -->
+<root>
+    <instruction asm="VPCOMPRESSD" category="COMPRESS" cpl="3" evex="1" extension="AVX512EVEX" iclass="VPCOMPRESSD" iform="VPCOMPRESSD_MEMu32_MASKmskw_ZMMu32_AVX512" isa-set="AVX512F_512" mask="1" opcode="8B" string="VPCOMPRESSD (M512, K, ZMM)" url="uops.info/html-instr/VPCOMPRESSD_M512_K_ZMM.html" summary="Store Sparse Packed Doubleword Integer Values Into Dense Memory/Register" url-ref="felixcloutier.com/x86/vpcompressd">
+      <operand idx="1" memory-prefix="zmmword ptr" name="MEM0" type="mem" w="1" width="512" xtype="u32"/>
+      <operand idx="2" name="REG0" opmask="1" r="1" type="reg" width="64" xtype="i1">K1,K2,K3,K4,K5,K6,K7</operand>
+      <operand idx="3" name="REG1" r="1" type="reg" width="512" xtype="u32">ZMM0,ZMM1,ZMM2,ZMM3,ZMM4,ZMM5,ZMM6,ZMM7,ZMM8,ZMM9,ZMM10,ZMM11,ZMM12,ZMM13,ZMM14,ZMM15,ZMM16,ZMM17,ZMM18,ZMM19,ZMM20,ZMM21,ZMM22,ZMM23,ZMM24,ZMM25,ZMM26,ZMM27,ZMM28,ZMM29,ZMM30,ZMM31</operand>
+      <architecture name="ZEN4">
+        <measurement TP_unrolled="72.50" TP_loop="72.50" uops="144" ports="1*FP01+1*FP12+2*FP23+18*FP45" TP_ports="9.00">
+          <latency start_op="1" target_op="1" cycles_addr="52" cycles_addr_is_upper_bound="1" cycles_addr_index="51" cycles_addr_index_is_upper_bound="1"/>
+          <latency start_op="3" target_op="1" cycles="40" cycles_is_upper_bound="1"/>
+        </measurement>
+      </architecture>
+    </instruction>
+    <instruction asm="VPCOMPRESSB" category="COMPRESS" cpl="3" evex="1" extension="AVX512EVEX" iclass="VPCOMPRESSB" iform="VPCOMPRESSB_MEMu8_MASKmskw_ZMMu8_AVX512" isa-set="AVX512_VBMI2_512" mask="1" opcode="63" string="VPCOMPRESSB (M512, K, ZMM)" url="uops.info/html-instr/VPCOMPRESSB_M512_K_ZMM.html" summary="Store Sparse Packed Byte/Word Integer Values Into DenseMemory/Register" url-ref="felixcloutier.com/x86/vpcompressb:vcompressw">
+      <operand idx="1" memory-prefix="zmmword ptr" name="MEM0" type="mem" w="1" width="512" xtype="u8"/>
+      <operand idx="2" name="REG0" opmask="1" r="1" type="reg" width="64" xtype="i1">K1,K2,K3,K4,K5,K6,K7</operand>
+      <operand idx="3" name="REG1" r="1" type="reg" width="512" xtype="u8">ZMM0,ZMM1,ZMM2,ZMM3,ZMM4,ZMM5,ZMM6,ZMM7,ZMM8,ZMM9,ZMM10,ZMM11,ZMM12,ZMM13,ZMM14,ZMM15,ZMM16,ZMM17,ZMM18,ZMM19,ZMM20,ZMM21,ZMM22,ZMM23,ZMM24,ZMM25,ZMM26,ZMM27,ZMM28,ZMM29,ZMM30,ZMM31</operand>
+      <architecture name="ZEN4">
+        <measurement TP_unrolled="167.50" TP_loop="168.47" uops="480" ports="1*FP01+1*FP12+2*FP23+66*FP45" TP_ports="33.00">
+          <latency start_op="1" target_op="1" cycles_addr="128" cycles_addr_is_upper_bound="1" cycles_addr_index="127" cycles_addr_index_is_upper_bound="1"/>
+          <latency start_op="3" target_op="1" cycles="110" cycles_is_upper_bound="1"/>
+        </measurement>
+      </architecture>
+    </instruction>
+    <instruction asm="RET" category="RET" cpl="3" eosz="3" extension="BASE" iclass="RET_NEAR" iform="RET_NEAR" isa-set="I86" opcode="C3" string="RET_NEAR" url="uops.info/html-instr/RET_NEAR.html" summary="Return From Procedure" url-ref="felixcloutier.com/x86/ret">
+      <operand idx="1" name="REG0" r="1" suppressed="1" type="reg" w="1" width="64">RSP</operand>
+      <operand idx="2" name="REG1" suppressed="1" type="reg" w="1" width="64">RIP</operand>
+      <operand base="RSP" idx="3" memory-prefix="qword ptr" name="MEM0" r="1" seg="SS" suppressed="1" type="mem" width="64" xtype="int"/>
+      <architecture name="HSW">
+        <IACA version="2.1" TP="1.00" latency="1" TP_no_interiteration="1.00" uops="1" ports="1*p5" TP_ports="1.00"/>
+        <IACA version="2.2" TP="7.00" fusion_occurred="1" TP_no_interiteration="1.00" uops="3" ports="1*p0156+1*p06+1*p23" TP_ports="0.50"/>
+        <IACA version="2.3" TP="6.67" fusion_occurred="1" uops="3" ports="1*p0156+1*p06+1*p23" TP_ports="0.50"/>
+        <IACA version="3.0" TP="0.49" fusion_occurred="1" uops="3" ports="1*p23" TP_ports="0.50"/>
+        <measurement TP_loop="28.91" TP_ports="3.00" TP_unrolled="33.35" ports="6*p06+6*p15+2*p23+2*p237+3*p4" uops="20" uops_MITE="4" uops_MS="6" uops_retire_slots="2"/>
+      </architecture>
+    </instruction>
+</root>

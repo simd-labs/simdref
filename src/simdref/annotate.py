@@ -574,6 +574,9 @@ def arch_perf_tag(arch: str, lat: float | None, cpi: float | None, kind: str) ->
 
 
 def _ports_for(details: dict[str, Any]) -> str | None:
+    # A harness-wide measurement loses its ports together with its CPI.
+    if perf._measurement_is_harness_contaminated(details):
+        return None
     measurement = details.get("measurement") or {}
     ports = measurement.get("ports") or measurement.get("TP_ports")
     if ports is None or ports == "-":
