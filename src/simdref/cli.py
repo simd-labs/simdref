@@ -1250,6 +1250,11 @@ def annotate(
     arch: str | None = typer.Option(
         None, "--arch", help="Pin annotations to a specific microarch (e.g. skylake-x, zen4)."
     ),
+    isa: str = typer.Option(
+        "auto",
+        "--isa",
+        help="Instruction set for the lookup: x86|arm|riscv|auto (detected from the input).",
+    ),
     agg: str = typer.Option(
         "avg",
         "--agg",
@@ -1293,6 +1298,9 @@ def annotate(
     if fmt not in {"sa", "md", "json"}:
         err_console.print(f"invalid --format value: {fmt}", style="red")
         raise typer.Exit(code=1)
+    if isa not in {"x86", "arm", "riscv", "auto"}:
+        err_console.print(f"invalid --isa value: {isa}", style="red")
+        raise typer.Exit(code=1)
 
     ensure_runtime()
 
@@ -1334,6 +1342,7 @@ def annotate(
         performance=performance,
         docs=docs,
         arch=arch,
+        isa=isa,
         agg=agg,
         include_modeled=include_modeled,
         block=block,

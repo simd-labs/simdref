@@ -189,9 +189,70 @@ def _lookup_variants(mnemonic: str) -> list[str]:
     return out
 
 
-def lookup(mnemonic: str, conn: sqlite3.Connection) -> list[InstructionRecord]:
+def _isa_family(architecture: str | None) -> str | None:
+    """Map an ISA option or a record architecture to one catalog family."""
+    name = (architecture or "").lower()
+    if not name or name == "auto":
+        return None
+    if name.startswith(("arm", "aarch")):
+        return "arm"
+    if name.startswith("riscv"):
+        return "riscv"
+    return "x86"
+
+
+_FILE_FORMAT_RE = re.compile(r"\bfile format\s+(\S+)")
+# AArch64-only register spellings and branches: w0-w30, v0-v31, b.<cond>.
+_A64_EXCL_RE = re.compile(
+    r"(?<![%\w])(?:w(?:[0-9]|[12][0-9]|30)|v(?:[0-9]|[12][0-9]|3[01]))(?![\w])"
+)
+_A64_BCOND_RE = re.compile(
+    r"(?<![\w])b\.(?:eq|ne|lt|le|gt|ge|hs|lo|hi|ls|mi|pl|vs|vc|al|nv)(?![\w])"
+)
+# x0-x30 and sp name both AArch64 and RISC-V registers.
+_A64_SHARED_RE = re.compile(r"(?<![%\w])(?:x(?:[0-9]|[12][0-9]|30)|sp)(?![\w])")
+# RISC-V register names: the ABI names and x31 (AArch64 stops at x30).
+_RISCV_ISA_RE = re.compile(r"(?<![%\w])(?:zero|ra|gp|tp|fp|t[0-6]|a[0-7]|x31)(?![\w])")
+
+
+def detect_isa(lines: Iterable[str]) -> str | None:
+    """Name the ISA the input speaks: ``"x86"``, ``"arm"`` or ``"riscv"``.
+
+    An objdump ``file format`` line names the ISA outright. Otherwise the
+    AArch64 register names x0-x30, w0-w30, v0-v31, sp, the ``b.<cond>``
+    branches and the RISC-V register names vote. Returns None when the
+    input carries no ISA signal.
+    shortcut: a RISC-V listing that uses only xN names and sp votes arm,
+    upgrade when a form pick on rv64 rows needs those listings split
+    """
+    excl_arm = excl_riscv = shared = 0
+    for line in lines:
+        fmt = _FILE_FORMAT_RE.search(line)
+        if fmt:
+            name = fmt.group(1).lower()
+            if "riscv" in name:
+                return "riscv"
+            return "arm" if "aarch64" in name or "arm" in name else "x86"
+        parsed = parse_asm_line(line)
+        if parsed.kind != LineKind.INSTRUCTION:
+            continue
+        text = f"{parsed.mnemonic} {parsed.operands}"
+        excl_arm += len(_A64_EXCL_RE.findall(text)) + len(_A64_BCOND_RE.findall(text))
+        excl_riscv += len(_RISCV_ISA_RE.findall(text))
+        shared += len(_A64_SHARED_RE.findall(text))
+    if excl_arm or excl_riscv:
+        return "arm" if excl_arm >= excl_riscv else "riscv"
+    return "arm" if shared else None
+
+
+def lookup(
+    mnemonic: str, conn: sqlite3.Connection, isa: str | None = None
+) -> list[InstructionRecord]:
+    keep = _isa_family(isa)
     for cand in _lookup_variants(mnemonic):
         records = load_instructions_by_mnemonic_from_db(conn, cand)
+        if keep is not None:
+            records = [r for r in records if _isa_family(r.architecture) == keep]
         if records:
             return records
     return []
@@ -466,12 +527,18 @@ def pick_record(
     *,
     arch: str | None = None,
     operands: str = "",
+    isa: str | None = None,
 ) -> InstructionRecord | None:
     if not records:
         return None
     candidates = records
+    keep = _isa_family(isa)
+    if keep is not None:
+        candidates = [r for r in records if _isa_family(r.architecture) == keep]
+        if not candidates:
+            return None
     if arch is not None:
-        pinned = [r for r in records if arch in (r.arch_details or {})]
+        pinned = [r for r in candidates if arch in (r.arch_details or {})]
         if pinned:
             candidates = pinned
 
@@ -724,6 +791,7 @@ class AnnotateOptions:
     performance: bool = True
     docs: bool = True
     arch: str | None = None
+    isa: str = "auto"  # "x86" | "arm" | "riscv" | "auto"
     agg: str = "avg"
     include_modeled: bool = False
     block: bool = False  # otherwise inline
@@ -772,14 +840,14 @@ def _annotate_instruction(
             records = lookup_cache.get(parsed.mnemonic)
             if records is None:
                 # Module-level call (not a captured reference) so tests can
-                # keep monkeypatching ``annotate.lookup`` with a 2-arg fake.
-                records = lookup(parsed.mnemonic, conn)
+                # keep monkeypatching ``annotate.lookup`` with a fake.
+                records = lookup(parsed.mnemonic, conn, isa=opts.isa)
                 lookup_cache[parsed.mnemonic] = records
         else:
-            records = lookup(parsed.mnemonic, conn)
+            records = lookup(parsed.mnemonic, conn, isa=opts.isa)
         if stats is not None and records:
             stats["recognized"] = stats.get("recognized", 0) + 1
-        record = pick_record(records, arch=opts.arch, operands=parsed.operands)
+        record = pick_record(records, arch=opts.arch, operands=parsed.operands, isa=opts.isa)
 
     if record is None:
         if opts.unknown == "drop":
@@ -868,6 +936,7 @@ def annotate_stream(
     pending_src_file: str | None = None
     pending_src_line: int | None = None
     lookup_cache: dict[str, list[InstructionRecord]] = {}
+    arch_out: list[str] = []
 
     parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
     # One llvm-mc run for the whole input: byte identity per instruction
@@ -886,10 +955,19 @@ def annotate_stream(
     identity = {
         index: key
         for (index, _text), key in zip(
-            items, identity_keys([text for _index, text in items], None, conn)
+            items,
+            identity_keys([text for _index, text in items], None, conn, arch_out=arch_out),
         )
         if key
     }
+    if opts.isa not in ("x86", "arm", "riscv"):
+        # auto: the input signals name the ISA, then the document arch from
+        # _document_arch; x86 stays the guess when both stay silent.
+        opts.isa = (
+            detect_isa(parsed.raw for parsed in parsed_lines)
+            or (arch_out[0] if arch_out else None)
+            or "x86"
+        )
 
     for index, parsed in enumerate(parsed_lines):
         if opts.track_positions:
