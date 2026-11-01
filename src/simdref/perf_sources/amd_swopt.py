@@ -27,8 +27,8 @@ Download URLs (put the xlsx files in one raw directory, then run
 The vendored JSON keeps the vendor's latency and throughput text
 verbatim (ranges such as "3-5" stay strings). The Throughput column is
 operations per cycle, not cycles per instruction, so it is stored under
-``amd_ops_per_cycle`` in ``extra_measurement`` and never fills
-``PerfRow.cpi``.
+``amd_ops_per_cycle`` in ``extra_measurement``; ``PerfRow.cpi`` holds
+1 / ops-per-cycle when that value parses as a number.
 """
 
 from __future__ import annotations
@@ -199,6 +199,22 @@ def _clean(text: str) -> str:
     return "" if text.casefold() == "na" else text
 
 
+def _cpi(throughput: str) -> str:
+    """Invert the ops-per-cycle value to cycles per instruction.
+
+    Ranges ("0.25-0.5"), "variable" and "?" give an empty string; the raw
+    text stays in ``amd_ops_per_cycle``.
+    """
+    try:
+        ops = float(throughput)
+    except ValueError:
+        return ""
+    if ops <= 0:
+        return ""
+    cpi = 1 / ops
+    return f"{cpi:.3f}".rstrip("0").rstrip(".")
+
+
 def parse_workbook(
     path: Path | str,
     *,
@@ -261,6 +277,7 @@ def parse_workbook(
                 architecture="x86",
                 form=form,
                 latency=latency,
+                cpi=_cpi(throughput),
                 citation_url=citation_url,
                 extra_measurement=measurement,
             )
@@ -323,6 +340,7 @@ def load_vendored(path: Path | str | None = None) -> list[PerfRow]:
                     architecture=data.get("architecture", "x86"),
                     form=raw.get("form", ""),
                     latency=raw.get("latency", ""),
+                    cpi=_cpi(raw.get(THROUGHPUT_KEY, "")),
                     citation_url=data["citation_url"],
                     extra_measurement=measurement,
                 )

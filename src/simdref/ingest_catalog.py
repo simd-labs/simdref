@@ -1366,19 +1366,47 @@ def link_records(intrinsics: list[IntrinsicRecord], instructions: list[Instructi
         intrinsic.instruction_refs = resolved_refs
 
 
+def _attach_intel_guide_notes(intrinsics: Any) -> None:
+    """Copy the round and SAE guide note text onto intrinsics that cite it.
+
+    ``notes.json`` lives in ``vendor/intel_guide/``; intrinsics reference a
+    note as ``[note_name]`` in their description text.
+    """
+    from simdref.perf_sources.intel_guide import default_vendor_dir
+
+    notes_file = default_vendor_dir() / "notes.json"
+    if not notes_file.is_file():
+        return
+    notes = json.loads(notes_file.read_text(encoding="utf-8"))
+    wanted = [name for name in notes if name == "sae_note" or name.startswith("round")]
+    for intrinsic in intrinsics:
+        for name in wanted:
+            text = notes[name]
+            if f"[{name}]" in intrinsic.description and text not in intrinsic.notes:
+                intrinsic.notes.append(text)
+
+
 def _ingest_perf_sources(
     instructions: list[InstructionRecord],
     *,
     status: Callable[[str], None],
 ) -> list[SourceVersion]:
-    """Run the llvm scheduling pipeline and merge rows into *instructions*.
+    """Run the perf-source pipelines and merge rows into *instructions*.
 
-    Any ingester failure propagates so silent breakage (missing LLVM
-    binary, empty exegesis output, scheduler-model mismatch) surfaces at
-    build time instead of producing a silently empty catalog.
+    Each vendored source loads through its module's ``load_vendored()`` and
+    feeds ``merge_perf_rows``, so ``SOURCE_PRIORITY`` in merge.py decides
+    which source wins per core. Any ingester failure propagates so silent
+    breakage (missing LLVM binary, empty exegesis output, scheduler-model
+    mismatch) surfaces at build time instead of producing a silently empty
+    catalog.
     """
     from simdref.perf_sources import (
+        amd_swopt,
+        arm_swopt,
         ingest_llvm_mca,
+        instlatx64,
+        intel_guide,
+        intel_optref,
         merge_perf_rows,
     )
 
@@ -1395,6 +1423,31 @@ def _ingest_perf_sources(
                 version=llvm_version or "unknown",
                 fetched_at=now_iso(),
                 url="https://llvm.org/docs/CommandGuide/llvm-mca.html",
+            )
+        )
+
+    # Rows carry the arch_details mapping already: latency lands in
+    # ``latencies``, cpi in ``measurement`` (TP_loop/TP) and every
+    # module-specific extra key (amd_ops_per_cycle, cpuid, pipelines,
+    # throughput_ipc, instruction_group, notes) in ``measurement``.
+    for source, load in (
+        ("instlatx64", instlatx64.load_vendored),
+        ("intel-guide", intel_guide.load_vendored),
+        ("intel-optref", intel_optref.load_vendored),
+        ("amd-swopt", amd_swopt.load_vendored),
+        ("arm-swopt", arm_swopt.load_vendored),
+    ):
+        rows = load()
+        if not rows:
+            continue
+        merge_perf_rows(instructions, rows)
+        status(f"Merged {len(rows)} {source} perf rows")
+        versions.append(
+            SourceVersion(
+                source=source,
+                version=", ".join(dict.fromkeys(row.source_version for row in rows)),
+                fetched_at=now_iso(),
+                url=next(iter(dict.fromkeys(row.citation_url for row in rows)), ""),
             )
         )
 
@@ -1439,6 +1492,7 @@ def build_catalog(
     emit("Linking intrinsics to instructions")
     link_records(intrinsics, instructions)
     emit("Linked intrinsics and instructions")
+    _attach_intel_guide_notes(intrinsics)
 
     perf_sources_version = list(_ingest_perf_sources(instructions, status=emit))
 
