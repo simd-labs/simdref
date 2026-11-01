@@ -250,6 +250,14 @@ def _hover_markdown(
             meta.append(f"ISA {', '.join(intrinsic.isa)}")
         if intrinsic.category:
             meta.append(f"category {intrinsic.category}")
+        if intrinsic.metadata.get("tail_policy") or intrinsic.metadata.get("mask_policy"):
+            meta.append(
+                " ".join(
+                    f"{key} {intrinsic.metadata[key]}"
+                    for key in ("tail_policy", "mask_policy")
+                    if intrinsic.metadata.get(key)
+                )
+            )
         if intrinsic.url:
             meta.append(f"[source]({intrinsic.url})")
         if meta:

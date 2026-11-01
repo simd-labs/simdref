@@ -869,6 +869,7 @@ def print_operand_block(item) -> None:
     table.add_column("width", width=6)
     table.add_column("xtype", width=8)
     table.add_column("name", width=10)
+    table.add_column("flags")
     for operand in item.operand_details:
         rw = "".join(flag for flag in ("r", "w") if operand.get(flag) == "1")
         table.add_row(
@@ -878,6 +879,7 @@ def print_operand_block(item) -> None:
             operand.get("width", "-"),
             operand.get("xtype", "-"),
             operand.get("name", "-"),
+            operand_flags_text(operand) or "-",
         )
     console.print(Panel(table, title="operands", border_style="blue"))
 
@@ -958,6 +960,25 @@ def print_instruction_metadata(item) -> None:
     console.print(Panel(table, title="instruction metadata", border_style="magenta"))
 
 
+def operand_flags_text(operand: dict[str, str]) -> str:
+    """uops.info flag reads/writes and the suppressed mark for one operand."""
+    parts = [
+        f"{key[5:]} {value}"
+        for key, value in sorted(operand.items())
+        if key.startswith("flag_") and value
+    ]
+    if operand.get("suppressed") == "1":
+        parts.append("suppressed")
+    return "; ".join(parts)
+
+
+def category_display_text(item) -> str:
+    """Intel category with the subcategory in front, for the metadata panel."""
+    if item.subcategory:
+        return f"{item.subcategory} / {item.category}" if item.category else item.subcategory
+    return item.category or "-"
+
+
 def instruction_metadata_rows(item) -> list[tuple[str, str]]:
     rows: list[tuple[str, str]] = [("summary", item.summary or "-")]
     url = item.metadata.get("url", "")
@@ -979,6 +1000,9 @@ def instruction_metadata_rows(item) -> list[tuple[str, str]]:
         rows.append(("category", item.metadata["category"]))
     if item.metadata.get("cpl"):
         rows.append(("cpl", item.metadata["cpl"]))
+    for key in ("masking", "policy", "tail_policy", "mask_policy"):
+        if item.metadata.get(key):
+            rows.append((key, item.metadata[key]))
     return rows
 
 
@@ -1072,13 +1096,17 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
         table.add_row("source", item.url)
     table.add_row("architecture", display_architecture(item.architecture))
     table.add_row("isa", ", ".join(item.isa) or "-")
-    table.add_row("category", item.category or "-")
+    table.add_row("category", category_display_text(item))
     for key in (
         "reference_url",
         "argument_preparation",
         "result",
         "supported_architectures",
         "classification_path",
+        "masking",
+        "policy",
+        "tail_policy",
+        "mask_policy",
     ):
         if item.metadata.get(key):
             table.add_row(key, item.metadata[key])

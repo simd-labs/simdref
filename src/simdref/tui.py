@@ -118,10 +118,12 @@ from simdref.display import (
     FAMILY_SUB_ORDER,
     ISA_FAMILY_ORDER,
     canonical_url,
+    category_display_text,
     display_isa,
     display_instruction_form,
     display_uarch,
     isa_family,
+    operand_flags_text,
     perf_panel_border,
     perf_panel_title,
     split_perf_rows,
@@ -1764,14 +1766,10 @@ class SimdrefApp(App):
         meta.add_row("signature", intrinsic.signature or "-")
         meta.add_row("header", intrinsic.header or "-")
         meta.add_row("isa", ", ".join(intrinsic.isa) or "-")
-        category_display = intrinsic.category or "-"
-        if intrinsic.subcategory:
-            category_display = (
-                f"{intrinsic.subcategory} / {intrinsic.category}"
-                if intrinsic.category
-                else intrinsic.subcategory
-            )
-        meta.add_row("category", category_display)
+        meta.add_row("category", category_display_text(intrinsic))
+        for key in ("masking", "policy", "tail_policy", "mask_policy"):
+            if intrinsic.metadata.get(key):
+                meta.add_row(key, intrinsic.metadata[key])
         if intrinsic.description:
             meta.add_row("description", intrinsic.description)
         if intrinsic.notes:
@@ -1834,6 +1832,7 @@ class SimdrefApp(App):
         table.add_column("width", width=6)
         table.add_column("xtype", width=8)
         table.add_column("name", width=10)
+        table.add_column("flags")
         for operand in item.operand_details:
             rw = "".join(flag for flag in ("r", "w") if operand.get(flag) == "1")
             table.add_row(
@@ -1843,6 +1842,7 @@ class SimdrefApp(App):
                 operand.get("width", "-"),
                 operand.get("xtype", "-"),
                 operand.get("name", "-"),
+                operand_flags_text(operand) or "-",
             )
         payload.append(("static", Panel(table, title="operands", border_style="blue")))
 

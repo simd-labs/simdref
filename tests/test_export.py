@@ -191,6 +191,8 @@ def _decode_intrinsics(payload: dict) -> list[dict]:
             entry["arm_arch"] = payload["arm"][c["arm"][i]]
         if c["cat"][i] >= 0:
             entry["category"] = payload["cat"][c["cat"][i]]
+        if c["sub"][i] >= 0:
+            entry["subcategory"] = payload["sub"][c["sub"][i]]
         out.append(entry)
     return out
 

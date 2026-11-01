@@ -1,0 +1,53 @@
+{
+  "rvv_intrinsic": {
+    "name": "__riscv_vadd_vv_i32m1_tu",
+    "signature": "vint32m1_t __riscv_vadd_vv_i32m1_tu(vint32m1_t maskedoff, vint32m1_t op1, vint32m1_t op2, size_t vl)",
+    "description": "Vector integer add intrinsic.",
+    "header": "riscv_vector.h",
+    "architecture": "riscv",
+    "isa": ["V"],
+    "metadata": {
+      "masking": "unmasked",
+      "policy": "undisturbed",
+      "tail_policy": "undisturbed",
+      "mask_policy": "agnostic"
+    }
+  },
+  "rvv_instruction": {
+    "mnemonic": "vadd.vv",
+    "form": "vadd.vv vd, vs2, vs1, vm",
+    "summary": "Vector integer add.",
+    "architecture": "riscv",
+    "isa": ["V"],
+    "metadata": {
+      "extension": "V",
+      "masking": "unmasked",
+      "policy": "agnostic",
+      "tail_policy": "agnostic",
+      "mask_policy": "agnostic"
+    }
+  },
+  "x86_intrinsic": {
+    "name": "_mm256_add_ps",
+    "signature": "__m256 _mm256_add_ps (__m256 a, __m256 b)",
+    "description": "Add packed single-precision floating-point values in a and b.",
+    "header": "immintrin.h",
+    "architecture": "x86",
+    "isa": ["AVX"],
+    "category": "Arithmetic",
+    "subcategory": "AVX"
+  },
+  "uops_instruction": {
+    "mnemonic": "ADC",
+    "form": "ADC r64, r64",
+    "summary": "Add with carry.",
+    "architecture": "x86",
+    "isa": ["X86"],
+    "operand_details": [
+      {"idx": "1", "r": "1", "w": "1", "type": "reg", "width": "64", "xtype": "int", "name": "REG0"},
+      {"idx": "2", "r": "1", "type": "reg", "width": "64", "xtype": "int", "name": "REG1"},
+      {"idx": "3", "r": "1", "type": "flags", "name": "REG2", "flag_CF": "r/w", "suppressed": "1"}
+    ]
+  },
+  "uops_xml": "<instructions date=\"test\"><instruction asm=\"ADCX\" category=\"MISC\" cpl=\"0\" isa-set=\"BMI2\" string=\"ADCX r64, r64, r64\" summary=\"Unsigned Integer Addition of Two Operands with Carry Flag\"><operand idx=\"1\" type=\"reg\" width=\"64\" name=\"REG0\" r=\"1\" w=\"1\"/><operand idx=\"2\" type=\"reg\" width=\"64\" name=\"REG1\" r=\"1\"/><operand idx=\"3\" type=\"reg\" width=\"64\" name=\"REG2\" r=\"1\"/><operand idx=\"4\" type=\"flags\" name=\"REG3\" r=\"1\" flag_CF=\"r/w\" suppressed=\"1\"/></instruction></instructions>"
+}

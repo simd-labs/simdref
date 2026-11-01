@@ -31,7 +31,7 @@ from simdref.riscv import parse_riscv_instruction_payload, parse_riscv_intrinsic
 _UOPS_METADATA_KEYS = frozenset(
     {"category", "cpl", "extension", "iclass", "iform", "url", "url-ref"}
 )
-_UOPS_OPERAND_KEYS = ("idx", "r", "w", "type", "width", "xtype", "name")
+_UOPS_OPERAND_KEYS = ("idx", "r", "w", "type", "width", "xtype", "name", "suppressed")
 _ARM_ACLE_INTRINSIC_BASE_URL = (
     "https://developer.arm.com/architectures/instruction-sets/intrinsics/"
 )
@@ -1028,7 +1028,8 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
                         else value.strip()
                     )
                     for key, value in child.attrib.items()
-                    if key in _UOPS_OPERAND_KEYS
+                    # flag_* names the reads/writes of CF, OF, SF, ... on flags operands.
+                    if key in _UOPS_OPERAND_KEYS or key.startswith("flag_")
                 }
                 if xtype:
                     operand_payload["xtype"] = _intern_small(xtype)

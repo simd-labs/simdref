@@ -49,6 +49,10 @@ from simdref.storage import derive_arm_arch
 # loader must reject rather than silently misread.
 SCHEMA_VERSION = 1
 
+# Keys of operand_details exported to the web detail view. flag_* keys are
+# kept on top of this set (uops.info flag reads/writes).
+_OPERAND_EXPORT_KEYS = {"idx", "r", "w", "type", "width", "xtype", "name", "suppressed"}
+
 
 def _web_measurements(item) -> list[dict]:
     """Per-microarchitecture measurement rows for the web UI."""
@@ -244,11 +248,13 @@ def _search_intrinsics(catalog: Catalog, instr_perf: dict[str, tuple[str, str]])
         )
         if arm_arch:
             entry["arm_arch"] = arm_arch
-        category = (
+        category = item.category or (
             (item.metadata or {}).get("category", "") if isinstance(item.metadata, dict) else ""
         )
         if category:
             entry["category"] = category
+        if item.subcategory:
+            entry["subcategory"] = item.subcategory
         out.append(entry)
     return out
 
@@ -350,7 +356,9 @@ def _columnar_instructions(entries: list[dict]) -> dict:
 
 def _columnar_intrinsics(entries: list[dict]) -> dict:
     """Column-encode ``_search_intrinsics`` rows; ``decodeIntrinsics`` in app.js inverts it exactly."""
-    tables = {k: _interner() for k in ("isa", "arch", "perf", "desc", "ins", "prim", "arm", "cat")}
+    tables = {
+        k: _interner() for k in ("isa", "arch", "perf", "desc", "ins", "prim", "arm", "cat", "sub")
+    }
     cols: dict[str, list] = {k: [] for k in ("name", *tables)}
     fields: dict[int, list] = {}
     summaries: dict[int, str] = {}
@@ -365,6 +373,7 @@ def _columnar_intrinsics(entries: list[dict]) -> dict:
             "prim": e.get("primary_instr"),
             "arm": e.get("arm_arch"),
             "cat": e.get("category"),
+            "sub": e.get("subcategory"),
         }
         cols["name"].append(e["name"])
         for k, (intern, _) in tables.items():
@@ -427,13 +436,9 @@ def _detail_chunks(catalog: Catalog) -> dict[str, dict]:
             "display_isa": display_isa(item.isa),
             "operand_details": [
                 {
-                    "idx": op.get("idx", ""),
-                    "r": op.get("r", ""),
-                    "w": op.get("w", ""),
-                    "type": op.get("type", ""),
-                    "width": op.get("width", ""),
-                    "xtype": op.get("xtype", ""),
-                    "name": op.get("name", ""),
+                    key: value
+                    for key, value in op.items()
+                    if key in _OPERAND_EXPORT_KEYS or key.startswith("flag_")
                 }
                 for op in item.operand_details
             ],
@@ -449,6 +454,10 @@ def _detail_chunks(catalog: Catalog) -> dict[str, dict]:
                     "intel-sdm-url",
                     "intel-sdm-page-start",
                     "intel-sdm-page-end",
+                    "masking",
+                    "policy",
+                    "tail_policy",
+                    "mask_policy",
                 }
             },
             "pdf_refs": normalize_pdf_refs(item.pdf_refs, item.metadata),
