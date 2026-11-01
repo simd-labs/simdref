@@ -64,6 +64,37 @@ _OBJDUMP_INSTR_RE = re.compile(
 # objdump -S injects "file:line" comment lines before the instruction block.
 _OBJDUMP_SRC_RE = re.compile(r"^\s*(?P<file>[^ \t/][^:]*):(?P<line>\d+)\s*$")
 
+# Legal x86 prefix tokens objdump prints as words before the mnemonic
+# ("data16 cs nopw ..."). The mnemonic is the first token after them.
+_X86_PREFIX_TOKENS = frozenset(
+    {
+        "data16",
+        "addr32",
+        "cs",
+        "ds",
+        "es",
+        "ss",
+        "fs",
+        "gs",
+        "lock",
+        "rep",
+        "repe",
+        "repne",
+        "notrack",
+        "bnd",
+    }
+)
+
+
+def _strip_prefix_tokens(head: str) -> str:
+    """Drop leading x86 prefix tokens; return the text from the mnemonic on."""
+    rest = head.lstrip()
+    while True:
+        parts = rest.split(None, 1)
+        if len(parts) != 2 or parts[0].lower() not in _X86_PREFIX_TOKENS:
+            return rest
+        rest = parts[1]
+
 
 def _parse_objdump_instr(line: str) -> tuple[int, str] | None:
     """Match an ``objdump -d`` instruction line: ``<hexaddr>: [bytes] mnemonic ...``.
@@ -114,7 +145,7 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
         if obj is not None:
             address, rest = obj
             head, comment = _split_comment(rest)
-            m = _INSTR_RE.match(head)
+            m = _INSTR_RE.match(_strip_prefix_tokens(head))
             if m:
                 return AsmLine(
                     kind=LineKind.INSTRUCTION,
@@ -141,7 +172,7 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
     if obj is not None:
         address, rest = obj
         head, comment = _split_comment(rest)
-        m = _INSTR_RE.match(head)
+        m = _INSTR_RE.match(_strip_prefix_tokens(head))
         if m:
             return AsmLine(
                 kind=LineKind.INSTRUCTION,
