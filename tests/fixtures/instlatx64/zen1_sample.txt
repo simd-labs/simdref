@@ -1,0 +1,8 @@
+Copyright (C) 1995-2017 FinalWire Ltd. All rights reserved.
+aida_bench64.dll build: 4.3.758.0 Jun  9 2017 12:45:17
+CPU#007 Vendor: AuthenticAMD Family: 8f Model: 01 Stepping: 1 CoreType:0x10800f11
+CPU#007 Type: "AMD Ryzen 5 1500X Quad-Core Processor          "
+Instruction Latency: Used CPUs:  1 ProcMask: 0x0000000000000080
+  27 AMD64           :MOV r64, [m64]                        L:   1.15ns=  4.0c  T:   0.14ns=  0.50c
+Inst 1798 AVX             : VADDPS ymm, ymm, ymm                      L:   0.67ns=   3.0c  T:   0.11ns=   0.50c
+   0 X86                 :NOP                                   L: [no true dep.]     T:   0.03ns=   0.124c
