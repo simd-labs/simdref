@@ -1,21 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Verbatim excerpts from vendor/uops/instructions.xml (uops.info instructions.xml).
      Only the microarch blocks used by tests/test_issue_57_cpi.py are kept.
-     VPCOMPRESSD (M512, K, ZMM): lines 612293-612296, 612347-612352.
+     VPCOMPRESSD (M512, K, ZMM): lines 612293-612296, 612347-612352 (ZEN4),
+     plus the verbatim ICL architecture block for the same row.
      VPCOMPRESSB (M512, K, ZMM): lines 611490-611493, 611524-611529.
      RET_NEAR: lines 1249116-1249119, 1249148-1249154.
-     The uops_MS attributes and the VADDPS row are added for the issue #57
-     "Expected" part: uops.info counts microcode-sequencer uops in uops_MS,
-     and annotate reports the microcoded flag from that key. -->
+     Every row carries the real attribute set: uops.info gives uops_MS on
+     Intel rows only, never on AMD rows, so the ZEN4 rows have no uops_MS.
+     The microcoded flag of an AMD row comes from its macro-op count. -->
 <root>
     <instruction asm="VPCOMPRESSD" category="COMPRESS" cpl="3" evex="1" extension="AVX512EVEX" iclass="VPCOMPRESSD" iform="VPCOMPRESSD_MEMu32_MASKmskw_ZMMu32_AVX512" isa-set="AVX512F_512" mask="1" opcode="8B" string="VPCOMPRESSD (M512, K, ZMM)" url="uops.info/html-instr/VPCOMPRESSD_M512_K_ZMM.html" summary="Store Sparse Packed Doubleword Integer Values Into Dense Memory/Register" url-ref="felixcloutier.com/x86/vpcompressd">
       <operand idx="1" memory-prefix="zmmword ptr" name="MEM0" type="mem" w="1" width="512" xtype="u32"/>
       <operand idx="2" name="REG0" opmask="1" r="1" type="reg" width="64" xtype="i1">K1,K2,K3,K4,K5,K6,K7</operand>
       <operand idx="3" name="REG1" r="1" type="reg" width="512" xtype="u32">ZMM0,ZMM1,ZMM2,ZMM3,ZMM4,ZMM5,ZMM6,ZMM7,ZMM8,ZMM9,ZMM10,ZMM11,ZMM12,ZMM13,ZMM14,ZMM15,ZMM16,ZMM17,ZMM18,ZMM19,ZMM20,ZMM21,ZMM22,ZMM23,ZMM24,ZMM25,ZMM26,ZMM27,ZMM28,ZMM29,ZMM30,ZMM31</operand>
       <architecture name="ZEN4">
-        <measurement TP_unrolled="72.50" TP_loop="72.50" uops="144" uops_MITE="0" uops_MS="144" ports="1*FP01+1*FP12+2*FP23+18*FP45" TP_ports="9.00">
+        <measurement TP_unrolled="72.50" TP_loop="72.50" uops="144" ports="1*FP01+1*FP12+2*FP23+18*FP45" TP_ports="9.00">
           <latency start_op="1" target_op="1" cycles_addr="52" cycles_addr_is_upper_bound="1" cycles_addr_index="51" cycles_addr_index_is_upper_bound="1"/>
           <latency start_op="3" target_op="1" cycles="40" cycles_is_upper_bound="1"/>
+        </measurement>
+      </architecture>
+      <architecture name="ICL">
+        <measurement uops_retire_slots="3" uops_MITE="3" uops_MS="0" complex_decoder="1" available_simple_decoders="2" TP_unrolled="2.00" TP_loop="2.00" uops="4" ports="1*p49+2*p5+1*p78" TP_ports="2.00">
+          <latency start_op="1" target_op="1" cycles_addr="11" cycles_addr_is_upper_bound="1" cycles_addr_index="11" cycles_addr_index_is_upper_bound="1"/>
+          <latency start_op="3" target_op="1" cycles="8" cycles_is_upper_bound="1"/>
         </measurement>
       </architecture>
     </instruction>
@@ -47,9 +54,15 @@
       <operand idx="2" name="REG1" r="1" type="reg" width="512" xtype="f32">ZMM0-ZMM31</operand>
       <operand idx="3" name="REG2" r="1" type="reg" width="512" xtype="f32">ZMM0-ZMM31</operand>
       <architecture name="SKX">
-        <measurement TP_unrolled="0.47" TP_loop="0.50" uops="1" uops_MITE="1" uops_MS="0" uops_retire_slots="1" ports="1*FP01" TP_ports="0.50">
+        <measurement uops_retire_slots="1" uops_MITE="1" uops_MS="0" TP_unrolled="0.50" TP_loop="0.50" uops="1" ports="1*p05" TP_ports="0.50">
           <latency start_op="2" target_op="1" cycles="4"/>
           <latency start_op="3" target_op="1" cycles="4"/>
+        </measurement>
+      </architecture>
+      <architecture name="ZEN4">
+        <measurement TP_unrolled="1.00" TP_loop="1.00" uops="1" ports="1*FP23" TP_ports="0.50">
+          <latency start_op="2" target_op="1" cycles="3"/>
+          <latency start_op="3" target_op="1" cycles="3"/>
         </measurement>
       </architecture>
     </instruction>

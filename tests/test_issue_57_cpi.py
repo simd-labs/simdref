@@ -67,13 +67,34 @@ def test_zen4_microcoded_form_keeps_cpi_when_tp_figures_differ(monkeypatch):
 
 def test_zen4_vpcompressd_reports_uops_and_microcoded(monkeypatch):
     # Issue #57 "Expected": keep the uop count of the ZEN4 row and mark the
-    # form microcoded. The fixture row carries uops=144 and uops_MS=144.
+    # form microcoded. The real row has no uops_MS: AMD cores count macro-
+    # ops only, and 144 macro-ops is far over the AMD microcode bound of
+    # two macro ops (AMD 57647).
     rec = _records()["VPCOMPRESSD (M512, K, ZMM)"]
     row = _annotate(monkeypatch, rec, "vpcompressd ZMMWORD PTR [rsi+rcx*4]{k1},zmm0", "ZEN4")
     assert row["uops"] == 144
     assert row["microcoded"] is True
     assert "uops=144" in row["annotation"]
     assert "microcoded" in row["annotation"]
+
+
+def test_icl_vpcompressd_keeps_uops_ms_rule(monkeypatch):
+    # The ICL row of the same form has uops=4 but uops_MS=0: Intel rows
+    # stay on the uops_MS rule, so the form is not microcoded on ICL.
+    rec = _records()["VPCOMPRESSD (M512, K, ZMM)"]
+    row = _annotate(monkeypatch, rec, "vpcompressd ZMMWORD PTR [rsi+rcx*4]{k1},zmm0", "ICL")
+    assert row["uops"] == 4
+    assert row["microcoded"] is False
+    assert "microcoded" not in row["annotation"]
+
+
+def test_zen4_vaddps_reports_not_microcoded(monkeypatch):
+    # A plain 1-macro-op ZEN4 form is fastpath single, not microcoded.
+    rec = _records()["VADDPS (ZMM, ZMM, ZMM)"]
+    row = _annotate(monkeypatch, rec, "vaddps %zmm1, %zmm0, %zmm2", "ZEN4")
+    assert row["uops"] == 1
+    assert row["microcoded"] is False
+    assert "microcoded" not in row["annotation"]
 
 
 def test_skx_vaddps_reports_uops_and_not_microcoded(monkeypatch):

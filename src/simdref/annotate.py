@@ -584,12 +584,16 @@ def _ports_for(details: dict[str, Any]) -> str | None:
     return str(ports)
 
 
-def _uops_for(details: dict[str, Any]) -> tuple[int | None, bool | None]:
+def _uops_for(details: dict[str, Any], arch: str) -> tuple[int | None, bool | None]:
     """Return ``(uops, microcoded)`` for one core's measurement.
 
-    uops.info counts microcode-sequencer uops in ``uops_MS``; a positive
-    value marks the form microcoded. Rows without the key omit the flag so
-    the output never guesses ``False``. A harness-contaminated row loses
+    Intel rows count microcode-sequencer uops in ``uops_MS``; a positive
+    value marks the form microcoded. AMD rows carry no ``uops_MS``; their
+    ``uops`` count is macro-ops, and AMD 57647 p.14 states "Instructions
+    are marked as fastpath single (one macro op), fastpath double (two
+    macro ops), or microcode (greater than two macro ops).", so over two
+    macro-ops marks the form microcoded. Rows without the data omit the
+    flag so the output never guesses. A harness-contaminated row loses
     both, the same as its ports.
     """
     if perf._measurement_is_harness_contaminated(details):
@@ -603,6 +607,9 @@ def _uops_for(details: dict[str, Any]) -> tuple[int | None, bool | None]:
 
     measurement = details.get("measurement") or {}
     uops = _int(measurement.get("uops"))
+    if arch.upper().startswith("ZEN"):
+        # AMD 57647 p.14: "Instructions are marked as fastpath single (one macro op), fastpath double (two macro ops), or microcode (greater than two macro ops)."
+        return uops, (None if uops is None else uops > 2)
     ms = _int(measurement.get("uops_MS"))
     return uops, (None if ms is None else ms > 0)
 
@@ -674,7 +681,7 @@ def format_annotation(
         if arch is not None:
             lat, cpi, kind = arch_perf(record, arch)
             tag = arch_perf_tag(arch, lat, cpi, kind)
-            uops_val, microcoded_val = _uops_for((record.arch_details or {}).get(arch) or {})
+            uops_val, microcoded_val = _uops_for((record.arch_details or {}).get(arch) or {}, arch)
             if uops_val is not None:
                 uops_frag = f" uops={uops_val}"
                 if microcoded_val:
@@ -815,7 +822,9 @@ def _annotate_instruction(
     if opts.arch is not None:
         # A single core is pinned, so its uop count is well defined. In the
         # aggregate case the count differs per core and both fields stay out.
-        uops_val, microcoded_val = _uops_for((record.arch_details or {}).get(opts.arch) or {})
+        uops_val, microcoded_val = _uops_for(
+            (record.arch_details or {}).get(opts.arch) or {}, opts.arch
+        )
         if uops_val is not None:
             json_record["uops"] = uops_val
         if microcoded_val is not None:
