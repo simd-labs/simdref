@@ -200,6 +200,56 @@ def merge_pdf_enrichment(
                         candidates.append(stem)
         return candidates
 
+    # SDM family keys (CMOVCC, JCC, SETCC, PREFETCHH) describe the whole
+    # condition-code family; a concrete record falls back to its family.
+    _CC_SUFFIXES = {
+        "O",
+        "NO",
+        "B",
+        "C",
+        "NAE",
+        "AE",
+        "NB",
+        "NC",
+        "E",
+        "Z",
+        "NE",
+        "NZ",
+        "BE",
+        "NA",
+        "A",
+        "NBE",
+        "S",
+        "NS",
+        "P",
+        "PE",
+        "NP",
+        "PO",
+        "L",
+        "NGE",
+        "GE",
+        "NL",
+        "LE",
+        "NG",
+        "G",
+        "NLE",
+    }
+
+    def _family_candidates(mnemonic: str) -> list[str]:
+        for family, stem in (("CMOVCC", "CMOV"), ("SETCC", "SET"), ("JCC", "J")):
+            if mnemonic.startswith(stem) and mnemonic[len(stem) :] in _CC_SUFFIXES:
+                return [family]
+        if mnemonic in {
+            "PREFETCHT0",
+            "PREFETCHT1",
+            "PREFETCHT2",
+            "PREFETCHNTA",
+            "PREFETCHW",
+            "PREFETCHWT1",
+        }:
+            return ["PREFETCHH"]
+        return []
+
     for record in instructions:
         # The Intel SDM holds x86 mnemonics only; arm reuses names like ADC.
         if source_id == "intel-sdm" and record.architecture != "x86":
@@ -208,6 +258,11 @@ def merge_pdf_enrichment(
         payload = result.descriptions.get(mnemonic)
         if payload is None:
             for candidate in _base_candidates(mnemonic):
+                payload = result.descriptions.get(candidate)
+                if payload is not None:
+                    break
+        if payload is None:
+            for candidate in _family_candidates(mnemonic):
                 payload = result.descriptions.get(candidate)
                 if payload is not None:
                     break
