@@ -46,6 +46,7 @@ from simdref.perf import (
     latency_pairs,
     perf_family_label,
     perf_row_values,
+    record_iclass,
     variant_perf_summary,
 )
 from simdref.pdfrefs import normalize_pdf_refs
@@ -207,7 +208,7 @@ def _isa_config() -> dict:
 def _instr_perf_map(catalog: Catalog) -> dict[str, tuple[str, str]]:
     perf: dict[str, tuple[str, str]] = {}
     for item in catalog.instructions:
-        lat, cpi = variant_perf_summary(item.arch_details)
+        lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
         perf[item.db_key] = (lat, cpi)
     return perf
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 from typing import TYPE_CHECKING
 
-from simdref.perf import variant_perf_summary
+from simdref.perf import record_iclass, variant_perf_summary
 from simdref.storage import load_instruction_from_db
 
 SOURCE_KINDS: tuple[str, ...] = ("measured", "modeled", "any")
@@ -173,7 +173,7 @@ def intrinsic_perf_summary(
     latencies: list[str] = []
     throughput: list[str] = []
     for item in linked:
-        lat, cpi = variant_perf_summary(item.arch_details)
+        lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
         if lat != "-":
             latencies.append(lat)
         if cpi != "-":
@@ -210,7 +210,9 @@ def intrinsic_perf_summary_runtime(
             linked.append(instruction)
     if not linked:
         return "-", "-"
-    perf_pairs = [variant_perf_summary(record.arch_details) for record in linked]
+    perf_pairs = [
+        variant_perf_summary(record.arch_details, record_iclass(record)) for record in linked
+    ]
     latencies = [float(lat) for lat, _ in perf_pairs if lat not in {"-", ""}]
     cpis = [float(cpi_value) for _, cpi_value in perf_pairs if cpi_value not in {"-", ""}]
     lat = str(min(latencies)).rstrip("0").rstrip(".") if latencies else "-"

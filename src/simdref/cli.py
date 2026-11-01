@@ -818,7 +818,7 @@ def _llm_result_payload(
         if item is not None:
             instruction_map[result.key] = item
     if item is not None:
-        lat, cpi = variant_perf_summary(item.arch_details)
+        lat, cpi = variant_perf_summary(item.arch_details, perf.record_iclass(item))
         return {
             "query": item.key,
             "intrinsic": item.linked_intrinsics,
@@ -827,7 +827,7 @@ def _llm_result_payload(
             "lat": lat,
             "cpi": cpi,
             "source_kinds": _payload_source_kinds(item.arch_details),
-            "timing": _llm_timing(item.arch_details),
+            "timing": _llm_timing(item.arch_details, perf.record_iclass(item)),
         }
     return {
         "query": result.title,
@@ -867,7 +867,9 @@ def _llm_intrinsic_payload(conn, intrinsic) -> dict:
 def _intrinsic_timing(conn, intrinsic, cache: dict[str, object] | None = None) -> dict[str, dict]:
     """Per-core timing for an intrinsic, merged over its linked instruction forms."""
     linked = linked_instruction_records(None, intrinsic, conn, cache=cache)
-    return _merge_timing([_llm_timing(record.arch_details) for record in linked])
+    return _merge_timing(
+        [_llm_timing(record.arch_details, perf.record_iclass(record)) for record in linked]
+    )
 
 
 def _intrinsic_operation_text(intrinsic) -> str:
@@ -882,7 +884,7 @@ def _intrinsic_operation_text(intrinsic) -> str:
 
 
 def _llm_instruction_payload(item) -> dict:
-    lat, cpi = variant_perf_summary(item.arch_details)
+    lat, cpi = variant_perf_summary(item.arch_details, perf.record_iclass(item))
     return {
         "query": item.key,
         "intrinsic": item.linked_intrinsics,
@@ -891,11 +893,11 @@ def _llm_instruction_payload(item) -> dict:
         "cpi": cpi,
         "summary": item.summary,
         "source_kinds": _payload_source_kinds(item.arch_details),
-        "timing": _llm_timing(item.arch_details),
+        "timing": _llm_timing(item.arch_details, perf.record_iclass(item)),
     }
 
 
-def _llm_timing(arch_details) -> dict[str, dict]:
+def _llm_timing(arch_details, iclass: str | None = None) -> dict[str, dict]:
     """Return ``{core: {lat, cpi, ports, uops, source_kind}}`` for one instruction.
 
     Latency and CPI are microarchitecture properties, so the payload keys
@@ -903,7 +905,8 @@ def _llm_timing(arch_details) -> dict[str, dict]:
     Cores with neither value are dropped. ``ports`` carries the upstream
     port-pressure string verbatim (e.g. ``1*p01``: one uop issuable on
     port 0 or port 1). No pipe count is derived from it: ``cpi`` already
-    measures issue throughput.
+    measures issue throughput. A call/ret loop harness row, named by
+    *iclass*, loses its cpi, uops and ports together.
     """
     from simdref.annotate import _cpi_for, _latency_for, _per_arch_value, _ports_for
 
@@ -915,10 +918,10 @@ def _llm_timing(arch_details) -> dict[str, dict]:
         if not isinstance(details, dict):
             continue
         lat = _per_arch_value(details, _latency_for)
-        cpi = _per_arch_value(details, _cpi_for)
+        cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
         if lat is None and cpi is None:
             continue
-        ports = _ports_for(details)
+        ports = _ports_for(details, iclass)
         entry: dict = {
             "lat": lat,
             "cpi": cpi,
@@ -927,7 +930,7 @@ def _llm_timing(arch_details) -> dict[str, dict]:
         if ports:
             entry["ports"] = ports
         uops = (details.get("measurement") or {}).get("uops")
-        if uops:
+        if uops and not perf._measurement_is_harness_contaminated(iclass):
             entry["uops"] = uops
         timing[core] = entry
     return timing
@@ -1001,7 +1004,7 @@ def _print_search_results_runtime(conn, query: str, limit: int = 20, as_json: bo
                     continue
                 arch = display_architecture(item.architecture)
                 isa = display_isa(item.isa)
-                lat, cpi = variant_perf_summary(item.arch_details)
+                lat, cpi = variant_perf_summary(item.arch_details, perf.record_iclass(item))
         elif result.kind == "intrinsic":
             item = intrinsic_map.get(result.key)
             if item is not None:
@@ -1250,6 +1253,11 @@ def annotate(
     arch: str | None = typer.Option(
         None, "--arch", help="Pin annotations to a specific microarch (e.g. skylake-x, zen4)."
     ),
+    isa: str = typer.Option(
+        "auto",
+        "--isa",
+        help="Instruction set for the lookup: x86|arm|riscv|auto (detected from the input).",
+    ),
     agg: str = typer.Option(
         "avg",
         "--agg",
@@ -1293,6 +1301,9 @@ def annotate(
     if fmt not in {"sa", "md", "json"}:
         err_console.print(f"invalid --format value: {fmt}", style="red")
         raise typer.Exit(code=1)
+    if isa not in {"x86", "arm", "riscv", "auto"}:
+        err_console.print(f"invalid --isa value: {isa}", style="red")
+        raise typer.Exit(code=1)
 
     ensure_runtime()
 
@@ -1334,6 +1345,7 @@ def annotate(
         performance=performance,
         docs=docs,
         arch=arch,
+        isa=isa,
         agg=agg,
         include_modeled=include_modeled,
         block=block,

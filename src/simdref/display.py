@@ -22,6 +22,7 @@ from simdref.perf import (
     latency_cycle_values,
     latency_pair_text,
     perf_row_values,
+    record_iclass,
     variant_perf_summary,
     variant_perf_summary_labeled,
 )
@@ -1253,7 +1254,7 @@ def render_instruction_variants(query: str, items, show_fp16: bool = False) -> N
     table.add_column("cpi", width=5)
     table.add_column("summary")
     for index, item in enumerate(items, start=1):
-        lat, cpi = variant_perf_summary_labeled(item.arch_details)
+        lat, cpi = variant_perf_summary_labeled(item.arch_details, record_iclass(item))
         table.add_row(
             str(index),
             instruction_query_text(item),

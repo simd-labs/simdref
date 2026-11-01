@@ -53,7 +53,7 @@ class _FakeConn:
 
 
 def _fake_lookup(mapping):
-    def _fake(mnemonic, conn):
+    def _fake(mnemonic, conn, isa=None):
         return mapping.get(mnemonic.lower(), [])
 
     return _fake

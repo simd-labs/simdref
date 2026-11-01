@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from simdref.display import instruction_markdown, web_deep_link
-from simdref.perf import best_cpi, best_latency
+from simdref.perf import best_cpi, best_latency, record_iclass
 from simdref.queries import linked_instruction_records
 from simdref.search import search_records
 from simdref.storage import (
@@ -1032,8 +1032,16 @@ def _mnemonic_has_rows(conn, text: str, semicolon_is_comment: bool) -> bool:
     )
 
 
+# llvm-mc arch names mapped to the catalog's architecture column values.
+_CATALOG_ISA = {"x86": "x86", "aarch64": "arm", "riscv64": "riscv"}
+
+
 def identity_keys(
-    texts: Sequence[str], intel: bool | None, conn: sqlite3.Connection
+    texts: Sequence[str],
+    intel: bool | None,
+    conn: sqlite3.Connection,
+    *,
+    arch_out: list[str] | None = None,
 ) -> list[str | None]:
     """Map each text to the catalog db_key its encoded bytes name, or a mark.
 
@@ -1048,7 +1056,9 @@ def identity_keys(
     holds no row at all for the line's mnemonic; ``intel`` is the file-type
     syntax flag; None infers the x86 syntax from the text, and keeps the
     operand votes neutral so a bare AArch64 or RISC-V line never reads as
-    forced x86.
+    forced x86. ``arch_out`` receives the catalog architecture that
+    _document_arch infers for the document, so the fallback matcher can
+    keep rows of that architecture even without an --isa pin.
     """
     if not texts:
         return []
@@ -1059,6 +1069,11 @@ def identity_keys(
         vote = False
     else:
         vote = bool(intel)
+    if arch_out is not None:
+        # The doc arch feeds the fallback matcher when byte identity cannot run.
+        picked = _document_arch(items, vote, bool(intel))
+        if picked is not None:
+            arch_out.append(_CATALOG_ISA.get(picked[0], picked[0]))
     try:
         row = conn.execute("PRAGMA database_list").fetchone()
     except (sqlite3.Error, AttributeError):
@@ -1126,7 +1141,9 @@ def _hover_markdown(
                 if best_latency(item.arch_details) != "-"
             ]
             throughputs = [
-                best_cpi(item.arch_details) for item in linked if best_cpi(item.arch_details) != "-"
+                best_cpi(item.arch_details, record_iclass(item))
+                for item in linked
+                if best_cpi(item.arch_details, record_iclass(item)) != "-"
             ]
             perf = []
             if latencies:

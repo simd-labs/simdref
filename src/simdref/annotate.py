@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Any, Iterable, Iterator
 
 from simdref import perf
-from simdref.lsp import NO_CATALOG_ROW, identity_keys
+from simdref.lsp import NO_CATALOG_ROW, _CATALOG_ISA, _document_arch, identity_keys
 from simdref.models import InstructionRecord
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
 
@@ -63,6 +63,37 @@ _OBJDUMP_INSTR_RE = re.compile(
 )
 # objdump -S injects "file:line" comment lines before the instruction block.
 _OBJDUMP_SRC_RE = re.compile(r"^\s*(?P<file>[^ \t/][^:]*):(?P<line>\d+)\s*$")
+
+# Legal x86 prefix tokens objdump prints as words before the mnemonic
+# ("data16 cs nopw ..."). The mnemonic is the first token after them.
+_X86_PREFIX_TOKENS = frozenset(
+    {
+        "data16",
+        "addr32",
+        "cs",
+        "ds",
+        "es",
+        "ss",
+        "fs",
+        "gs",
+        "lock",
+        "rep",
+        "repe",
+        "repne",
+        "notrack",
+        "bnd",
+    }
+)
+
+
+def _strip_prefix_tokens(head: str) -> str:
+    """Drop leading x86 prefix tokens; return the text from the mnemonic on."""
+    rest = head.lstrip()
+    while True:
+        parts = rest.split(None, 1)
+        if len(parts) != 2 or parts[0].lower() not in _X86_PREFIX_TOKENS:
+            return rest
+        rest = parts[1]
 
 
 def _parse_objdump_instr(line: str) -> tuple[int, str] | None:
@@ -114,7 +145,7 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
         if obj is not None:
             address, rest = obj
             head, comment = _split_comment(rest)
-            m = _INSTR_RE.match(head)
+            m = _INSTR_RE.match(_strip_prefix_tokens(head))
             if m:
                 return AsmLine(
                     kind=LineKind.INSTRUCTION,
@@ -141,7 +172,7 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
     if obj is not None:
         address, rest = obj
         head, comment = _split_comment(rest)
-        m = _INSTR_RE.match(head)
+        m = _INSTR_RE.match(_strip_prefix_tokens(head))
         if m:
             return AsmLine(
                 kind=LineKind.INSTRUCTION,
@@ -189,9 +220,89 @@ def _lookup_variants(mnemonic: str) -> list[str]:
     return out
 
 
-def lookup(mnemonic: str, conn: sqlite3.Connection) -> list[InstructionRecord]:
+def _isa_family(architecture: str | None) -> str | None:
+    """Map an ISA option or a record architecture to one catalog family."""
+    name = (architecture or "").lower()
+    if not name or name == "auto":
+        return None
+    if name.startswith(("arm", "aarch")):
+        return "arm"
+    if name.startswith("riscv"):
+        return "riscv"
+    return "x86"
+
+
+_FILE_FORMAT_RE = re.compile(r"\bfile format\s+(\S+)")
+# AArch64-only register spellings and branches: w0-w30, v0-v31, b.<cond>.
+_A64_EXCL_RE = re.compile(
+    r"(?<![%\w])(?:w(?:[0-9]|[12][0-9]|30)|v(?:[0-9]|[12][0-9]|3[01]))(?![\w])"
+)
+_A64_BCOND_RE = re.compile(
+    r"(?<![\w])b\.(?:eq|ne|lt|le|gt|ge|hs|lo|hi|ls|mi|pl|vs|vc|al|nv)(?![\w])"
+)
+# x0-x30 and sp name both AArch64 and RISC-V registers.
+_A64_SHARED_RE = re.compile(r"(?<![%\w])(?:x(?:[0-9]|[12][0-9]|30)|sp)(?![\w])")
+# RISC-V register names: the ABI names and x31 (AArch64 stops at x30).
+_RISCV_ISA_RE = re.compile(r"(?<![%\w])(?:zero|ra|gp|tp|fp|t[0-6]|a[0-7]|x31)(?![\w])")
+# objdump symbol annotation ("jmp 50 <x0+0x50>"): a target label, never input.
+_SYMBOL_ANNOTATION_RE = re.compile(r"<[^>]*>")
+
+
+def detect_isa(lines: Iterable[str]) -> str | None:
+    """Name the ISA the input speaks: ``"x86"``, ``"arm"`` or ``"riscv"``.
+
+    An objdump ``file format`` line names the ISA outright. Otherwise the
+    AArch64 register names x0-x30, w0-w30, v0-v31, sp, the ``b.<cond>``
+    branches and the RISC-V register names vote. Returns None when the
+    input carries no ISA signal.
+    shortcut: a RISC-V listing that uses only xN names and sp votes arm,
+    upgrade when a form pick on rv64 rows needs those listings split
+    """
+    excl_arm = excl_riscv = shared = 0
+    for line in lines:
+        fmt = _FILE_FORMAT_RE.search(line)
+        if fmt:
+            name = fmt.group(1).lower()
+            if "riscv" in name:
+                return "riscv"
+            return "arm" if "aarch64" in name or "arm" in name else "x86"
+        parsed = parse_asm_line(line)
+        if parsed.kind != LineKind.INSTRUCTION:
+            continue
+        # Strip objdump symbol annotations: "<x0+0x50>" names a target, not
+        # a register (review finding 1).
+        text = _SYMBOL_ANNOTATION_RE.sub(" ", f"{parsed.mnemonic} {parsed.operands}")
+        excl_arm += len(_A64_EXCL_RE.findall(text)) + len(_A64_BCOND_RE.findall(text))
+        excl_riscv += len(_RISCV_ISA_RE.findall(text))
+        shared += len(_A64_SHARED_RE.findall(text))
+    if excl_arm or excl_riscv:
+        return "arm" if excl_arm >= excl_riscv else "riscv"
+    return "arm" if shared else None
+
+
+def _line_isa(text: str) -> str | None:
+    """Name the family one instruction line's own evidence shows.
+
+    detect_isa's register and ``b.<cond>`` votes come first, then the
+    strong operand votes ``_document_arch`` feeds byte identity. Returns
+    None for a neutral line: its family is the stream's.
+    """
+    text = _SYMBOL_ANNOTATION_RE.sub(" ", text)
+    vote = detect_isa([text])
+    if vote:
+        return vote
+    picked = _document_arch((text,), False, False)
+    return _CATALOG_ISA.get(picked[0]) if picked else None
+
+
+def lookup(
+    mnemonic: str, conn: sqlite3.Connection, isa: str | None = None
+) -> list[InstructionRecord]:
+    keep = _isa_family(isa)
     for cand in _lookup_variants(mnemonic):
         records = load_instructions_by_mnemonic_from_db(conn, cand)
+        if keep is not None:
+            records = [r for r in records if _isa_family(r.architecture) == keep]
         if records:
             return records
     return []
@@ -257,20 +368,37 @@ def _split_operands(operands: str) -> list[str]:
     return parts
 
 
+def _imm_kind(value: int) -> str:
+    """Immediate slot kind sized like the narrowest encoding that holds *value*."""
+    if value == 0:
+        return "I0"
+    for bits in (8, 16, 32, 64):
+        if -(1 << (bits - 1)) <= value < (1 << bits):
+            return f"I{bits}"
+    return "I64"
+
+
 def _classify_operand(op: str) -> tuple[str, str | None]:
     """Return ``(kind, reg_name_lower)`` for one operand.
 
     ``kind`` is one of ``R8``/``R16``/``R32``/``R64``/``XMM``/``YMM``/
-    ``ZMM``/``K``/``M``/``I``/``REL``/``?``.
+    ``ZMM``/``K``/``M``/``I0``/``I8``/``I16``/``I32``/``I64``/``I``/
+    ``REL``/``?``. Immediate kinds carry the width the value needs.
     ``reg_name_lower`` is the lowercase register name when ``kind`` is a
     register class (for alias detection), else ``None``.
     """
     s = op.strip()
     if not s:
         return "?", None
+    # objdump branch target: an address followed by a <symbol> annotation.
+    if re.fullmatch(r"-?(?:0x[0-9a-fA-F]+|\d+)\s+<[^>]*>", s):
+        return "REL", None
     # AT&T immediate: $... ; Intel immediate: bare number / 0x... / '$'-less literal
     if s.startswith("$") or re.fullmatch(r"-?0x[0-9a-fA-F]+|-?\d+", s):
-        return "I", None
+        try:
+            return _imm_kind(int(s.lstrip("$"), 0)), None
+        except ValueError:
+            return "I", None
     # AT&T memory: ``(%reg)``, ``disp(%reg,%idx,scale)``, or plain symbol
     # with a ``(...)`` section; Intel memory: ``[...]`` or explicit size ptr.
     if "(" in s or "[" in s or _SIZE_SPECIFIER_RE.search(s):
@@ -322,6 +450,9 @@ def _form_operand_tokens(form_or_key: str) -> list[str]:
     return [t.strip().upper() for t in inner.split(",") if t.strip()]
 
 
+_BROADCAST_TOK_RE = re.compile(r"_1TO\d+$")
+
+
 def _token_matches_slot(form_tok: str, slot_kind: str) -> bool:
     """True when a catalog operand token matches a parsed input slot kind."""
     ft = form_tok.upper()
@@ -340,13 +471,47 @@ def _token_matches_slot(form_tok: str, slot_kind: str) -> bool:
     # R8h/R8l both map to R8.
     if ft in ("R8H", "R8L") and sk == "R8":
         return True
+    # A plain R row takes a general register of any width.
+    if ft == "R" and sk in ("R8", "R16", "R32", "R64"):
+        return True
     # Mn forms: M32 matches a memory slot regardless of inferred width.
     if ft.startswith("M") and sk == "M":
         return True
-    # Immediate forms: In or the literal "0" both match an immediate slot.
-    if (ft.startswith("I") or ft == "0") and sk == "I":
+    # Relative branch targets match the Rel8/Rel32 rows.
+    if sk == "REL" and ft.startswith("REL"):
         return True
+    # Immediate rows: a literal-0 row takes only a zero immediate, and an
+    # In row takes an immediate whose value fits the encoding width.
+    if sk == "I0":
+        return ft == "0" or (ft.startswith("I") and ft[1:].isdigit())
+    if sk.startswith("I"):
+        if not (ft.startswith("I") and ft[1:].isdigit()):
+            return False
+        return sk == "I" or int(ft[1:]) >= int(sk[1:])
     return False
+
+
+def _slot_token_score(form_tok: str, slot_kind: str) -> int:
+    """Match strength for one form token against one input slot kind."""
+    ft = form_tok.upper()
+    sk = slot_kind.upper()
+    if not _token_matches_slot(ft, sk):
+        # Weak near-misses: a broadcast row wants a {1toN} annotation, and a
+        # register can ride a memory row (mov r,r against MOV (M32, R32)).
+        if sk == "M" and _BROADCAST_TOK_RE.search(ft):
+            return 2
+        if sk.startswith("R") and ("M" + sk[1:]) == ft:
+            return 2
+        return 0
+    score = 10
+    if sk == "I0" and ft == "0":
+        score += 2
+    elif sk not in ("I", "I0") and ft.startswith("I") and int(ft[1:]) == int(sk[1:]):
+        score += 2
+    elif sk == "REL" and ft == "REL32":
+        # The text carries no encoding width; the near jump is the common row.
+        score += 2
+    return score
 
 
 def _operand_match_score(
@@ -373,18 +538,11 @@ def _operand_match_score(
 
     score = 0
     matched_slots = 0
-    for i, (kind, _) in enumerate(slots):
-        if i < len(form_tokens) and _token_matches_slot(form_tokens[i], kind):
-            score += 10
+    for (kind, _), form_tok in zip(slots, form_tokens):
+        pair = _slot_token_score(form_tok, kind)
+        score += pair
+        if pair >= 10:
             matched_slots += 1
-        elif (
-            kind.startswith("R")
-            and i < len(form_tokens)
-            and ("M" + kind[1:]) == form_tokens[i].upper()
-        ):
-            # Register-vs-memory near-miss (e.g. mov r,r against MOV (M32, R32))
-            # still counts a little — better than an unrelated form.
-            score += 2
 
     # Penalise operand-count mismatch — heavily for extra slots in the form.
     len_delta = len(form_tokens) - len(slots)
@@ -419,26 +577,38 @@ def pick_record(
     *,
     arch: str | None = None,
     operands: str = "",
+    isa: str | None = None,
 ) -> InstructionRecord | None:
     if not records:
         return None
     candidates = records
+    keep = _isa_family(isa)
+    if keep is not None:
+        candidates = [r for r in records if _isa_family(r.architecture) == keep]
+        if not candidates:
+            return None
     if arch is not None:
-        pinned = [r for r in records if arch in (r.arch_details or {})]
+        pinned = [r for r in candidates if arch in (r.arch_details or {})]
         if pinned:
             candidates = pinned
 
     slots, aliased = _operand_shape(operands)
+    if "%" in operands or "$" in operands:
+        # AT&T lists sources first; catalog form tokens are in Intel order.
+        slots = list(reversed(slots))
 
-    def score(rec: InstructionRecord) -> tuple[int, int, int]:
+    def score(rec: InstructionRecord) -> tuple[int, int, int, int]:
         measured = sum(
             1
             for d in (rec.arch_details or {}).values()
             if (d.get("source_kind") or "measured") == "measured"
         )
         op_score = _operand_match_score(rec, slots, aliased=aliased)
-        # Operand match dominates; measurement coverage tiebreaks.
-        return (op_score, measured, len(rec.arch_details or {}))
+        # Operand match dominates; a plain row beats encoding-variant rows
+        # (ADD_NF, MOV_8B, ...) on ties, then measurement coverage.
+        head = str(getattr(rec, "key", "") or "").split("(", 1)[0]
+        variant = 1 if "_" in head else 0
+        return (op_score, -variant, measured, len(rec.arch_details or {}))
 
     return max(candidates, key=score)
 
@@ -472,8 +642,8 @@ def _latency_for(details: dict[str, Any]) -> list[str]:
     return perf.latency_cycle_values(details.get("latencies") or [])
 
 
-def _cpi_for(details: dict[str, Any]) -> list[str]:
-    return perf._cpi_values(details)
+def _cpi_for(details: dict[str, Any], iclass: str | None = None) -> list[str]:
+    return perf._cpi_values(details, iclass)
 
 
 def aggregate_perf(
@@ -484,6 +654,7 @@ def aggregate_perf(
 ) -> PerfSummary:
     """Aggregate latency and CPI across ``record``'s measured microarches."""
     arch_details = record.arch_details or {}
+    iclass = perf.record_iclass(record)
 
     def collect(kinds: tuple[str, ...]) -> tuple[list[float], list[float], list[str]]:
         lats: list[float] = []
@@ -494,7 +665,7 @@ def aggregate_perf(
             if kind not in kinds:
                 continue
             lat = _per_arch_value(details, _latency_for)
-            cpi = _per_arch_value(details, _cpi_for)
+            cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
             if lat is None and cpi is None:
                 continue
             archs.append(core)
@@ -557,8 +728,9 @@ def arch_perf(record: InstructionRecord, arch: str) -> tuple[float | None, float
     """
     details = (record.arch_details or {}).get(arch) or {}
     kind = details.get("source_kind") or "measured"
+    iclass = perf.record_iclass(record)
     lat = _per_arch_value(details, _latency_for)
-    cpi = _per_arch_value(details, _cpi_for)
+    cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
     return lat, cpi, kind
 
 
@@ -573,12 +745,47 @@ def arch_perf_tag(arch: str, lat: float | None, cpi: float | None, kind: str) ->
     return f"[{arch}, {kind}]"
 
 
-def _ports_for(details: dict[str, Any]) -> str | None:
+def _ports_for(details: dict[str, Any], iclass: str | None = None) -> str | None:
+    # A harness-wide measurement loses its ports together with its CPI.
+    if perf._measurement_is_harness_contaminated(iclass):
+        return None
     measurement = details.get("measurement") or {}
     ports = measurement.get("ports") or measurement.get("TP_ports")
     if ports is None or ports == "-":
         return None
     return str(ports)
+
+
+def _uops_for(
+    details: dict[str, Any], arch: str, iclass: str | None = None
+) -> tuple[int | None, bool | None]:
+    """Return ``(uops, microcoded)`` for one core's measurement.
+
+    Intel rows count microcode-sequencer uops in ``uops_MS``; a positive
+    value marks the form microcoded. AMD rows carry no ``uops_MS``; their
+    ``uops`` count is macro-ops, and AMD 57647 p.14 states "Instructions
+    are marked as fastpath single (one macro op), fastpath double (two
+    macro ops), or microcode (greater than two macro ops).", so over two
+    macro-ops marks the form microcoded. Rows without the data omit the
+    flag so the output never guesses. A harness-contaminated row loses
+    both, the same as its ports.
+    """
+    if perf._measurement_is_harness_contaminated(iclass):
+        return None, None
+
+    def _int(value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    measurement = details.get("measurement") or {}
+    uops = _int(measurement.get("uops"))
+    if arch.upper().startswith("ZEN"):
+        # AMD 57647 p.14: "Instructions are marked as fastpath single (one macro op), fastpath double (two macro ops), or microcode (greater than two macro ops)."
+        return uops, (None if uops is None else uops > 2)
+    ms = _int(measurement.get("uops_MS"))
+    return uops, (None if ms is None else ms > 0)
 
 
 def collect_ports(
@@ -596,8 +803,9 @@ def collect_ports(
     else:
         keys = list(arch_details.keys())
     ports: list[str] = []
+    iclass = perf.record_iclass(record)
     for core in keys:
-        value = _ports_for(arch_details.get(core) or {})
+        value = _ports_for(arch_details.get(core) or {}, iclass)
         if value and value not in ports:
             ports.append(value)
     return ports or None
@@ -644,9 +852,17 @@ def format_annotation(
     if docs and record.summary and _summary_matches_form(record.summary, record):
         parts.append(record.summary.strip())
     if performance:
+        uops_frag = ""
         if arch is not None:
             lat, cpi, kind = arch_perf(record, arch)
             tag = arch_perf_tag(arch, lat, cpi, kind)
+            uops_val, microcoded_val = _uops_for(
+                (record.arch_details or {}).get(arch) or {}, arch, perf.record_iclass(record)
+            )
+            if uops_val is not None:
+                uops_frag = f" uops={uops_val}"
+                if microcoded_val:
+                    uops_frag += " microcoded"
         else:
             summary = aggregate_perf(record, mode=agg, include_modeled=include_modeled)
             lat, cpi = summary.latency, summary.cpi
@@ -656,7 +872,7 @@ def format_annotation(
                 tag = f"[avg of {summary.n_archs} archs, {summary.source_kind}]"
             else:
                 tag = f"[{agg} of {summary.n_archs} archs, {summary.source_kind}]"
-        perf_frag = f"lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)} {tag}"
+        perf_frag = f"lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)}{uops_frag} {tag}"
         parts.append(perf_frag)
     return " | ".join(parts)
 
@@ -671,6 +887,7 @@ class AnnotateOptions:
     performance: bool = True
     docs: bool = True
     arch: str | None = None
+    isa: str = "auto"  # "x86" | "arm" | "riscv" | "auto"
     agg: str = "avg"
     include_modeled: bool = False
     block: bool = False  # otherwise inline
@@ -683,11 +900,17 @@ def _annotate_instruction(
     parsed: AsmLine,
     opts: AnnotateOptions,
     conn: sqlite3.Connection,
-    lookup_cache: dict[str, list[InstructionRecord]] | None = None,
+    lookup_cache: dict[tuple[str, str | None], list[InstructionRecord]] | None = None,
     stats: dict[str, int] | None = None,
     identity_key: str | None = None,
+    line_isa: str | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
-    """Return the rendered output line and an optional JSON record."""
+    """Return the rendered output line and an optional JSON record.
+
+    ``line_isa`` names the family the line's own evidence shows (a pinned
+    ``--isa`` counts as one). None marks a neutral line in auto mode: the
+    stream family answers first, then the family that holds rows.
+    """
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
     if identity_key == NO_CATALOG_ROW:
@@ -715,18 +938,27 @@ def _annotate_instruction(
         if stats is not None:
             stats["recognized"] = stats.get("recognized", 0) + 1
     else:
+        isa = line_isa or opts.isa
+        pick_isa = isa
         if lookup_cache is not None:
-            records = lookup_cache.get(parsed.mnemonic)
+            records = lookup_cache.get((parsed.mnemonic, isa))
             if records is None:
                 # Module-level call (not a captured reference) so tests can
-                # keep monkeypatching ``annotate.lookup`` with a 2-arg fake.
-                records = lookup(parsed.mnemonic, conn)
-                lookup_cache[parsed.mnemonic] = records
+                # keep monkeypatching ``annotate.lookup`` with a fake.
+                records = lookup(parsed.mnemonic, conn, isa=isa)
+                lookup_cache[(parsed.mnemonic, isa)] = records
         else:
-            records = lookup(parsed.mnemonic, conn)
+            records = lookup(parsed.mnemonic, conn, isa=isa)
+        if not records and line_isa is None:
+            # A neutral line whose stream family holds no rows gets the rows
+            # of the family that has them (issue #57 batch: jnle, bare b).
+            pick_isa = None
+            records = lookup(parsed.mnemonic, conn, isa=None)
+            if lookup_cache is not None:
+                lookup_cache[(parsed.mnemonic, None)] = records
         if stats is not None and records:
             stats["recognized"] = stats.get("recognized", 0) + 1
-        record = pick_record(records, arch=opts.arch, operands=parsed.operands)
+        record = pick_record(records, arch=opts.arch, operands=parsed.operands, isa=pick_isa)
 
     if record is None:
         if opts.unknown == "drop":
@@ -780,6 +1012,18 @@ def _annotate_instruction(
         "cpi": cpi_val,
         "ports": ports_val,
     }
+    if opts.arch is not None:
+        # A single core is pinned, so its uop count is well defined. In the
+        # aggregate case the count differs per core and both fields stay out.
+        uops_val, microcoded_val = _uops_for(
+            (record.arch_details or {}).get(opts.arch) or {},
+            opts.arch,
+            perf.record_iclass(record),
+        )
+        if uops_val is not None:
+            json_record["uops"] = uops_val
+        if microcoded_val is not None:
+            json_record["microcoded"] = microcoded_val
     if parsed.address is not None:
         json_record["address"] = f"0x{parsed.address:x}"
     if parsed.source_file:
@@ -814,7 +1058,8 @@ def annotate_stream(
     collecting_json = opts.fmt == "json"
     pending_src_file: str | None = None
     pending_src_line: int | None = None
-    lookup_cache: dict[str, list[InstructionRecord]] = {}
+    lookup_cache: dict[tuple[str, str | None], list[InstructionRecord]] = {}
+    arch_out: list[str] = []
 
     parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
     # One llvm-mc run for the whole input: byte identity per instruction
@@ -833,10 +1078,20 @@ def annotate_stream(
     identity = {
         index: key
         for (index, _text), key in zip(
-            items, identity_keys([text for _index, text in items], None, conn)
+            items,
+            identity_keys([text for _index, text in items], None, conn, arch_out=arch_out),
         )
         if key
     }
+    auto_isa = opts.isa not in ("x86", "arm", "riscv")
+    if auto_isa:
+        # auto: the input signals name the ISA, then the document arch from
+        # _document_arch; x86 stays the guess when both stay silent.
+        opts.isa = (
+            detect_isa(parsed.raw for parsed in parsed_lines)
+            or (arch_out[0] if arch_out else None)
+            or "x86"
+        )
 
     for index, parsed in enumerate(parsed_lines):
         if opts.track_positions:
@@ -869,7 +1124,16 @@ def annotate_stream(
                 yield parsed.raw + "\n"
             continue
         out_line, record = _annotate_instruction(
-            parsed, opts, conn, lookup_cache, stats, identity_key=identity.get(index)
+            parsed,
+            opts,
+            conn,
+            lookup_cache,
+            stats,
+            identity_key=identity.get(index),
+            # A pin forces one family; auto mode splits the batch per line.
+            line_isa=opts.isa
+            if not auto_isa
+            else _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
         )
         if collecting_json:
             if record is not None:

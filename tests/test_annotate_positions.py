@@ -43,11 +43,11 @@ def test_annotate_json_with_track_positions_emits_address(monkeypatch):
         operand_details = []
         key = "VFMADD231PS (XMM, XMM, XMM)"
 
-    monkeypatch.setattr(_annotate, "lookup", lambda mn, conn: [_FakeRecord()])
+    monkeypatch.setattr(_annotate, "lookup", lambda mn, conn, isa=None: [_FakeRecord()])
     monkeypatch.setattr(
         _annotate,
         "pick_record",
-        lambda records, *, arch=None, operands="": records[0] if records else None,
+        lambda records, *, arch=None, operands="", isa=None: records[0] if records else None,
     )
 
     conn = sqlite3.connect(":memory:")
@@ -76,11 +76,11 @@ def test_annotate_default_mode_annotates_objdump_input(monkeypatch):
         operand_details: ClassVar = []
         key = "VSUBPD (YMM, YMM, YMM)"
 
-    monkeypatch.setattr(_annotate, "lookup", lambda mn, conn: [_FakeRecord()])
+    monkeypatch.setattr(_annotate, "lookup", lambda mn, conn, isa=None: [_FakeRecord()])
     monkeypatch.setattr(
         _annotate,
         "pick_record",
-        lambda records, *, arch=None, operands="": records[0] if records else None,
+        lambda records, *, arch=None, operands="", isa=None: records[0] if records else None,
     )
 
     conn = sqlite3.connect(":memory:")

@@ -1,0 +1,5 @@
+add $0x8,%rax
+add $0x10,%edi
+sub $0x1,%esi
+mov $0xffffffff,%eax
+jmp 50 <idx+0x50>
