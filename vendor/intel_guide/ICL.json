@@ -23,42 +23,6 @@
    "cpi": ""
   },
   {
-   "mnemonic": "ADDPD",
-   "form": "ADDPD_XMMpd_XMMpd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "ADDPS",
-   "form": "ADDPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "ADDSD",
-   "form": "ADDSD_XMMsd_XMMsd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "ADDSS",
-   "form": "ADDSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "ADDSUBPD",
-   "form": "ADDSUBPD_XMMpd_XMMpd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "ADDSUBPS",
-   "form": "ADDSUBPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "ADOX",
    "form": "ADOX_GPR32d_GPR32d",
    "latency": "1",
@@ -69,48 +33,6 @@
    "form": "ADOX_GPR64q_GPR64q",
    "latency": "1",
    "cpi": ""
-  },
-  {
-   "mnemonic": "AESDECLAST",
-   "form": "AESDECLAST_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "AESDEC",
-   "form": "AESDEC_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "AESENCLAST",
-   "form": "AESENCLAST_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "AESENC",
-   "form": "AESENC_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "AESIMC",
-   "form": "AESIMC_XMMdq_XMMdq",
-   "latency": "6",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "ANDNPD",
-   "form": "ANDNPD_XMMxuq_XMMxuq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "ANDNPS",
-   "form": "ANDNPS_XMMxud_XMMxud",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "ANDN",
@@ -125,18 +47,6 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "ANDPD",
-   "form": "ANDPD_XMMxuq_XMMxuq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "ANDPS",
-   "form": "ANDPS_XMMxud_XMMxud",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
    "mnemonic": "BEXTR",
    "form": "BEXTR_VGPR32d_VGPR32d_VGPR32d",
    "latency": "2",
@@ -147,18 +57,6 @@
    "form": "BEXTR_VGPR64q_VGPR64q_VGPR64q",
    "latency": "2",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "BLENDPD",
-   "form": "BLENDPD_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "BLENDPS",
-   "form": "BLENDPS_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "BLSI",
@@ -215,12 +113,6 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "BT",
-   "form": "BT_GPRv_GPRv",
-   "latency": "",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "BZHI",
    "form": "BZHI_VGPR32d_VGPR32d_VGPR32d",
    "latency": "1",
@@ -233,628 +125,16 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "CMPPD",
-   "form": "CMPPD_XMMpd_XMMpd_IMMb",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "CMPPS",
-   "form": "CMPPS_XMMps_XMMps_IMMb",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "CMPSS",
-   "form": "CMPSS_XMMss_XMMss_IMMb",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "CRC32",
-   "form": "CRC32_GPRyy_GPR8b",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CRC32",
-   "form": "CRC32_GPRyy_GPRv",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTDQ2PD",
-   "form": "CVTDQ2PD_XMMpd_XMMq",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTDQ2PS",
-   "form": "CVTDQ2PS_XMMps_XMMdq",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "CVTPD2DQ",
-   "form": "CVTPD2DQ_XMMdq_XMMpd",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTPD2PI",
-   "form": "CVTPD2PI_MMXq_XMMpd",
-   "latency": "7",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTPD2PS",
-   "form": "CVTPD2PS_XMMps_XMMpd",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTPI2PD",
-   "form": "CVTPI2PD_XMMpd_MMXq",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTPS2DQ",
-   "form": "CVTPS2DQ_XMMdq_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "CVTPS2PD",
-   "form": "CVTPS2PD_XMMpd_XMMq",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTSD2SI",
-   "form": "CVTSD2SI_GPR32d_XMMsd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTSD2SI",
-   "form": "CVTSD2SI_GPR64q_XMMsd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTSD2SS",
-   "form": "CVTSD2SS_XMMss_XMMsd",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTSI2SD",
-   "form": "CVTSI2SD_XMMsd_GPR32d",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTSI2SD",
-   "form": "CVTSI2SD_XMMsd_GPR64q",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTSI2SS",
-   "form": "CVTSI2SS_XMMss_GPR32d",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTSI2SS",
-   "form": "CVTSI2SS_XMMss_GPR64q",
-   "latency": "6",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTSS2SD",
-   "form": "CVTSS2SD_XMMsd_XMMss",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTSS2SI",
-   "form": "CVTSS2SI_GPR32d_XMMss",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTSS2SI",
-   "form": "CVTSS2SI_GPR64q_XMMss",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTTPD2DQ",
-   "form": "CVTTPD2DQ_XMMdq_XMMpd",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "CVTTPD2PI",
-   "form": "CVTTPD2PI_MMXq_XMMpd",
-   "latency": "7",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTTPS2DQ",
-   "form": "CVTTPS2DQ_XMMdq_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "CVTTSD2SI",
-   "form": "CVTTSD2SI_GPR32d_XMMsd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTTSD2SI",
-   "form": "CVTTSD2SI_GPR64q_XMMsd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTTSS2SI",
-   "form": "CVTTSS2SI_GPR32d_XMMss",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "CVTTSS2SI",
-   "form": "CVTTSS2SI_GPR64q_XMMss",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "DPPD",
-   "form": "DPPD_XMMdq_XMMdq_IMMb",
-   "latency": "9",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "EXTRACTPS",
-   "form": "EXTRACTPS_GPR32d_XMMdq_IMMb",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "HADDPD",
-   "form": "HADDPD_XMMpd_XMMpd",
-   "latency": "6",
-   "cpi": "2"
-  },
-  {
-   "mnemonic": "HSUBPD",
-   "form": "HSUBPD_XMMpd_XMMpd",
-   "latency": "6",
-   "cpi": "2"
-  },
-  {
-   "mnemonic": "INSERTPS",
-   "form": "INSERTPS_XMMps_XMMps_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KADDB",
-   "form": "KADDB_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KADDD",
-   "form": "KADDD_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KADDQ",
-   "form": "KADDQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KADDW",
-   "form": "KADDW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDB",
-   "form": "KANDB_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDD",
-   "form": "KANDD_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDNB",
-   "form": "KANDNB_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDND",
-   "form": "KANDND_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDNQ",
-   "form": "KANDNQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDNW",
-   "form": "KANDNW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDQ",
-   "form": "KANDQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KANDW",
-   "form": "KANDW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVB",
-   "form": "KMOVB_GPR32u32_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVB",
-   "form": "KMOVB_MASKmskw_GPR32u32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVB",
-   "form": "KMOVB_MASKmskw_MEMu8_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "KMOVD",
-   "form": "KMOVD_GPR32u32_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVD",
-   "form": "KMOVD_MASKmskw_GPR32u32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVD",
-   "form": "KMOVD_MASKmskw_MEMu32_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "KMOVQ",
-   "form": "KMOVQ_GPR64u64_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVQ",
-   "form": "KMOVQ_MASKmskw_GPR64u64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVQ",
-   "form": "KMOVQ_MASKmskw_MEMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "KMOVW",
-   "form": "KMOVW_GPR32u32_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVW",
-   "form": "KMOVW_MASKmskw_GPR32u32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVW",
-   "form": "KMOVW_MASKmskw_MASKu16_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KMOVW",
-   "form": "KMOVW_MASKmskw_MEMu16_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "KNOTB",
-   "form": "KNOTB_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KNOTD",
-   "form": "KNOTD_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KNOTQ",
-   "form": "KNOTQ_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KNOTW",
-   "form": "KNOTW_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KORB",
-   "form": "KORB_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KORD",
-   "form": "KORD_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KORQ",
-   "form": "KORQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KORW",
-   "form": "KORW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTLB",
-   "form": "KSHIFTLB_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTLD",
-   "form": "KSHIFTLD_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTLQ",
-   "form": "KSHIFTLQ_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTLW",
-   "form": "KSHIFTLW_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTRB",
-   "form": "KSHIFTRB_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTRD",
-   "form": "KSHIFTRD_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTRQ",
-   "form": "KSHIFTRQ_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KSHIFTRW",
-   "form": "KSHIFTRW_MASKmskw_MASKmskw_IMM8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KUNPCKBW",
-   "form": "KUNPCKBW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KUNPCKDQ",
-   "form": "KUNPCKDQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KUNPCKWD",
-   "form": "KUNPCKWD_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXNORB",
-   "form": "KXNORB_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXNORD",
-   "form": "KXNORD_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXNORQ",
-   "form": "KXNORQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXNORW",
-   "form": "KXNORW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXORB",
-   "form": "KXORB_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXORD",
-   "form": "KXORD_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXORQ",
-   "form": "KXORQ_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "KXORW",
-   "form": "KXORW_MASKmskw_MASKmskw_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "LDDQU",
-   "form": "LDDQU_XMMpd_MEMdq",
-   "latency": "6",
-   "cpi": "0.55"
-  },
-  {
    "mnemonic": "LZCNT",
    "form": "LZCNT_GPRv_GPRv",
    "latency": "3",
    "cpi": "1"
   },
   {
-   "mnemonic": "MAXPD",
-   "form": "MAXPD_XMMpd_XMMpd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MAXPS",
-   "form": "MAXPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MAXSD",
-   "form": "MAXSD_XMMsd_XMMsd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MAXSS",
-   "form": "MAXSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MINPD",
-   "form": "MINPD_XMMpd_XMMpd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MINPS",
-   "form": "MINPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MINSD",
-   "form": "MINSD_XMMsd_XMMsd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MINSS",
-   "form": "MINSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MOVAPD",
-   "form": "MOVAPD_XMMpd_MEMpd",
-   "latency": "6",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "MOVAPS",
-   "form": "MOVAPS_XMMps_MEMps",
-   "latency": "6",
-   "cpi": "0.55"
-  },
-  {
    "mnemonic": "MOVBE",
    "form": "MOVBE_GPRv_MEMv",
    "latency": "6",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MOVDDUP",
-   "form": "MOVDDUP_XMMdq_MEMq",
-   "latency": "",
-   "cpi": "0.54"
-  },
-  {
-   "mnemonic": "MOVDDUP",
-   "form": "MOVDDUP_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "MOVDQA",
-   "form": "MOVDQA_XMMdq_MEMdq",
-   "latency": "6",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "MOVDQU",
-   "form": "MOVDQU_XMMdq_MEMdq",
-   "latency": "6",
-   "cpi": "0.55"
   },
   {
    "mnemonic": "MOVD",
@@ -864,73 +144,7 @@
   },
   {
    "mnemonic": "MOVD",
-   "form": "MOVD_GPR32_XMMd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVD",
    "form": "MOVD_MMXq_GPR32",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVD",
-   "form": "MOVD_XMMdq_GPR32",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVD",
-   "form": "MOVD_XMMdq_MEMd",
-   "latency": "6",
-   "cpi": "0.54"
-  },
-  {
-   "mnemonic": "MOVHLPS",
-   "form": "MOVHLPS_XMMq_XMMq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVLHPS",
-   "form": "MOVLHPS_XMMq_XMMq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVLPD",
-   "form": "MOVLPD_XMMsd_MEMq",
-   "latency": "",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "MOVLPS",
-   "form": "MOVLPS_XMMq_MEMq",
-   "latency": "",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "MOVMSKPD",
-   "form": "MOVMSKPD_GPR32_XMMpd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVMSKPS",
-   "form": "MOVMSKPS_GPR32_XMMps",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVNTDQA",
-   "form": "MOVNTDQA_XMMdq_MEMdq",
-   "latency": "",
-   "cpi": "0.58"
-  },
-  {
-   "mnemonic": "MOVQ2DQ",
-   "form": "MOVQ2DQ_XMMdq_MMXq",
    "latency": "",
    "cpi": "1"
   },
@@ -942,99 +156,9 @@
   },
   {
    "mnemonic": "MOVQ",
-   "form": "MOVQ_GPR64_XMMq",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVQ",
    "form": "MOVQ_MMXq_GPR64",
    "latency": "",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVQ",
-   "form": "MOVQ_XMMdq_GPR64",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "MOVQ",
-   "form": "MOVQ_XMMdq_MEMq_0F6E",
-   "latency": "6",
-   "cpi": "0.54"
-  },
-  {
-   "mnemonic": "MOVQ",
-   "form": "MOVQ_XMMdq_MEMq_0F7E",
-   "latency": "6",
-   "cpi": "0.54"
-  },
-  {
-   "mnemonic": "MOVQ",
-   "form": "MOVQ_XMMdq_XMMq_0F7E",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "MOVSHDUP",
-   "form": "MOVSHDUP_XMMps_XMMps",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "MOVSLDUP",
-   "form": "MOVSLDUP_XMMps_XMMps",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "MOVSS",
-   "form": "MOVSS_XMMdq_MEMss",
-   "latency": "6",
-   "cpi": "0.54"
-  },
-  {
-   "mnemonic": "MOVSS",
-   "form": "MOVSS_XMMss_XMMss_0F10",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "MOVUPD",
-   "form": "MOVUPD_XMMpd_MEMpd",
-   "latency": "6",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "MOVUPS",
-   "form": "MOVUPS_XMMps_MEMps",
-   "latency": "6",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "MULPD",
-   "form": "MULPD_XMMpd_XMMpd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MULPS",
-   "form": "MULPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MULSD",
-   "form": "MULSD_XMMsd_XMMsd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "MULSS",
-   "form": "MULSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "MULX",
@@ -1049,34 +173,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "ORPD",
-   "form": "ORPD_XMMxuq_XMMxuq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "ORPS",
-   "form": "ORPS_XMMxud_XMMxud",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "OR",
-   "form": "OR_GPRv_IMMb",
-   "latency": "1",
-   "cpi": "0.25"
-  },
-  {
    "mnemonic": "PABSB",
    "form": "PABSB_MMXq_MMXq",
    "latency": "1",
    "cpi": ""
-  },
-  {
-   "mnemonic": "PABSB",
-   "form": "PABSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PABSD",
@@ -1085,22 +185,10 @@
    "cpi": ""
   },
   {
-   "mnemonic": "PABSD",
-   "form": "PABSD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PABSW",
    "form": "PABSW_MMXq_MMXq",
    "latency": "1",
    "cpi": ""
-  },
-  {
-   "mnemonic": "PABSW",
-   "form": "PABSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PACKSSDW",
@@ -1109,28 +197,10 @@
    "cpi": "2"
   },
   {
-   "mnemonic": "PACKSSDW",
-   "form": "PACKSSDW_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PACKSSWB",
    "form": "PACKSSWB_MMXq_MMXq",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "PACKSSWB",
-   "form": "PACKSSWB_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PACKUSDW",
-   "form": "PACKUSDW_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "1"
   },
   {
    "mnemonic": "PACKUSWB",
@@ -1139,22 +209,10 @@
    "cpi": "2"
   },
   {
-   "mnemonic": "PACKUSWB",
-   "form": "PACKUSWB_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PADDB",
    "form": "PADDB_MMXq_MMXq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PADDB",
-   "form": "PADDB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "PADDD",
@@ -1163,22 +221,10 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "PADDD",
-   "form": "PADDD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
    "mnemonic": "PADDQ",
    "form": "PADDQ_MMXq_MMXq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PADDQ",
-   "form": "PADDQ_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "PADDSB",
@@ -1187,22 +233,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PADDSB",
-   "form": "PADDSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PADDSW",
    "form": "PADDSW_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PADDSW",
-   "form": "PADDSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PADDUSB",
@@ -1211,22 +245,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PADDUSB",
-   "form": "PADDUSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PADDUSW",
    "form": "PADDUSW_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PADDUSW",
-   "form": "PADDUSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PADDW",
@@ -1235,34 +257,10 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "PADDW",
-   "form": "PADDW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "PALIGNR",
-   "form": "PALIGNR_MMXq_MMXq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PALIGNR",
-   "form": "PALIGNR_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PANDN",
    "form": "PANDN_MMXq_MMXq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PANDN",
-   "form": "PANDN_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "PAND",
@@ -1271,45 +269,15 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "PAND",
-   "form": "PAND_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
    "mnemonic": "PAVGB",
    "form": "PAVGB_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
   },
   {
-   "mnemonic": "PAVGB",
-   "form": "PAVGB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PAVGW",
    "form": "PAVGW_MMXq_MMXq",
    "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PAVGW",
-   "form": "PAVGW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PBLENDW",
-   "form": "PBLENDW_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PCLMULQDQ",
-   "form": "PCLMULQDQ_XMMdq_XMMdq_IMMb",
-   "latency": "6",
    "cpi": "1"
   },
   {
@@ -1319,28 +287,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PCMPEQB",
-   "form": "PCMPEQB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PCMPEQD",
    "form": "PCMPEQD_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PCMPEQD",
-   "form": "PCMPEQD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PCMPEQQ",
-   "form": "PCMPEQQ_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PCMPEQW",
@@ -1349,28 +299,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PCMPEQW",
-   "form": "PCMPEQW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PCMPESTRI",
-   "form": "PCMPESTRI_XMMdq_XMMdq_IMMb",
-   "latency": "",
-   "cpi": "4.01"
-  },
-  {
    "mnemonic": "PCMPGTB",
    "form": "PCMPGTB_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PCMPGTB",
-   "form": "PCMPGTB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PCMPGTD",
@@ -1379,34 +311,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PCMPGTD",
-   "form": "PCMPGTD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PCMPGTQ",
-   "form": "PCMPGTQ_XMMdq_XMMdq",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PCMPGTW",
    "form": "PCMPGTW_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PCMPGTW",
-   "form": "PCMPGTW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PCMPISTRI",
-   "form": "PCMPISTRI_XMMdq_XMMdq_IMMb",
-   "latency": "",
-   "cpi": "3"
   },
   {
    "mnemonic": "PDEP",
@@ -1418,36 +326,6 @@
    "mnemonic": "PDEP",
    "form": "PDEP_VGPR64q_VGPR64q_VGPR64q",
    "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PEXTRB",
-   "form": "PEXTRB_GPR32d_XMMdq_IMMb",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PEXTRD",
-   "form": "PEXTRD_GPR32d_XMMdq_IMMb",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PEXTRQ",
-   "form": "PEXTRQ_GPR64q_XMMdq_IMMb",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PEXTRW",
-   "form": "PEXTRW_GPR32_MMXq_IMMb",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PEXTRW",
-   "form": "PEXTRW_GPR32_XMMdq_IMMb",
-   "latency": "",
    "cpi": "1"
   },
   {
@@ -1463,22 +341,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PHADDD",
-   "form": "PHADDD_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.07"
-  },
-  {
    "mnemonic": "PHADDSW",
    "form": "PHADDSW_MMXq_MMXq",
    "latency": "3",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "PHADDSW",
-   "form": "PHADDSW_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.06"
   },
   {
    "mnemonic": "PHADDW",
@@ -1487,22 +353,10 @@
    "cpi": "2"
   },
   {
-   "mnemonic": "PHADDW",
-   "form": "PHADDW_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.07"
-  },
-  {
    "mnemonic": "PHSUBD",
    "form": "PHSUBD_MMXq_MMXq",
    "latency": "3",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "PHSUBD",
-   "form": "PHSUBD_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.07"
   },
   {
    "mnemonic": "PHSUBSW",
@@ -1511,52 +365,10 @@
    "cpi": "2"
   },
   {
-   "mnemonic": "PHSUBSW",
-   "form": "PHSUBSW_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.06"
-  },
-  {
    "mnemonic": "PHSUBW",
    "form": "PHSUBW_MMXq_MMXq",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "PHSUBW",
-   "form": "PHSUBW_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.07"
-  },
-  {
-   "mnemonic": "PINSRB",
-   "form": "PINSRB_XMMdq_GPR32d_IMMb",
-   "latency": "2",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "PINSRD",
-   "form": "PINSRD_XMMdq_GPR32d_IMMb",
-   "latency": "2",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "PINSRQ",
-   "form": "PINSRQ_XMMdq_GPR64q_IMMb",
-   "latency": "2",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "PINSRW",
-   "form": "PINSRW_MMXq_GPR32_IMMb",
-   "latency": "2",
-   "cpi": "2"
-  },
-  {
-   "mnemonic": "PINSRW",
-   "form": "PINSRW_XMMdq_GPR32_IMMb",
-   "latency": "2",
-   "cpi": ""
   },
   {
    "mnemonic": "PMADDUBSW",
@@ -1565,34 +377,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PMADDUBSW",
-   "form": "PMADDUBSW_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PMADDWD",
    "form": "PMADDWD_MMXq_MMXq",
    "latency": "",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PMADDWD",
-   "form": "PMADDWD_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMAXSB",
-   "form": "PMAXSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMAXSD",
-   "form": "PMAXSD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PMAXSW",
@@ -1601,46 +389,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PMAXSW",
-   "form": "PMAXSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PMAXUB",
    "form": "PMAXUB_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PMAXUB",
-   "form": "PMAXUB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMAXUD",
-   "form": "PMAXUD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMAXUW",
-   "form": "PMAXUW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMINSB",
-   "form": "PMINSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMINSD",
-   "form": "PMINSD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PMINSW",
@@ -1649,34 +401,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PMINSW",
-   "form": "PMINSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PMINUB",
    "form": "PMINUB_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PMINUB",
-   "form": "PMINUB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMINUD",
-   "form": "PMINUD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMINUW",
-   "form": "PMINUW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PMOVMSKB",
@@ -1685,100 +413,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PMOVMSKB",
-   "form": "PMOVMSKB_GPR32_XMMdq",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PMOVSXBD",
-   "form": "PMOVSXBD_XMMdq_XMMd",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVSXBQ",
-   "form": "PMOVSXBQ_XMMdq_XMMw",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVSXBW",
-   "form": "PMOVSXBW_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVSXDQ",
-   "form": "PMOVSXDQ_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVSXWD",
-   "form": "PMOVSXWD_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVSXWQ",
-   "form": "PMOVSXWQ_XMMdq_XMMd",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVZXBD",
-   "form": "PMOVZXBD_XMMdq_XMMd",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVZXBQ",
-   "form": "PMOVZXBQ_XMMdq_XMMw",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVZXBW",
-   "form": "PMOVZXBW_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVZXDQ",
-   "form": "PMOVZXDQ_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVZXWD",
-   "form": "PMOVZXWD_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMOVZXWQ",
-   "form": "PMOVZXWQ_XMMdq_XMMd",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMULDQ",
-   "form": "PMULDQ_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PMULHRSW",
    "form": "PMULHRSW_MMXq_MMXq",
    "latency": "",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PMULHRSW",
-   "form": "PMULHRSW_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PMULHUW",
@@ -1787,28 +425,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PMULHUW",
-   "form": "PMULHUW_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PMULHW",
    "form": "PMULHW_MMXq_MMXq",
    "latency": "",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PMULHW",
-   "form": "PMULHW_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PMULLD",
-   "form": "PMULLD_XMMdq_XMMdq",
-   "latency": "10",
-   "cpi": "1.06"
   },
   {
    "mnemonic": "PMULLW",
@@ -1817,22 +437,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PMULLW",
-   "form": "PMULLW_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PMULUDQ",
    "form": "PMULUDQ_MMXq_MMXq",
    "latency": "",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PMULUDQ",
-   "form": "PMULUDQ_XMMdq_XMMdq",
-   "latency": "5",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "POPCNT",
@@ -1847,20 +455,8 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "POR",
-   "form": "POR_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
    "mnemonic": "PSADBW",
    "form": "PSADBW_MMXq_MMXq",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PSADBW",
-   "form": "PSADBW_XMMdq_XMMdq",
    "latency": "3",
    "cpi": "1"
   },
@@ -1871,46 +467,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSHUFB",
-   "form": "PSHUFB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSHUFD",
-   "form": "PSHUFD_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSHUFHW",
-   "form": "PSHUFHW_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSHUFLW",
-   "form": "PSHUFLW_XMMdq_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSHUFW",
-   "form": "PSHUFW_MMXq_MMXq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PSIGNB",
    "form": "PSIGNB_MMXq_MMXq",
    "latency": "1",
    "cpi": ""
-  },
-  {
-   "mnemonic": "PSIGNB",
-   "form": "PSIGNB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PSIGND",
@@ -1919,56 +479,14 @@
    "cpi": ""
   },
   {
-   "mnemonic": "PSIGND",
-   "form": "PSIGND_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PSIGNW",
    "form": "PSIGNW_MMXq_MMXq",
    "latency": "1",
    "cpi": ""
   },
   {
-   "mnemonic": "PSIGNW",
-   "form": "PSIGNW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSLLDQ",
-   "form": "PSLLDQ_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSLLD",
-   "form": "PSLLD_MMXq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PSLLD",
    "form": "PSLLD_MMXq_MMXq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PSLLD",
-   "form": "PSLLD_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSLLD",
-   "form": "PSLLD_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSLLQ",
-   "form": "PSLLQ_MMXq_IMMb",
    "latency": "1",
    "cpi": "1"
   },
@@ -1979,44 +497,8 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSLLQ",
-   "form": "PSLLQ_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSLLQ",
-   "form": "PSLLQ_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSLLW",
-   "form": "PSLLW_MMXq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PSLLW",
    "form": "PSLLW_MMXq_MMXq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PSLLW",
-   "form": "PSLLW_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSLLW",
-   "form": "PSLLW_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSRAD",
-   "form": "PSRAD_MMXq_IMMb",
    "latency": "1",
    "cpi": "1"
   },
@@ -2027,50 +509,8 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSRAD",
-   "form": "PSRAD_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSRAD",
-   "form": "PSRAD_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSRAW",
-   "form": "PSRAW_MMXq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PSRAW",
    "form": "PSRAW_MMXq_MMXq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PSRAW",
-   "form": "PSRAW_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSRAW",
-   "form": "PSRAW_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSRLDQ",
-   "form": "PSRLDQ_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSRLD",
-   "form": "PSRLD_MMXq_IMMb",
    "latency": "1",
    "cpi": "1"
   },
@@ -2081,44 +521,8 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSRLD",
-   "form": "PSRLD_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSRLD",
-   "form": "PSRLD_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSRLQ",
-   "form": "PSRLQ_MMXq_IMMb",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "PSRLQ",
    "form": "PSRLQ_MMXq_MMXq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "PSRLQ",
-   "form": "PSRLQ_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSRLQ",
-   "form": "PSRLQ_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
-   "mnemonic": "PSRLW",
-   "form": "PSRLW_MMXq_IMMb",
    "latency": "1",
    "cpi": "1"
   },
@@ -2129,28 +533,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSRLW",
-   "form": "PSRLW_XMMdq_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSRLW",
-   "form": "PSRLW_XMMdq_XMMdq",
-   "latency": "2",
-   "cpi": "0.69"
-  },
-  {
    "mnemonic": "PSUBB",
    "form": "PSUBB_MMXq_MMXq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSUBB",
-   "form": "PSUBB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "PSUBD",
@@ -2159,22 +545,10 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "PSUBD",
-   "form": "PSUBD_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
    "mnemonic": "PSUBQ",
    "form": "PSUBQ_MMXq_MMXq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "PSUBQ",
-   "form": "PSUBQ_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
   },
   {
    "mnemonic": "PSUBSB",
@@ -2183,22 +557,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSUBSB",
-   "form": "PSUBSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PSUBSW",
    "form": "PSUBSW_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PSUBSW",
-   "form": "PSUBSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PSUBUSB",
@@ -2207,22 +569,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PSUBUSB",
-   "form": "PSUBUSB_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PSUBUSW",
    "form": "PSUBUSW_MMXq_MMXq",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PSUBUSW",
-   "form": "PSUBUSW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.5"
   },
   {
    "mnemonic": "PSUBW",
@@ -2231,22 +581,10 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "PSUBW",
-   "form": "PSUBW_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
    "mnemonic": "PUNPCKHBW",
    "form": "PUNPCKHBW_MMXq_MMXd",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PUNPCKHBW",
-   "form": "PUNPCKHBW_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
   },
   {
    "mnemonic": "PUNPCKHDQ",
@@ -2255,34 +593,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PUNPCKHDQ",
-   "form": "PUNPCKHDQ_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "PUNPCKHQDQ",
-   "form": "PUNPCKHQDQ_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "PUNPCKHWD",
-   "form": "PUNPCKHWD_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
    "mnemonic": "PUNPCKLBW",
    "form": "PUNPCKLBW_MMXq_MMXd",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PUNPCKLBW",
-   "form": "PUNPCKLBW_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
   },
   {
    "mnemonic": "PUNPCKLDQ",
@@ -2291,28 +605,10 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "PUNPCKLDQ",
-   "form": "PUNPCKLDQ_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "PUNPCKLQDQ",
-   "form": "PUNPCKLQDQ_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "PUNPCKLWD",
    "form": "PUNPCKLWD_MMXq_MMXd",
    "latency": "1",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "PUNPCKLWD",
-   "form": "PUNPCKLWD_XMMdq_XMMq",
-   "latency": "1",
-   "cpi": ""
   },
   {
    "mnemonic": "PXOR",
@@ -2321,171 +617,15 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "PXOR",
-   "form": "PXOR_XMMdq_XMMdq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "RCPPS",
-   "form": "RCPPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "RCPSS",
-   "form": "RCPSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "ROL",
-   "form": "ROL_GPRv_IMMb",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "ROR",
-   "form": "ROR_GPRv_IMMb",
-   "latency": "1",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "ROUNDPD",
-   "form": "ROUNDPD_XMMpd_XMMpd_IMMb",
-   "latency": "8",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "ROUNDPS",
-   "form": "ROUNDPS_XMMps_XMMps_IMMb",
-   "latency": "8",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "ROUNDSD",
-   "form": "ROUNDSD_XMMq_XMMq_IMMb",
-   "latency": "8",
-   "cpi": "1.03"
-  },
-  {
-   "mnemonic": "ROUNDSS",
-   "form": "ROUNDSS_XMMd_XMMd_IMMb",
-   "latency": "8",
-   "cpi": "1.03"
-  },
-  {
-   "mnemonic": "RSQRTPS",
-   "form": "RSQRTPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "RSQRTSS",
-   "form": "RSQRTSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "SBB",
    "form": "SBB_GPRv_GPRv_19",
    "latency": "1",
    "cpi": ""
   },
   {
-   "mnemonic": "SHA1MSG1",
-   "form": "SHA1MSG1_XMMi32_XMMi32_SHA",
-   "latency": "2",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "SHA1MSG2",
-   "form": "SHA1MSG2_XMMi32_XMMi32_SHA",
-   "latency": "6",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "SHA1NEXTE",
-   "form": "SHA1NEXTE_XMMi32_XMMi32_SHA",
-   "latency": "3",
-   "cpi": "1.02"
-  },
-  {
-   "mnemonic": "SHA1RNDS4",
-   "form": "SHA1RNDS4_XMMi32_XMMi32_IMM8_SHA",
-   "latency": "6",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "SHA256RNDS2",
-   "form": "SHA256RNDS2_XMMi32_XMMi32_SHA",
-   "latency": "4",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "SHUFPD",
-   "form": "SHUFPD_XMMpd_XMMpd_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "SHUFPS",
-   "form": "SHUFPS_XMMps_XMMps_IMMb",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "SUBPD",
-   "form": "SUBPD_XMMpd_XMMpd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "SUBPS",
-   "form": "SUBPS_XMMps_XMMps",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "SUBSD",
-   "form": "SUBSD_XMMsd_XMMsd",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "SUBSS",
-   "form": "SUBSS_XMMss_XMMss",
-   "latency": "4",
-   "cpi": "0.5"
-  },
-  {
    "mnemonic": "TZCNT",
    "form": "TZCNT_GPRv_GPRv",
    "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "UNPCKHPD",
-   "form": "UNPCKHPD_XMMpd_XMMq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "UNPCKHPS",
-   "form": "UNPCKHPS_XMMps_XMMdq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "UNPCKLPD",
-   "form": "UNPCKLPD_XMMpd_XMMq",
-   "latency": "1",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "UNPCKLPS",
-   "form": "UNPCKLPS_XMMps_XMMq",
-   "latency": "1",
    "cpi": "1"
   },
   {
@@ -2982,24 +1122,6 @@
   },
   {
    "mnemonic": "VCMPPD",
-   "form": "VCMPPD_MASKmskw_MASKmskw_XMMf64_XMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCMPPD",
-   "form": "VCMPPD_MASKmskw_MASKmskw_YMMf64_YMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCMPPD",
-   "form": "VCMPPD_MASKmskw_MASKmskw_ZMMf64_ZMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VCMPPD",
    "form": "VCMPPD_XMMdq_XMMdq_XMMdq_IMMb",
    "latency": "4",
    "cpi": "0.5"
@@ -3008,24 +1130,6 @@
    "mnemonic": "VCMPPD",
    "form": "VCMPPD_YMMqq_YMMqq_YMMqq_IMMb",
    "latency": "4",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VCMPPS",
-   "form": "VCMPPS_MASKmskw_MASKmskw_XMMf32_XMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCMPPS",
-   "form": "VCMPPS_MASKmskw_MASKmskw_YMMf32_YMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCMPPS",
-   "form": "VCMPPS_MASKmskw_MASKmskw_ZMMf32_ZMMf32_IMM8_AVX512",
-   "latency": "3",
    "cpi": "0.5"
   },
   {
@@ -3042,21 +1146,9 @@
   },
   {
    "mnemonic": "VCMPSD",
-   "form": "VCMPSD_MASKmskw_MASKmskw_XMMf64_XMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCMPSD",
    "form": "VCMPSD_XMMdq_XMMdq_XMMq_IMMb",
    "latency": "4",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VCMPSS",
-   "form": "VCMPSS_MASKmskw_MASKmskw_XMMf32_XMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
   },
   {
    "mnemonic": "VCMPSS",
@@ -3449,86 +1541,14 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "VCVTSD2SI",
-   "form": "VCVTSD2SI_GPR32i32_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSD2SI",
-   "form": "VCVTSD2SI_GPR64i64_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "VCVTSD2SS",
    "form": "VCVTSD2SS_XMMf32_MASKmskw_XMMf64_XMMf64_AVX512",
    "latency": "",
    "cpi": "1"
   },
   {
-   "mnemonic": "VCVTSD2USI",
-   "form": "VCVTSD2USI_GPR32u32_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSD2USI",
-   "form": "VCVTSD2USI_GPR64u64_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSI2SD",
-   "form": "VCVTSI2SD_XMMf64_XMMf64_GPR32i32_AVX512",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSI2SD",
-   "form": "VCVTSI2SD_XMMf64_XMMf64_GPR64i64_AVX512",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSI2SS",
-   "form": "VCVTSI2SS_XMMf32_XMMf32_GPR32i32_AVX512",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSI2SS",
-   "form": "VCVTSI2SS_XMMf32_XMMf32_GPR64i64_AVX512",
-   "latency": "6",
-   "cpi": ""
-  },
-  {
    "mnemonic": "VCVTSS2SD",
    "form": "VCVTSS2SD_XMMf64_MASKmskw_XMMf32_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSS2SI",
-   "form": "VCVTSS2SI_GPR32i32_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSS2SI",
-   "form": "VCVTSS2SI_GPR64i64_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSS2USI",
-   "form": "VCVTSS2USI_GPR32u32_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTSS2USI",
-   "form": "VCVTSS2USI_GPR64u64_XMMf32_AVX512",
    "latency": "",
    "cpi": "1"
   },
@@ -3689,54 +1709,6 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "VCVTTSD2SI",
-   "form": "VCVTTSD2SI_GPR32i32_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSD2SI",
-   "form": "VCVTTSD2SI_GPR64i64_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSD2USI",
-   "form": "VCVTTSD2USI_GPR32u32_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSD2USI",
-   "form": "VCVTTSD2USI_GPR64u64_XMMf64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSS2SI",
-   "form": "VCVTTSS2SI_GPR32i32_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSS2SI",
-   "form": "VCVTTSS2SI_GPR64i64_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSS2USI",
-   "form": "VCVTTSS2USI_GPR32u32_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTTSS2USI",
-   "form": "VCVTTSS2USI_GPR64u64_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "VCVTUDQ2PD",
    "form": "VCVTUDQ2PD_XMMf64_MASKmskw_XMMu32_AVX512",
    "latency": "5",
@@ -3795,30 +1767,6 @@
    "form": "VCVTUQQ2PS_YMMf32_MASKmskw_ZMMu64_AVX512_VL512",
    "latency": "7",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTUSI2SD",
-   "form": "VCVTUSI2SD_XMMf64_XMMf64_GPR32u32_AVX512",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTUSI2SD",
-   "form": "VCVTUSI2SD_XMMf64_XMMf64_GPR64u64_AVX512",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTUSI2SS",
-   "form": "VCVTUSI2SS_XMMf32_XMMf32_GPR32u32_AVX512",
-   "latency": "5",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VCVTUSI2SS",
-   "form": "VCVTUSI2SS_XMMf32_XMMf32_GPR64u64_AVX512",
-   "latency": "6",
-   "cpi": "2"
   },
   {
    "mnemonic": "VDBPSADBW",
@@ -3896,12 +1844,6 @@
    "mnemonic": "VDIVSS",
    "form": "VDIVSS_XMMf32_MASKmskw_XMMf32_XMMf32_AVX512",
    "latency": "11",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "VDPPS",
-   "form": "VDPPS_YMMqq_YMMqq_YMMqq_IMMb",
-   "latency": "14",
    "cpi": ""
   },
   {
@@ -5477,54 +3419,6 @@
    "cpi": "0.5"
   },
   {
-   "mnemonic": "VFPCLASSPD",
-   "form": "VFPCLASSPD_MASKmskw_MASKmskw_XMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSPD",
-   "form": "VFPCLASSPD_MASKmskw_MASKmskw_YMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSPD",
-   "form": "VFPCLASSPD_MASKmskw_MASKmskw_ZMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSPS",
-   "form": "VFPCLASSPS_MASKmskw_MASKmskw_XMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSPS",
-   "form": "VFPCLASSPS_MASKmskw_MASKmskw_YMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSPS",
-   "form": "VFPCLASSPS_MASKmskw_MASKmskw_ZMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSSD",
-   "form": "VFPCLASSSD_MASKmskw_MASKmskw_XMMf64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VFPCLASSSS",
-   "form": "VFPCLASSSS_MASKmskw_MASKmskw_XMMf32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "VGETEXPPD",
    "form": "VGETEXPPD_XMMf64_MASKmskw_XMMf64_AVX512",
    "latency": "4",
@@ -5778,18 +3672,6 @@
   },
   {
    "mnemonic": "VMASKMOVPD",
-   "form": "VMASKMOVPD_MEMdq_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VMASKMOVPD",
-   "form": "VMASKMOVPD_MEMqq_YMMqq_YMMqq",
-   "latency": "",
-   "cpi": "1.06"
-  },
-  {
-   "mnemonic": "VMASKMOVPD",
    "form": "VMASKMOVPD_XMMdq_XMMdq_MEMdq",
    "latency": "7",
    "cpi": "0.5"
@@ -5799,18 +3681,6 @@
    "form": "VMASKMOVPD_YMMqq_YMMqq_MEMqq",
    "latency": "8",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VMASKMOVPS",
-   "form": "VMASKMOVPS_MEMdq_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VMASKMOVPS",
-   "form": "VMASKMOVPS_MEMqq_YMMqq_YMMqq",
-   "latency": "",
-   "cpi": "1.06"
   },
   {
    "mnemonic": "VMASKMOVPS",
@@ -5946,12 +3816,6 @@
   },
   {
    "mnemonic": "VMOVAPD",
-   "form": "VMOVAPD_MEMf64_MASKmskw_ZMMf64_AVX512",
-   "latency": "",
-   "cpi": "1.08"
-  },
-  {
-   "mnemonic": "VMOVAPD",
    "form": "VMOVAPD_XMMf64_MASKmskw_MEMf64_AVX512",
    "latency": "7",
    "cpi": "0.5"
@@ -5991,24 +3855,6 @@
    "form": "VMOVAPD_ZMMf64_MASKmskw_ZMMf64_AVX512",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VMOVAPS",
-   "form": "VMOVAPS_MEMf32_MASKmskw_XMMf32_AVX512",
-   "latency": "",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "VMOVAPS",
-   "form": "VMOVAPS_MEMf32_MASKmskw_YMMf32_AVX512",
-   "latency": "",
-   "cpi": "0.56"
-  },
-  {
-   "mnemonic": "VMOVAPS",
-   "form": "VMOVAPS_MEMf32_MASKmskw_ZMMf32_AVX512",
-   "latency": "",
-   "cpi": "1.08"
   },
   {
    "mnemonic": "VMOVAPS",
@@ -6078,24 +3924,6 @@
   },
   {
    "mnemonic": "VMOVDQA32",
-   "form": "VMOVDQA32_MEMu32_MASKmskw_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "0.55"
-  },
-  {
-   "mnemonic": "VMOVDQA32",
-   "form": "VMOVDQA32_MEMu32_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "0.56"
-  },
-  {
-   "mnemonic": "VMOVDQA32",
-   "form": "VMOVDQA32_MEMu32_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.08"
-  },
-  {
-   "mnemonic": "VMOVDQA32",
    "form": "VMOVDQA32_XMMu32_MASKmskw_MEMu32_AVX512",
    "latency": "7",
    "cpi": "0.5"
@@ -6129,18 +3957,6 @@
    "form": "VMOVDQA32_ZMMu32_MASKmskw_ZMMu32_AVX512",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VMOVDQA64",
-   "form": "VMOVDQA64_MEMu64_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "0.56"
-  },
-  {
-   "mnemonic": "VMOVDQA64",
-   "form": "VMOVDQA64_MEMu64_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.08"
   },
   {
    "mnemonic": "VMOVDQA64",
@@ -6186,12 +4002,6 @@
   },
   {
    "mnemonic": "VMOVDQU16",
-   "form": "VMOVDQU16_MEMu16_MASKmskw_ZMMu16_AVX512",
-   "latency": "",
-   "cpi": "1.08"
-  },
-  {
-   "mnemonic": "VMOVDQU16",
    "form": "VMOVDQU16_XMMu16_MASKmskw_MEMu16_AVX512",
    "latency": "",
    "cpi": "0.5"
@@ -6228,18 +4038,6 @@
   },
   {
    "mnemonic": "VMOVDQU32",
-   "form": "VMOVDQU32_MEMu32_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "0.56"
-  },
-  {
-   "mnemonic": "VMOVDQU32",
-   "form": "VMOVDQU32_MEMu32_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.08"
-  },
-  {
-   "mnemonic": "VMOVDQU32",
    "form": "VMOVDQU32_XMMu32_MASKmskw_MEMu32_AVX512",
    "latency": "7",
    "cpi": "0.5"
@@ -6258,12 +4056,6 @@
   },
   {
    "mnemonic": "VMOVDQU64",
-   "form": "VMOVDQU64_MEMu64_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.08"
-  },
-  {
-   "mnemonic": "VMOVDQU64",
    "form": "VMOVDQU64_XMMu64_MASKmskw_MEMu64_AVX512",
    "latency": "7",
    "cpi": "0.5"
@@ -6279,12 +4071,6 @@
    "form": "VMOVDQU64_ZMMu64_MASKmskw_MEMu64_AVX512",
    "latency": "8",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VMOVDQU8",
-   "form": "VMOVDQU8_MEMu8_MASKmskw_ZMMu8_AVX512",
-   "latency": "2",
-   "cpi": "0"
   },
   {
    "mnemonic": "VMOVDQU8",
@@ -6327,30 +4113,6 @@
    "form": "VMOVDQU_YMMqq_MEMqq",
    "latency": "7",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VMOVD",
-   "form": "VMOVD_GPR32d_XMMd",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VMOVD",
-   "form": "VMOVD_GPR32u32_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VMOVMSKPD",
-   "form": "VMOVMSKPD_GPR32d_YMMqq",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VMOVMSKPS",
-   "form": "VMOVMSKPS_GPR32d_YMMqq",
-   "latency": "",
-   "cpi": "1"
   },
   {
    "mnemonic": "VMOVNTDQA",
@@ -6438,12 +4200,6 @@
   },
   {
    "mnemonic": "VMOVUPD",
-   "form": "VMOVUPD_MEMf64_MASKmskw_ZMMf64_AVX512",
-   "latency": "",
-   "cpi": "1.08"
-  },
-  {
-   "mnemonic": "VMOVUPD",
    "form": "VMOVUPD_XMMf64_MASKmskw_MEMf64_AVX512",
    "latency": "7",
    "cpi": "0.5"
@@ -6465,12 +4221,6 @@
    "form": "VMOVUPD_ZMMf64_MASKmskw_MEMf64_AVX512",
    "latency": "8",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VMOVUPS",
-   "form": "VMOVUPS_MEMf32_MASKmskw_ZMMf32_AVX512",
-   "latency": "",
-   "cpi": "1.08"
   },
   {
    "mnemonic": "VMOVUPS",
@@ -7272,20 +5022,8 @@
   },
   {
    "mnemonic": "VPBROADCASTB",
-   "form": "VPBROADCASTB_YMMu8_MASKmskw_GPR32u8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTB",
    "form": "VPBROADCASTB_YMMu8_MASKmskw_XMMu8_AVX512",
    "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTB",
-   "form": "VPBROADCASTB_ZMMu8_MASKmskw_GPR32u8_AVX512",
-   "latency": "3",
    "cpi": "1"
   },
   {
@@ -7320,19 +5058,7 @@
   },
   {
    "mnemonic": "VPBROADCASTD",
-   "form": "VPBROADCASTD_YMMu32_MASKmskw_GPR32u32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTD",
    "form": "VPBROADCASTD_YMMu32_MASKmskw_XMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTD",
-   "form": "VPBROADCASTD_ZMMu32_MASKmskw_GPR32u32_AVX512",
    "latency": "3",
    "cpi": "1"
   },
@@ -7340,42 +5066,6 @@
    "mnemonic": "VPBROADCASTD",
    "form": "VPBROADCASTD_ZMMu32_MASKmskw_XMMu32_AVX512",
    "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTMB2Q",
-   "form": "VPBROADCASTMB2Q_XMMu64_MASKu64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTMB2Q",
-   "form": "VPBROADCASTMB2Q_YMMu64_MASKu64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTMB2Q",
-   "form": "VPBROADCASTMB2Q_ZMMu64_MASKu64_AVX512CD",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTMW2D",
-   "form": "VPBROADCASTMW2D_XMMu32_MASKu32_AVX512",
-   "latency": "",
-   "cpi": "1.01"
-  },
-  {
-   "mnemonic": "VPBROADCASTMW2D",
-   "form": "VPBROADCASTMW2D_YMMu32_MASKu32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTMW2D",
-   "form": "VPBROADCASTMW2D_ZMMu32_MASKu32_AVX512CD",
-   "latency": "",
    "cpi": "1"
   },
   {
@@ -7404,19 +5094,7 @@
   },
   {
    "mnemonic": "VPBROADCASTQ",
-   "form": "VPBROADCASTQ_YMMu64_MASKmskw_GPR64u64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTQ",
    "form": "VPBROADCASTQ_YMMu64_MASKmskw_XMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTQ",
-   "form": "VPBROADCASTQ_ZMMu64_MASKmskw_GPR64u64_AVX512",
    "latency": "3",
    "cpi": "1"
   },
@@ -7452,62 +5130,14 @@
   },
   {
    "mnemonic": "VPBROADCASTW",
-   "form": "VPBROADCASTW_YMMu16_MASKmskw_GPR32u16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTW",
    "form": "VPBROADCASTW_YMMu16_MASKmskw_XMMu16_AVX512",
    "latency": "",
    "cpi": "1"
   },
   {
    "mnemonic": "VPBROADCASTW",
-   "form": "VPBROADCASTW_ZMMu16_MASKmskw_GPR32u16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPBROADCASTW",
    "form": "VPBROADCASTW_ZMMu16_MASKmskw_XMMu16_AVX512",
    "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPB",
-   "form": "VPCMPB_MASKmskw_MASKmskw_XMMi8_XMMi8_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPB",
-   "form": "VPCMPB_MASKmskw_MASKmskw_YMMi8_YMMi8_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPB",
-   "form": "VPCMPB_MASKmskw_MASKmskw_ZMMi8_ZMMi8_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPD",
-   "form": "VPCMPD_MASKmskw_MASKmskw_XMMi32_XMMi32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPD",
-   "form": "VPCMPD_MASKmskw_MASKmskw_YMMi32_YMMi32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPD",
-   "form": "VPCMPD_MASKmskw_MASKmskw_ZMMi32_ZMMi32_IMM8_AVX512",
-   "latency": "3",
    "cpi": "1"
   },
   {
@@ -7518,21 +5148,9 @@
   },
   {
    "mnemonic": "VPCMPEQD",
-   "form": "VPCMPEQD_MASKmskw_MASKmskw_ZMMu32_ZMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPEQD",
    "form": "VPCMPEQD_YMMqq_YMMqq_YMMqq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPCMPEQQ",
-   "form": "VPCMPEQQ_MASKmskw_MASKmskw_ZMMu64_ZMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
   },
   {
    "mnemonic": "VPCMPEQQ",
@@ -7554,21 +5172,9 @@
   },
   {
    "mnemonic": "VPCMPGTD",
-   "form": "VPCMPGTD_MASKmskw_MASKmskw_ZMMi32_ZMMi32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPGTD",
    "form": "VPCMPGTD_YMMqq_YMMqq_YMMqq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPCMPGTQ",
-   "form": "VPCMPGTQ_MASKmskw_MASKmskw_ZMMi64_ZMMi64_AVX512",
-   "latency": "3",
-   "cpi": "1"
   },
   {
    "mnemonic": "VPCMPGTQ",
@@ -7581,114 +5187,6 @@
    "form": "VPCMPGTW_YMMqq_YMMqq_YMMqq",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPCMPQ",
-   "form": "VPCMPQ_MASKmskw_MASKmskw_XMMi64_XMMi64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPQ",
-   "form": "VPCMPQ_MASKmskw_MASKmskw_YMMi64_YMMi64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPQ",
-   "form": "VPCMPQ_MASKmskw_MASKmskw_ZMMi64_ZMMi64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUB",
-   "form": "VPCMPUB_MASKmskw_MASKmskw_XMMu8_XMMu8_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUB",
-   "form": "VPCMPUB_MASKmskw_MASKmskw_YMMu8_YMMu8_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUB",
-   "form": "VPCMPUB_MASKmskw_MASKmskw_ZMMu8_ZMMu8_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUD",
-   "form": "VPCMPUD_MASKmskw_MASKmskw_XMMu32_XMMu32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUD",
-   "form": "VPCMPUD_MASKmskw_MASKmskw_YMMu32_YMMu32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUD",
-   "form": "VPCMPUD_MASKmskw_MASKmskw_ZMMu32_ZMMu32_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUQ",
-   "form": "VPCMPUQ_MASKmskw_MASKmskw_XMMu64_XMMu64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUQ",
-   "form": "VPCMPUQ_MASKmskw_MASKmskw_YMMu64_YMMu64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUQ",
-   "form": "VPCMPUQ_MASKmskw_MASKmskw_ZMMu64_ZMMu64_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUW",
-   "form": "VPCMPUW_MASKmskw_MASKmskw_XMMu16_XMMu16_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUW",
-   "form": "VPCMPUW_MASKmskw_MASKmskw_YMMu16_YMMu16_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPUW",
-   "form": "VPCMPUW_MASKmskw_MASKmskw_ZMMu16_ZMMu16_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPW",
-   "form": "VPCMPW_MASKmskw_MASKmskw_XMMi16_XMMi16_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPW",
-   "form": "VPCMPW_MASKmskw_MASKmskw_YMMi16_YMMi16_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPCMPW",
-   "form": "VPCMPW_MASKmskw_MASKmskw_ZMMi16_ZMMi16_IMM8_AVX512",
-   "latency": "3",
-   "cpi": "1"
   },
   {
    "mnemonic": "VPCOMPRESSB",
@@ -8568,12 +6066,6 @@
   },
   {
    "mnemonic": "VPMADDUBSW",
-   "form": "VPMADDUBSW_YMMqq_YMMqq_YMMqq",
-   "latency": "5",
-   "cpi": ""
-  },
-  {
-   "mnemonic": "VPMADDUBSW",
    "form": "VPMADDUBSW_ZMMi16_MASKmskw_ZMMi16_ZMMi16_AVX512",
    "latency": "",
    "cpi": "1"
@@ -8604,18 +6096,6 @@
   },
   {
    "mnemonic": "VPMASKMOVD",
-   "form": "VPMASKMOVD_MEMdq_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMASKMOVD",
-   "form": "VPMASKMOVD_MEMqq_YMMqq_YMMqq",
-   "latency": "",
-   "cpi": "1.06"
-  },
-  {
-   "mnemonic": "VPMASKMOVD",
    "form": "VPMASKMOVD_XMMdq_XMMdq_MEMdq",
    "latency": "7",
    "cpi": "0.5"
@@ -8625,18 +6105,6 @@
    "form": "VPMASKMOVD_YMMqq_YMMqq_MEMqq",
    "latency": "8",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPMASKMOVQ",
-   "form": "VPMASKMOVQ_MEMdq_XMMdq_XMMdq",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMASKMOVQ",
-   "form": "VPMASKMOVQ_MEMqq_YMMqq_YMMqq",
-   "latency": "",
-   "cpi": "1.06"
   },
   {
    "mnemonic": "VPMASKMOVQ",
@@ -9011,60 +6479,6 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "VPMOVB2M",
-   "form": "VPMOVB2M_MASKmskw_XMMu8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVB2M",
-   "form": "VPMOVB2M_MASKmskw_YMMu8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVB2M",
-   "form": "VPMOVB2M_MASKmskw_ZMMu8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVD2M",
-   "form": "VPMOVD2M_MASKmskw_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVD2M",
-   "form": "VPMOVD2M_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVD2M",
-   "form": "VPMOVD2M_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVDB",
-   "form": "VPMOVDB_MEMu8_MASKmskw_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVDB",
-   "form": "VPMOVDB_MEMu8_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVDB",
-   "form": "VPMOVDB_MEMu8_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "2.05"
-  },
-  {
    "mnemonic": "VPMOVDB",
    "form": "VPMOVDB_XMMu8_MASKmskw_XMMu32_AVX512",
    "latency": "4",
@@ -9084,24 +6498,6 @@
   },
   {
    "mnemonic": "VPMOVDW",
-   "form": "VPMOVDW_MEMu16_MASKmskw_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVDW",
-   "form": "VPMOVDW_MEMu16_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVDW",
-   "form": "VPMOVDW_MEMu16_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "2.06"
-  },
-  {
-   "mnemonic": "VPMOVDW",
    "form": "VPMOVDW_XMMu16_MASKmskw_XMMu32_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9117,120 +6513,6 @@
    "form": "VPMOVDW_YMMu16_MASKmskw_ZMMu32_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVM2B",
-   "form": "VPMOVM2B_XMMu8_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2B",
-   "form": "VPMOVM2B_YMMu8_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2B",
-   "form": "VPMOVM2B_ZMMu8_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPMOVM2D",
-   "form": "VPMOVM2D_XMMu32_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2D",
-   "form": "VPMOVM2D_YMMu32_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2D",
-   "form": "VPMOVM2D_ZMMu32_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPMOVM2Q",
-   "form": "VPMOVM2Q_XMMu64_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2Q",
-   "form": "VPMOVM2Q_YMMu64_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2Q",
-   "form": "VPMOVM2Q_ZMMu64_MASKmskw_AVX512",
-   "latency": "1",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPMOVM2W",
-   "form": "VPMOVM2W_XMMu16_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2W",
-   "form": "VPMOVM2W_YMMu16_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "VPMOVM2W",
-   "form": "VPMOVM2W_ZMMu16_MASKmskw_AVX512",
-   "latency": "",
-   "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPMOVMSKB",
-   "form": "VPMOVMSKB_GPR32d_YMMqq",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVQ2M",
-   "form": "VPMOVQ2M_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVQ2M",
-   "form": "VPMOVQ2M_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVQ2M",
-   "form": "VPMOVQ2M_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVQB",
-   "form": "VPMOVQB_MEMu8_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVQB",
-   "form": "VPMOVQB_MEMu8_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVQB",
-   "form": "VPMOVQB_MEMu8_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "2.04"
   },
   {
    "mnemonic": "VPMOVQB",
@@ -9252,24 +6534,6 @@
   },
   {
    "mnemonic": "VPMOVQD",
-   "form": "VPMOVQD_MEMu32_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVQD",
-   "form": "VPMOVQD_MEMu32_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVQD",
-   "form": "VPMOVQD_MEMu32_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.06"
-  },
-  {
-   "mnemonic": "VPMOVQD",
    "form": "VPMOVQD_XMMu32_MASKmskw_YMMu64_AVX512",
    "latency": "3",
    "cpi": "1"
@@ -9279,24 +6543,6 @@
    "form": "VPMOVQD_YMMu32_MASKmskw_ZMMu64_AVX512",
    "latency": "3",
    "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVQW",
-   "form": "VPMOVQW_MEMu16_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVQW",
-   "form": "VPMOVQW_MEMu16_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVQW",
-   "form": "VPMOVQW_MEMu16_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "2.05"
   },
   {
    "mnemonic": "VPMOVQW",
@@ -9318,24 +6564,6 @@
   },
   {
    "mnemonic": "VPMOVSDB",
-   "form": "VPMOVSDB_MEMi8_MASKmskw_XMMi32_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVSDB",
-   "form": "VPMOVSDB_MEMi8_MASKmskw_YMMi32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSDB",
-   "form": "VPMOVSDB_MEMi8_MASKmskw_ZMMi32_AVX512",
-   "latency": "",
-   "cpi": "2.05"
-  },
-  {
-   "mnemonic": "VPMOVSDB",
    "form": "VPMOVSDB_XMMi8_MASKmskw_XMMi32_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9351,24 +6579,6 @@
    "form": "VPMOVSDB_XMMi8_MASKmskw_ZMMi32_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVSDW",
-   "form": "VPMOVSDW_MEMi16_MASKmskw_XMMi32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSDW",
-   "form": "VPMOVSDW_MEMi16_MASKmskw_YMMi32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSDW",
-   "form": "VPMOVSDW_MEMi16_MASKmskw_ZMMi32_AVX512",
-   "latency": "",
-   "cpi": "2.06"
   },
   {
    "mnemonic": "VPMOVSDW",
@@ -9390,24 +6600,6 @@
   },
   {
    "mnemonic": "VPMOVSQB",
-   "form": "VPMOVSQB_MEMi8_MASKmskw_XMMi64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVSQB",
-   "form": "VPMOVSQB_MEMi8_MASKmskw_YMMi64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVSQB",
-   "form": "VPMOVSQB_MEMi8_MASKmskw_ZMMi64_AVX512",
-   "latency": "",
-   "cpi": "2.04"
-  },
-  {
-   "mnemonic": "VPMOVSQB",
    "form": "VPMOVSQB_XMMi8_MASKmskw_XMMi64_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9423,24 +6615,6 @@
    "form": "VPMOVSQB_XMMi8_MASKmskw_ZMMi64_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVSQD",
-   "form": "VPMOVSQD_MEMi32_MASKmskw_XMMi64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSQD",
-   "form": "VPMOVSQD_MEMi32_MASKmskw_YMMi64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSQD",
-   "form": "VPMOVSQD_MEMi32_MASKmskw_ZMMi64_AVX512",
-   "latency": "",
-   "cpi": "2.06"
   },
   {
    "mnemonic": "VPMOVSQD",
@@ -9462,24 +6636,6 @@
   },
   {
    "mnemonic": "VPMOVSQW",
-   "form": "VPMOVSQW_MEMi16_MASKmskw_XMMi64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVSQW",
-   "form": "VPMOVSQW_MEMi16_MASKmskw_YMMi64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSQW",
-   "form": "VPMOVSQW_MEMi16_MASKmskw_ZMMi64_AVX512",
-   "latency": "",
-   "cpi": "2.05"
-  },
-  {
-   "mnemonic": "VPMOVSQW",
    "form": "VPMOVSQW_XMMi16_MASKmskw_XMMi64_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9495,24 +6651,6 @@
    "form": "VPMOVSQW_XMMi16_MASKmskw_ZMMi64_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVSWB",
-   "form": "VPMOVSWB_MEMi8_MASKmskw_XMMi16_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSWB",
-   "form": "VPMOVSWB_MEMi8_MASKmskw_YMMi16_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVSWB",
-   "form": "VPMOVSWB_MEMi8_MASKmskw_ZMMi16_AVX512",
-   "latency": "",
-   "cpi": "2.06"
   },
   {
    "mnemonic": "VPMOVSWB",
@@ -9678,24 +6816,6 @@
   },
   {
    "mnemonic": "VPMOVUSDB",
-   "form": "VPMOVUSDB_MEMu8_MASKmskw_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVUSDB",
-   "form": "VPMOVUSDB_MEMu8_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSDB",
-   "form": "VPMOVUSDB_MEMu8_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "2.05"
-  },
-  {
-   "mnemonic": "VPMOVUSDB",
    "form": "VPMOVUSDB_XMMu8_MASKmskw_XMMu32_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9711,24 +6831,6 @@
    "form": "VPMOVUSDB_XMMu8_MASKmskw_ZMMu32_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVUSDW",
-   "form": "VPMOVUSDW_MEMu16_MASKmskw_XMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSDW",
-   "form": "VPMOVUSDW_MEMu16_MASKmskw_YMMu32_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSDW",
-   "form": "VPMOVUSDW_MEMu16_MASKmskw_ZMMu32_AVX512",
-   "latency": "",
-   "cpi": "2.06"
   },
   {
    "mnemonic": "VPMOVUSDW",
@@ -9750,24 +6852,6 @@
   },
   {
    "mnemonic": "VPMOVUSQB",
-   "form": "VPMOVUSQB_MEMu8_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVUSQB",
-   "form": "VPMOVUSQB_MEMu8_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVUSQB",
-   "form": "VPMOVUSQB_MEMu8_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "2.04"
-  },
-  {
-   "mnemonic": "VPMOVUSQB",
    "form": "VPMOVUSQB_XMMu8_MASKmskw_XMMu64_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9783,24 +6867,6 @@
    "form": "VPMOVUSQB_XMMu8_MASKmskw_ZMMu64_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVUSQD",
-   "form": "VPMOVUSQD_MEMu32_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSQD",
-   "form": "VPMOVUSQD_MEMu32_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSQD",
-   "form": "VPMOVUSQD_MEMu32_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "2.06"
   },
   {
    "mnemonic": "VPMOVUSQD",
@@ -9822,24 +6888,6 @@
   },
   {
    "mnemonic": "VPMOVUSQW",
-   "form": "VPMOVUSQW_MEMu16_MASKmskw_XMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.04"
-  },
-  {
-   "mnemonic": "VPMOVUSQW",
-   "form": "VPMOVUSQW_MEMu16_MASKmskw_YMMu64_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSQW",
-   "form": "VPMOVUSQW_MEMu16_MASKmskw_ZMMu64_AVX512",
-   "latency": "",
-   "cpi": "2.05"
-  },
-  {
-   "mnemonic": "VPMOVUSQW",
    "form": "VPMOVUSQW_XMMu16_MASKmskw_XMMu64_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9858,24 +6906,6 @@
   },
   {
    "mnemonic": "VPMOVUSWB",
-   "form": "VPMOVUSWB_MEMu8_MASKmskw_XMMu16_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSWB",
-   "form": "VPMOVUSWB_MEMu8_MASKmskw_YMMu16_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVUSWB",
-   "form": "VPMOVUSWB_MEMu8_MASKmskw_ZMMu16_AVX512",
-   "latency": "",
-   "cpi": "2.06"
-  },
-  {
-   "mnemonic": "VPMOVUSWB",
    "form": "VPMOVUSWB_XMMu8_MASKmskw_XMMu16_AVX512",
    "latency": "4",
    "cpi": "1"
@@ -9891,42 +6921,6 @@
    "form": "VPMOVUSWB_YMMu8_MASKmskw_ZMMu16_AVX512",
    "latency": "",
    "cpi": "2"
-  },
-  {
-   "mnemonic": "VPMOVW2M",
-   "form": "VPMOVW2M_MASKmskw_XMMu16_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVW2M",
-   "form": "VPMOVW2M_MASKmskw_YMMu16_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVW2M",
-   "form": "VPMOVW2M_MASKmskw_ZMMu16_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPMOVWB",
-   "form": "VPMOVWB_MEMu8_MASKmskw_XMMu16_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVWB",
-   "form": "VPMOVWB_MEMu8_MASKmskw_YMMu16_AVX512",
-   "latency": "",
-   "cpi": "1.05"
-  },
-  {
-   "mnemonic": "VPMOVWB",
-   "form": "VPMOVWB_MEMu8_MASKmskw_ZMMu16_AVX512",
-   "latency": "",
-   "cpi": "2.06"
   },
   {
    "mnemonic": "VPMOVWB",
@@ -10757,12 +7751,6 @@
    "cpi": "1"
   },
   {
-   "mnemonic": "VPSHUFBITQMB",
-   "form": "VPSHUFBITQMB_MASKmskw_MASKmskw_ZMMu64_ZMMu8_AVX512",
-   "latency": "",
-   "cpi": "1"
-  },
-  {
    "mnemonic": "VPSHUFB",
    "form": "VPSHUFB_XMMu8_MASKmskw_XMMu8_XMMu8_AVX512",
    "latency": "",
@@ -11163,12 +8151,6 @@
    "form": "VPSRAQ_XMMu64_MASKmskw_XMMu64_IMM8_AVX512",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPSRAQ",
-   "form": "VPSRAQ_XMMu64_MASKmskw_XMMu64_XMMu64_AVX512",
-   "latency": "2",
-   "cpi": ""
   },
   {
    "mnemonic": "VPSRAQ",
@@ -11769,150 +8751,6 @@
    "form": "VPTERNLOGQ_ZMMu64_MASKmskw_ZMMu64_ZMMu64_IMM8_AVX512",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "VPTESTMB",
-   "form": "VPTESTMB_MASKmskw_MASKmskw_XMMu8_XMMu8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMB",
-   "form": "VPTESTMB_MASKmskw_MASKmskw_YMMu8_YMMu8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMB",
-   "form": "VPTESTMB_MASKmskw_MASKmskw_ZMMu8_ZMMu8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMD",
-   "form": "VPTESTMD_MASKmskw_MASKmskw_XMMu32_XMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMD",
-   "form": "VPTESTMD_MASKmskw_MASKmskw_YMMu32_YMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMD",
-   "form": "VPTESTMD_MASKmskw_MASKmskw_ZMMu32_ZMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMQ",
-   "form": "VPTESTMQ_MASKmskw_MASKmskw_XMMu64_XMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMQ",
-   "form": "VPTESTMQ_MASKmskw_MASKmskw_YMMu64_YMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMQ",
-   "form": "VPTESTMQ_MASKmskw_MASKmskw_ZMMu64_ZMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMW",
-   "form": "VPTESTMW_MASKmskw_MASKmskw_XMMu16_XMMu16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMW",
-   "form": "VPTESTMW_MASKmskw_MASKmskw_YMMu16_YMMu16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTMW",
-   "form": "VPTESTMW_MASKmskw_MASKmskw_ZMMu16_ZMMu16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMB",
-   "form": "VPTESTNMB_MASKmskw_MASKmskw_XMMu8_XMMu8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMB",
-   "form": "VPTESTNMB_MASKmskw_MASKmskw_YMMu8_YMMu8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMB",
-   "form": "VPTESTNMB_MASKmskw_MASKmskw_ZMMu8_ZMMu8_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMD",
-   "form": "VPTESTNMD_MASKmskw_MASKmskw_XMMu32_XMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMD",
-   "form": "VPTESTNMD_MASKmskw_MASKmskw_YMMu32_YMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMD",
-   "form": "VPTESTNMD_MASKmskw_MASKmskw_ZMMu32_ZMMu32_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMQ",
-   "form": "VPTESTNMQ_MASKmskw_MASKmskw_XMMu64_XMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMQ",
-   "form": "VPTESTNMQ_MASKmskw_MASKmskw_YMMu64_YMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMQ",
-   "form": "VPTESTNMQ_MASKmskw_MASKmskw_ZMMu64_ZMMu64_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMW",
-   "form": "VPTESTNMW_MASKmskw_MASKmskw_XMMu16_XMMu16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMW",
-   "form": "VPTESTNMW_MASKmskw_MASKmskw_YMMu16_YMMu16_AVX512",
-   "latency": "3",
-   "cpi": "1"
-  },
-  {
-   "mnemonic": "VPTESTNMW",
-   "form": "VPTESTNMW_MASKmskw_MASKmskw_ZMMu16_ZMMu16_AVX512",
-   "latency": "3",
-   "cpi": "1"
   },
   {
    "mnemonic": "VPTEST",
@@ -12825,18 +9663,6 @@
    "form": "VXORPS_ZMMu32_MASKmskw_ZMMu32_ZMMu32_AVX512",
    "latency": "1",
    "cpi": "0.5"
-  },
-  {
-   "mnemonic": "XORPD",
-   "form": "XORPD_XMMxuq_XMMxuq",
-   "latency": "1",
-   "cpi": "0.33"
-  },
-  {
-   "mnemonic": "XORPS",
-   "form": "XORPS_XMMxud_XMMxud",
-   "latency": "1",
-   "cpi": "0.33"
   }
  ]
 }

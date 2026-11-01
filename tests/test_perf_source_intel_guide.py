@@ -37,7 +37,7 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(row.mnemonic, "ADCX")
         self.assertEqual(row.latency, "1")
         self.assertEqual(row.cpi, "0.5")
-        row = _rows_by(self.result, "ADDPD_XMMpd_XMMpd", "ICL")
+        row = _rows_by(self.result, "ADDPD_XMMpd_XMMpd", "ICX")
         self.assertEqual(row.latency, "4")
         self.assertEqual(row.cpi, "0.5")
         row = _rows_by(self.result, "XSETBV", "SKL")
@@ -64,11 +64,11 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(row.latency, "")
         self.assertEqual(row.cpi, "0.5")
 
-    def test_icelake_client_row_wins_over_xeon(self):
-        # "Icelake Intel Core" and "Icelake Xeon" both map to ICL. The
-        # client label matches the cores.py ``icelake-client`` llvm_cpu.
-        rows = [r for r in self.result.rows if r.form == "ADCX_GPR32d_GPR32d" and r.core == "ICL"]
-        self.assertEqual(len(rows), 1)
+    def test_icelake_labels_map_to_distinct_cores(self):
+        # "Icelake Intel Core" maps to ICL and "Icelake Xeon" to ICX, so
+        # both labels keep their own row.
+        rows = [r for r in self.result.rows if r.form == "ADCX_GPR32d_GPR32d"]
+        self.assertEqual(sorted(r.core for r in rows), ["ADL-P", "EMR", "ICL", "ICX", "SKL"])
 
     def test_known_rows_kept_and_unknown_cpu_dropped(self):
         text = '"FOO_XMMp_XMMp":[\n\t\t{"No Such CPU":{l:"1",t:"1"}},\n\t],'
@@ -92,7 +92,7 @@ class VendoredTests(unittest.TestCase):
 
     def test_load_vendored_covers_all_expected_cores(self):
         cores = {row.core for row in load_vendored(VENDOR)}
-        self.assertEqual(cores, {"ADL-P", "SKL", "EMR", "ICL"})
+        self.assertEqual(cores, {"ADL-P", "SKL", "EMR", "ICL", "ICX"})
 
     def test_load_vendored_default_path(self):
         # Default path is the repo vendor directory next to this checkout.

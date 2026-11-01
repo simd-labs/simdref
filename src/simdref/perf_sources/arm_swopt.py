@@ -18,10 +18,10 @@ Downloads (probe report, probes/arm-swopt/report.md):
 
 Refresh: ``python -m simdref.perf_sources.arm_swopt refresh RAWDIR`` where
 RAWDIR holds the PDFs under the file names in :data:`CPUS` (``v2.pdf`` ...).
-Rows whose CPU has no id in cores.py (today: neoverse-e1) are dropped.
+Rows whose CPU has no id in cores.py are dropped.
 
-The Neoverse V3AE guide (Issue 3.0, 110075_0000_3.0_en) exists but has no
-core id either and is not vendored.
+The Neoverse V3AE guide (Issue 3.0, 110075_0000_3.0_en) is vendored from
+the same documentation-service.arm.com download as the other guides.
 """
 
 from __future__ import annotations
@@ -93,6 +93,12 @@ CPUS: tuple[CpuSpec, ...] = (
         "neoverse-e1",
         "Issue 1.0 (r1p1)",
         "https://documentation-service.arm.com/static/6687ce1469e89f01e39c44d0?token=",
+    ),
+    CpuSpec(
+        "v3ae.pdf",
+        "neoverse-v3ae",
+        "Issue 3.0 (r0p2)",
+        "https://documentation-service.arm.com/static/6734ebb3c7fc0d1f211d931c?token=",
     ),
 )
 _CPU_BY_NAME = {c.cpu: c for c in CPUS}

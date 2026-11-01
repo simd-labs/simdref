@@ -42,19 +42,19 @@ CITATION_URL = "https://www.intel.com/content/www/us/en/docs/intrinsics-guide/in
 # not say whether "Skylake" is client or server and whether "Alderlake" is
 # the P-core or E-core; the client ids (SKL, ADL-P) follow the uops.info
 # convention. cores.py aliases map Sapphire Rapids to EMR (same Golden
-# Cove P-core microarchitecture). The C-series brief forbids editing
-# cores.py from this node.
+# Cove P-core microarchitecture). "Icelake Xeon" maps to the ICX server
+# id, so the client and server rows no longer collide.
 _CPU_CORE: dict[str, str] = {
     "Alderlake": "ADL-P",
     "Skylake": "SKL",
     "Sapphire Rapids": "EMR",
     "Icelake Intel Core": "ICL",
-    "Icelake Xeon": "ICL",
+    "Icelake Xeon": "ICX",
 }
 
 # When two perf2.js labels map to one canonical core, keep the row whose
-# label sorts first here. "Icelake Intel Core" comes before "Icelake Xeon"
-# because cores.py names icelake-client as the llvm_cpu of ICL.
+# label sorts first here. The Icelake labels now map to distinct cores,
+# so no label pair collides today; the guard stays for future additions.
 _CPU_PREFERENCE = (
     "Alderlake",
     "Skylake",

@@ -42,10 +42,10 @@ _VENDOR_DIR = _REPO_ROOT / "vendor" / "intel_optref"
 @dataclass(frozen=True)
 class _TableSpec:
     # Column cores, latency first in text order. A tuple lists the
-    # canonical ids one column covers; None marks a column with no
-    # cores.py id. Six tables share one SNB+IVB column; 6-19 shares one
-    # GLM+GLP column and puts the throughput block before the latency
-    # block.
+    # canonical ids one column covers. Six tables share one SNB+IVB
+    # column; 6-19 shares one GLM+GLP column and puts the throughput
+    # block before the latency block. Its first column is Silvermont
+    # (SLM).
     latency: tuple[tuple[str, ...] | None, ...]
     throughput: tuple[tuple[str, ...] | None, ...]
     throughput_first: bool = False
@@ -82,8 +82,8 @@ _TABLES: dict[str, _TableSpec] = {
     "7-16": _spec(_SKL_BDW_HSW_SNBIVB),
     "7-17": _spec(_SKL_BDW_HSW_IVB),
     "6-19": _TableSpec(
-        latency=(None, ("GLM", "GLP")),
-        throughput=(None, ("GLM", "GLP")),
+        latency=(("SLM",), ("GLM", "GLP")),
+        throughput=(("SLM",), ("GLM", "GLP")),
         throughput_first=True,
         allow_partial=False,
     ),

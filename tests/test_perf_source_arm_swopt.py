@@ -102,11 +102,8 @@ class VendoredTests(unittest.TestCase):
     def test_every_vendored_cpu_resolves_to_a_core(self):
         known = {c.cpu for c in CPUS if canonical_core_id(c.cpu) is not None}
         self.assertIn("neoverse-v2", known)
-        # CPUs without a core id are dropped by load_vendored.
-        self.assertEqual(
-            [c.cpu for c in CPUS if canonical_core_id(c.cpu) is None],
-            ["neoverse-e1"],
-        )
+        # Every guide CPU now has a core id, so no group is dropped.
+        self.assertEqual([c.cpu for c in CPUS if canonical_core_id(c.cpu) is None], [])
 
     def test_load_vendored_returns_rows(self):
         rows = load_vendored()
@@ -123,6 +120,8 @@ class VendoredTests(unittest.TestCase):
                 "neoverse-v1",
                 "neoverse-v2",
                 "neoverse-v3",
+                "neoverse-v3ae",
+                "neoverse-e1",
                 "neoverse-n1",
                 "neoverse-n2",
                 "neoverse-n3",

@@ -103,6 +103,20 @@ AARCH64_CORES: tuple[CoreSpec, ...] = (
         frozenset({"neoverse-v3", "V3", "Neoverse-V3"}),
     ),
     CoreSpec(
+        "neoverse-e1",
+        "aarch64",
+        "aarch64-unknown-linux-gnu",
+        "neoverse-e1",
+        frozenset({"neoverse-e1", "Neoverse-E1", "E1"}),
+    ),
+    CoreSpec(
+        "neoverse-v3ae",
+        "aarch64",
+        "aarch64-unknown-linux-gnu",
+        "neoverse-v3ae",
+        frozenset({"neoverse-v3ae", "Neoverse-V3AE", "V3AE"}),
+    ),
+    CoreSpec(
         "a64fx", "aarch64", "aarch64-unknown-linux-gnu", "a64fx", frozenset({"a64fx", "A64FX"})
     ),
     # Apple cores reuse the Linux AArch64 triple so llvm-exegesis can
@@ -214,7 +228,14 @@ X86_CORES: tuple[CoreSpec, ...] = (
         "x86",
         "x86_64-unknown-linux-gnu",
         "icelake-client",
-        frozenset({"ICL", "icelake", "icelake-client", "icelake-server", "icl"}),
+        frozenset({"ICL", "icelake", "icelake-client", "icl"}),
+    ),
+    CoreSpec(
+        "ICX",
+        "x86",
+        "x86_64-unknown-linux-gnu",
+        "icelake-server",
+        frozenset({"ICX", "icelake-server", "icelake-xeon"}),
     ),
     CoreSpec(
         "TGL",
@@ -369,6 +390,9 @@ X86_CORES: tuple[CoreSpec, ...] = (
     ),
     CoreSpec(
         "GLM", "x86", "x86_64-unknown-linux-gnu", "goldmont", frozenset({"GLM", "goldmont", "glm"})
+    ),
+    CoreSpec(
+        "SLM", "x86", "x86_64-unknown-linux-gnu", "silvermont", frozenset({"SLM", "silvermont"})
     ),
     CoreSpec(
         "TRM", "x86", "x86_64-unknown-linux-gnu", "tremont", frozenset({"TRM", "tremont", "trm"})
