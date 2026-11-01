@@ -91,6 +91,8 @@ LOCAL_ARM_A64_JSONS = [
 ARM_A64_ARCHIVE_CACHE = _REPO_ROOT / "vendor" / "arm" / Path(ARM_A64_ARCHIVE_URL).name
 LOCAL_ARM_A64_ARCHIVES = [
     ARM_A64_ARCHIVE_CACHE,
+    # Vendored 2025-09 release, checked into the repo for offline builds.
+    _REPO_ROOT / "vendor" / "arm" / "AARCHMRS_OPENSOURCE_A_profile_FAT-2025-09_ASL0.tar.gz",
     _REPO_ROOT / "vendor" / "arm" / "AARCHMRS_BSD.tar.gz",
     _REPO_ROOT / "vendor" / "arm" / "aarchmrs_bsd.tar.gz",
     _REPO_ROOT / "vendor" / "arm" / "aarchmrs-bsd.tar.gz",
