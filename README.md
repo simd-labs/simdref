@@ -152,7 +152,7 @@ Each perf row carries a `(measured, <core>)` or `(modeled, <core>)` tag.
 
 ### Scope
 
-- Performance data is x86-only.
+- Performance data is measured on x86; Arm and RISC-V carry modeled llvm-mca rows.
 - RISC-V coverage is RVV only, not scalar or privileged ISA.
 
 ## Development

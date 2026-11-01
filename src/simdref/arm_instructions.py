@@ -28,10 +28,45 @@ def _canonical_instruction_key(name: str, form: str) -> str:
     return f"{instruction_name} ({instruction_form.upper()})"
 
 
+# Arm ARM titles for mnemonics whose summary the AARCHMRS payload does not
+# carry (this release ships no node titles and no operation briefs).
+_AARCHMRS_TITLES: dict[str, str] = {
+    "FMLA": "Floating-point fused Multiply-Add",
+    "LD4": "Load Multiple Structures",
+    "LDP": "Load Pair of Registers",
+}
+
+# A64 condition-code spellings for B.cond, including the hs/lo forms
+# llvm-objdump prints (Arm ARM lists cs/cc for the same field values).
+_CONDITION_CODES: tuple[str, ...] = (
+    "eq",
+    "ne",
+    "hs",
+    "cs",
+    "lo",
+    "cc",
+    "mi",
+    "pl",
+    "vs",
+    "vc",
+    "hi",
+    "ls",
+    "ge",
+    "lt",
+    "gt",
+    "le",
+    "al",
+    "nv",
+)
+
+
 def _generated_summary(mnemonic: str) -> str:
     core = mnemonic.strip().upper()
     if not core:
         return "Arm instruction."
+    title = _AARCHMRS_TITLES.get(core)
+    if title:
+        return f"{title}."
     if core.startswith("ADD"):
         return "Add operands."
     if core.startswith("SUB"):
@@ -42,7 +77,7 @@ def _generated_summary(mnemonic: str) -> str:
         return "Load data."
     if core.startswith("ST"):
         return "Store data."
-    return f"{core.title()} instruction."
+    return f"{core.title()} is an Arm instruction."
 
 
 def _strip_text(value: Any) -> str:
@@ -493,6 +528,21 @@ def _infer_aarchmrs_isa(group_path: list[str]) -> list[str]:
     return isa or ["A64"]
 
 
+def _aarchmrs_title(node: dict[str, Any], operations: dict[str, Any]) -> str:
+    """AARCHMRS title text for one instruction node, when the data carries it.
+
+    The node title wins; the operation entry named by ``operation_id`` is the
+    only other place a title can live.
+    """
+    title = _strip_text(node.get("title")).rstrip(".")
+    if title:
+        return title
+    operation = operations.get(str(node.get("operation_id") or "").strip())
+    if isinstance(operation, dict):
+        return _strip_text(operation.get("title") or operation.get("brief")).rstrip(".")
+    return ""
+
+
 def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
     if not isinstance(payload, dict):
         return []
@@ -508,6 +558,8 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
 
     records: list[InstructionRecord] = []
     seen_keys: dict[tuple[str, str], tuple[int, int]] = {}
+    raw_operations = payload.get("operations")
+    operations: dict[str, Any] = raw_operations if isinstance(raw_operations, dict) else {}
 
     def walk(node: dict[str, Any], group_path: list[str]) -> None:
         node_type = str(node.get("_type", ""))
@@ -533,6 +585,37 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             mnemonic = mnemonic_match.group(0)
             operand_form = tail.strip()
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
+            metadata = {
+                "operation_id": str(node.get("operation_id") or "").strip(),
+                "instruction_set": group_path[0] if group_path else "A64",
+                "group": group_path[-1] if group_path else "",
+            }
+            metadata = {k: v for k, v in metadata.items() if v}
+            if str(node.get("operation_id") or "") == "B_cond":
+                # B.cond assembles under one encoding with the condition in a
+                # free field; assemblers spell it B.EQ, B.NE, ... and the
+                # mnemonic matcher keys on that dotted form (issue #57a).
+                for code in _CONDITION_CODES:
+                    cond_mnemonic = f"B.{code.upper()}"
+                    records.append(
+                        InstructionRecord(
+                            mnemonic=cond_mnemonic,
+                            form=(
+                                _canonical_instruction_key(cond_mnemonic, operand_form)
+                                if operand_form
+                                else cond_mnemonic
+                            ),
+                            summary="Branch conditionally.",
+                            architecture="arm",
+                            isa=_infer_aarchmrs_isa(group_path),
+                            metadata=dict(metadata),
+                            source="arm-a64",
+                            enc_bits=enc_bits,
+                            enc_mask=enc_mask,
+                            enc_match=enc_match,
+                        )
+                    )
+                return
             key = (mnemonic, form.casefold())
             seen_enc = seen_keys.get(key)
             if seen_enc is not None:
@@ -543,15 +626,9 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 form = f"{form} [{str(node.get('name') or '').strip()}]"
                 key = (mnemonic, form.casefold())
             seen_keys[key] = (enc_mask, enc_match)
-            summary = _generated_summary(mnemonic)
+            summary = _aarchmrs_title(node, operations) or _generated_summary(mnemonic)
             if not summary.endswith("."):
                 summary += "."
-            metadata = {
-                "operation_id": str(node.get("operation_id") or "").strip(),
-                "instruction_set": group_path[0] if group_path else "A64",
-                "group": group_path[-1] if group_path else "",
-            }
-            metadata = {k: v for k, v in metadata.items() if v}
             records.append(
                 InstructionRecord(
                     mnemonic=mnemonic,
