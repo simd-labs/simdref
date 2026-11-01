@@ -10,7 +10,7 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 
 - URL: <https://cdrdv2.intel.com/v1/dl/getContent/764289> (offline zip), <https://www.intel.com/content/www/us/en/docs/intrinsics-guide/> (index HTML).
 - Format: XML in a JavaScript wrapper (`data.js`) in a versioned zip.
-- License: Intel permits redistribution with attribution. See `LICENSE.TXT` in the zip.
+- License: no licence grant found in the zip or on the Intel site. Used under the removal-request policy in the README.
 - Refresh: a few times per year with new extensions. Pin the local `vendor/intel/` copy, update on releases.
 - Gaps: none in the ~7k published intrinsics.
 
@@ -18,7 +18,7 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 
 - URL: <https://uops.info/instructions.xml>.
 - Format: XML, one `<instruction>` per entry, timings per CPU generation.
-- License: public research data, citation requested (<https://www.uops.info/about.html>).
+- License: no licence text found on <https://uops.info/>. Cite uops.info when you use the data. Used under the removal-request policy in the README.
 - Refresh: multiple times per year.
 - Gaps: some new AVX-512 refinements can lag.
 

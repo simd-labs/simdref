@@ -145,6 +145,10 @@ Dev commands
 [`docs/coverage/summary.json`](docs/coverage/summary.json) for parity
 against upstream and [`docs/SOURCES.md`](docs/SOURCES.md) for licenses.
 
+### Removal requests
+
+Some sources in [`docs/SOURCES.md`](docs/SOURCES.md) do not state a licence. If you own one of these sources and want simdref to stop using it, open an issue at <https://github.com/simd-labs/simdref/issues>. The maintainers then remove the data and the links from the next release.
+
 ² The full AARCHMRS A64 spec needs a live fetch or a tarball under
 `vendor/arm/`.
 
