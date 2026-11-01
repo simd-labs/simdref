@@ -126,22 +126,34 @@ class PerfTests(unittest.TestCase):
         self.assertEqual(best_cpi(arch_details), "0.5")
 
     def test_best_cpi_drops_harness_contaminated_measurement(self):
-        # Upstream uops.info records RET inside a call/ret loop harness;
-        # the raw measurement block reports harness-wide ``uops=20`` with
-        # ``TP_unrolled=33.35``. That figure is meaningless for the lone
-        # ret, so ``_cpi_values`` must drop the measurement and let the
-        # caller surface "-" rather than a nonsense CPI.
+        # uops.info measures RET inside a call/ret loop harness (iclass
+        # RET_NEAR). The figures describe the whole loop, so the iclass
+        # rule drops them whatever the uop count: SNB reports uops=3 with
+        # TP_unrolled=33.80, HSW reports uops=20 with 33.35.
+        for measurement in (
+            {"TP_unrolled": "33.80", "TP_loop": "31.08", "TP_ports": "6.00", "uops": "3"},
+            {"TP_unrolled": "33.35", "TP_loop": "28.91", "TP_ports": "3.00", "uops": "20"},
+        ):
+            arch_details = {"SNB": {"measurement": measurement}}
+            self.assertEqual(best_cpi(arch_details, iclass="RET_NEAR"), "-")
+            self.assertEqual(variant_perf_summary(arch_details, "RET_NEAR"), ("-", "-"))
+
+    def test_best_cpi_keeps_big_uops_non_harness_measurement(self):
+        # CPUID on ZEN4 measures TP_unrolled 145.58 with 88 uops and no
+        # latency children. The figure is real: only the iclass rule drops
+        # data, so a big uops count keeps its CPI on the dict path.
         arch_details = {
-            "HSW": {
+            "ZEN4": {
                 "measurement": {
-                    "TP_loop": "28.91",
-                    "TP_ports": "3.00",
-                    "TP_unrolled": "33.35",
-                    "uops": "20",
+                    "TP_unrolled": "145.58",
+                    "TP_loop": "146.72",
+                    "uops": "88",
                 },
             },
         }
-        self.assertEqual(best_cpi(arch_details), "-")
+        self.assertEqual(best_cpi(arch_details), "145.58")
+        self.assertEqual(best_cpi(arch_details, iclass="CPUID"), "145.58")
+        self.assertEqual(variant_perf_summary(arch_details, "CPUID"), ("-", "145.58"))
 
     def test_variant_perf_summary(self):
         arch_details = {

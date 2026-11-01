@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from simdref.display import instruction_markdown, web_deep_link
-from simdref.perf import best_cpi, best_latency
+from simdref.perf import best_cpi, best_latency, record_iclass
 from simdref.queries import linked_instruction_records
 from simdref.search import search_records
 from simdref.storage import (
@@ -1104,7 +1104,9 @@ def _hover_markdown(
                 if best_latency(item.arch_details) != "-"
             ]
             throughputs = [
-                best_cpi(item.arch_details) for item in linked if best_cpi(item.arch_details) != "-"
+                best_cpi(item.arch_details, record_iclass(item))
+                for item in linked
+                if best_cpi(item.arch_details, record_iclass(item)) != "-"
             ]
             perf = []
             if latencies:

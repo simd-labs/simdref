@@ -642,11 +642,6 @@ def _latency_for(details: dict[str, Any]) -> list[str]:
     return perf.latency_cycle_values(details.get("latencies") or [])
 
 
-def _record_iclass(record: InstructionRecord) -> str | None:
-    """The uops.info iclass of the row, when the record carries one."""
-    return (getattr(record, "metadata", None) or {}).get("iclass")
-
-
 def _cpi_for(details: dict[str, Any], iclass: str | None = None) -> list[str]:
     return perf._cpi_values(details, iclass)
 
@@ -659,7 +654,7 @@ def aggregate_perf(
 ) -> PerfSummary:
     """Aggregate latency and CPI across ``record``'s measured microarches."""
     arch_details = record.arch_details or {}
-    iclass = _record_iclass(record)
+    iclass = perf.record_iclass(record)
 
     def collect(kinds: tuple[str, ...]) -> tuple[list[float], list[float], list[str]]:
         lats: list[float] = []
@@ -733,7 +728,7 @@ def arch_perf(record: InstructionRecord, arch: str) -> tuple[float | None, float
     """
     details = (record.arch_details or {}).get(arch) or {}
     kind = details.get("source_kind") or "measured"
-    iclass = _record_iclass(record)
+    iclass = perf.record_iclass(record)
     lat = _per_arch_value(details, _latency_for)
     cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
     return lat, cpi, kind
@@ -752,7 +747,7 @@ def arch_perf_tag(arch: str, lat: float | None, cpi: float | None, kind: str) ->
 
 def _ports_for(details: dict[str, Any], iclass: str | None = None) -> str | None:
     # A harness-wide measurement loses its ports together with its CPI.
-    if perf._measurement_is_harness_contaminated(details, iclass):
+    if perf._measurement_is_harness_contaminated(iclass):
         return None
     measurement = details.get("measurement") or {}
     ports = measurement.get("ports") or measurement.get("TP_ports")
@@ -775,7 +770,7 @@ def _uops_for(
     flag so the output never guesses. A harness-contaminated row loses
     both, the same as its ports.
     """
-    if perf._measurement_is_harness_contaminated(details, iclass):
+    if perf._measurement_is_harness_contaminated(iclass):
         return None, None
 
     def _int(value: Any) -> int | None:
@@ -808,7 +803,7 @@ def collect_ports(
     else:
         keys = list(arch_details.keys())
     ports: list[str] = []
-    iclass = _record_iclass(record)
+    iclass = perf.record_iclass(record)
     for core in keys:
         value = _ports_for(arch_details.get(core) or {}, iclass)
         if value and value not in ports:
@@ -862,7 +857,7 @@ def format_annotation(
             lat, cpi, kind = arch_perf(record, arch)
             tag = arch_perf_tag(arch, lat, cpi, kind)
             uops_val, microcoded_val = _uops_for(
-                (record.arch_details or {}).get(arch) or {}, arch, _record_iclass(record)
+                (record.arch_details or {}).get(arch) or {}, arch, perf.record_iclass(record)
             )
             if uops_val is not None:
                 uops_frag = f" uops={uops_val}"
@@ -1023,7 +1018,7 @@ def _annotate_instruction(
         uops_val, microcoded_val = _uops_for(
             (record.arch_details or {}).get(opts.arch) or {},
             opts.arch,
-            _record_iclass(record),
+            perf.record_iclass(record),
         )
         if uops_val is not None:
             json_record["uops"] = uops_val
@@ -1136,7 +1131,9 @@ def annotate_stream(
             stats,
             identity_key=identity.get(index),
             # A pin forces one family; auto mode splits the batch per line.
-            line_isa=opts.isa if not auto_isa else _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
+            line_isa=opts.isa
+            if not auto_isa
+            else _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
         )
         if collecting_json:
             if record is not None:

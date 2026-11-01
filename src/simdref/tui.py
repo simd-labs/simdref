@@ -132,7 +132,7 @@ from simdref.display import (
     measurement_rows,
     uarch_sort_key,
 )
-from simdref.perf import variant_perf_summary
+from simdref.perf import record_iclass, variant_perf_summary
 from simdref.queries import linked_instruction_records
 from simdref.search import SearchResult
 from simdref.storage import (
@@ -1848,7 +1848,7 @@ class SimdrefApp(App):
     def _append_perf_sections(self, payload: list[tuple], item: InstructionRecord) -> None:
         rows = measurement_rows(item)
         if not rows:
-            lat, cpi = variant_perf_summary(item.arch_details)
+            lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
             if lat != "-" or cpi != "-":
                 payload.append(
                     ("static_markup", f"  [green]latency:[/] {lat}  [green]CPI:[/] {cpi}")

@@ -129,33 +129,20 @@ def best_numeric(values: list[str]) -> str:
 # every other measured row keeps its figures: VPCOMPRESSD (M512, K, ZMM) on
 # ZEN4 keeps its real 144 uops at a measured 72.50 cycles.
 _HARNESS_ICLASS_PREFIXES = ("CALL", "JMP", "RET")
-_HARNESS_UOPS_THRESHOLD = 8
 
 
-def _measurement_is_harness_contaminated(
-    details: dict[str, Any], iclass: str | None = None
-) -> bool:
-    """True when *details* holds a harness-wide figure, not one instruction."""
-    if iclass:
-        return str(iclass).upper().startswith(_HARNESS_ICLASS_PREFIXES)
-    # A caller that passes only an arch_details dict cannot name the row.
-    # Keep the uops heuristic for it: a big uops count with no latency
-    # children reads as harness data (uops.info attaches <latency> children
-    # when the measurement covers the instruction's own operands).
-    # shortcut: a harness row with latency children would pass, upgrade when
-    # uops.info tags harness rows explicitly.
-    measurement = details.get("measurement") or {}
-    try:
-        uops = int(float(measurement.get("uops", 0) or 0))
-    except (TypeError, ValueError):
-        return False
-    if uops < _HARNESS_UOPS_THRESHOLD:
-        return False
-    return not (details.get("latencies") or [])
+def record_iclass(record: Any) -> str | None:
+    """The uops.info iclass of the row, when the record carries one."""
+    return (getattr(record, "metadata", None) or {}).get("iclass")
+
+
+def _measurement_is_harness_contaminated(iclass: str | None) -> bool:
+    """True when the iclass marks a call/ret loop harness row."""
+    return bool(iclass) and str(iclass).upper().startswith(_HARNESS_ICLASS_PREFIXES)
 
 
 def _cpi_values(details: dict[str, Any], iclass: str | None = None) -> list[str]:
-    if _measurement_is_harness_contaminated(details, iclass):
+    if _measurement_is_harness_contaminated(iclass):
         return []
     measurement = details.get("measurement") or {}
     out: list[str] = []
@@ -223,14 +210,23 @@ def best_latency_labeled(
 def best_cpi_labeled(
     arch_details: dict[str, dict[str, Any]],
     kind_filter: str | None = None,
+    iclass: str | None = None,
 ) -> PerfValue:
-    """Lowest cycles-per-instruction across arch entries, as a :class:`PerfValue`."""
+    """Lowest cycles-per-instruction across arch entries, as a :class:`PerfValue`.
+
+    *iclass* names the uops.info iclass of the record; a call/ret loop
+    harness row loses its figures (see :func:`_cpi_values`).
+    """
+
+    def cpi_values(details: dict[str, Any]) -> list[str]:
+        return _cpi_values(details, iclass)
+
     if kind_filter is None:
-        measured = _best_labeled(arch_details, _cpi_values, kind_filter="measured")
+        measured = _best_labeled(arch_details, cpi_values, kind_filter="measured")
         if measured.value != "-":
             return measured
-        return _best_labeled(arch_details, _cpi_values, kind_filter="modeled")
-    return _best_labeled(arch_details, _cpi_values, kind_filter=kind_filter)
+        return _best_labeled(arch_details, cpi_values, kind_filter="modeled")
+    return _best_labeled(arch_details, cpi_values, kind_filter=kind_filter)
 
 
 def best_latency(arch_details: dict[str, dict[str, Any]]) -> str:
@@ -241,12 +237,12 @@ def best_latency(arch_details: dict[str, dict[str, Any]]) -> str:
     return best_latency_labeled(arch_details).value
 
 
-def best_cpi(arch_details: dict[str, dict[str, Any]]) -> str:
+def best_cpi(arch_details: dict[str, dict[str, Any]], iclass: str | None = None) -> str:
     """Return the best (lowest) cycles-per-instruction across all microarchitectures.
 
     Prefers measured rows over modeled rows (see :func:`best_cpi_labeled`).
     """
-    return best_cpi_labeled(arch_details).value
+    return best_cpi_labeled(arch_details, iclass=iclass).value
 
 
 def best_latency_measured(arch_details: dict[str, dict[str, Any]]) -> PerfValue:
@@ -259,27 +255,34 @@ def best_latency_modeled(arch_details: dict[str, dict[str, Any]]) -> PerfValue:
     return best_latency_labeled(arch_details, kind_filter="modeled")
 
 
-def best_cpi_measured(arch_details: dict[str, dict[str, Any]]) -> PerfValue:
+def best_cpi_measured(
+    arch_details: dict[str, dict[str, Any]], iclass: str | None = None
+) -> PerfValue:
     """Lowest CPI drawn exclusively from ``source_kind="measured"`` rows."""
-    return best_cpi_labeled(arch_details, kind_filter="measured")
+    return best_cpi_labeled(arch_details, kind_filter="measured", iclass=iclass)
 
 
-def best_cpi_modeled(arch_details: dict[str, dict[str, Any]]) -> PerfValue:
+def best_cpi_modeled(
+    arch_details: dict[str, dict[str, Any]], iclass: str | None = None
+) -> PerfValue:
     """Lowest CPI drawn exclusively from ``source_kind="modeled"`` rows."""
-    return best_cpi_labeled(arch_details, kind_filter="modeled")
+    return best_cpi_labeled(arch_details, kind_filter="modeled", iclass=iclass)
 
 
-def variant_perf_summary(arch_details: dict[str, dict[str, Any]]) -> tuple[str, str]:
+def variant_perf_summary(
+    arch_details: dict[str, dict[str, Any]], iclass: str | None = None
+) -> tuple[str, str]:
     """Return ``(best_latency, best_cpi)`` strings for a single variant."""
-    return best_latency(arch_details), best_cpi(arch_details)
+    return best_latency(arch_details), best_cpi(arch_details, iclass)
 
 
 def variant_perf_summary_labeled(
     arch_details: dict[str, dict[str, Any]],
+    iclass: str | None = None,
 ) -> tuple[PerfValue, PerfValue]:
     """Return labeled ``(latency, cpi)`` for a single variant.
 
     Each element carries its ``source_kind`` and originating ``core`` so
     renderers can show "(measured, SKL)" / "(modeled, neoverse-n1)" suffixes.
     """
-    return best_latency_labeled(arch_details), best_cpi_labeled(arch_details)
+    return best_latency_labeled(arch_details), best_cpi_labeled(arch_details, iclass=iclass)
