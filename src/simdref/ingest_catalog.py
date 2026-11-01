@@ -252,13 +252,28 @@ def _generated_instruction_summary(
     return f"{_verb_for_mnemonic(mnemonic, architecture=architecture)} {_shared_operand_phrase(operand_details)}".strip()
 
 
+_SUMMARY_CAMEL_SEAM_RE = re.compile(r"(?<=[a-z])(?=[A-Z])")
+
+# Mixed-case Intel terms of art that stay joined; they are not dropped-space typos.
+_SUMMARY_CAMEL_KEEP = frozenset({"InvMixColumn", "OpMask"})
+
+
+def _split_summary_camel_seams(text: str) -> str:
+    # uops.info summary attributes drop the space at CamelCase seams, for
+    # example "SinglePrecision" and "ExtractPacked".
+    return " ".join(
+        word if word in _SUMMARY_CAMEL_KEEP else _SUMMARY_CAMEL_SEAM_RE.sub(" ", word)
+        for word in text.split(" ")
+    )
+
+
 def _instruction_summary(
     mnemonic: str,
     raw_summary: str,
     operand_details: list[dict[str, str]],
     architecture: str = "x86",
 ) -> str:
-    base = raw_summary.strip().strip(".")
+    base = _split_summary_camel_seams(raw_summary.strip().strip("."))
     prefix = _summary_prefix(mnemonic, operand_details, base)
     if not _summary_too_terse(base, mnemonic):
         return f"{prefix}{base}".strip() + "."

@@ -1,0 +1,17 @@
+<root>
+  <instruction asm="VFMADD231PS" string="VFMADD231PS (YMM, YMM, YMM)" isa-set="AVX" summary="Fused Multiply-Add of Packed SinglePrecision Floating-Point Values">
+    <operand idx="0" type="reg" width="256" xtype="f32" name="YMM" r="1" w="1"/>
+    <operand idx="1" type="reg" width="256" xtype="f32" name="YMM" r="1"/>
+    <operand idx="2" type="reg" width="256" xtype="f32" name="YMM" r="1"/>
+  </instruction>
+  <instruction asm="VEXTRACTI64X4" string="VEXTRACTI64X4 (YMM, ZMM, I8)" isa-set="AVX512F" summary="ExtractPacked Integer Values">
+    <operand idx="0" type="reg" width="256" xtype="int" name="YMM" w="1"/>
+    <operand idx="1" type="reg" width="512" xtype="int" name="ZMM" r="1"/>
+    <operand idx="2" type="imm" width="8" xtype="int" name="I8" r="1"/>
+  </instruction>
+  <instruction asm="VEXTRACTI128" string="VEXTRACTI128 (XMM, YMM, I8)" isa-set="AVX" summary="ExtractPacked Integer Values">
+    <operand idx="0" type="reg" width="128" xtype="int" name="XMM" w="1"/>
+    <operand idx="1" type="reg" width="256" xtype="int" name="YMM" r="1"/>
+    <operand idx="2" type="imm" width="8" xtype="int" name="I8" r="1"/>
+  </instruction>
+</root>
