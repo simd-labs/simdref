@@ -1,102 +1,213 @@
 {
-  "instructions": [
+ "instructions": [
+  {
+   "_type": "Instructions.InstructionSet",
+   "name": "A64",
+   "children": [
     {
-      "_type": "Instructions.InstructionSet",
-      "name": "SVE",
-      "children": [
+     "_type": "Instructions.InstructionSet",
+     "name": "SVE",
+     "children": [
+      {
+       "_type": "Instructions.Section",
+       "name": "SVE arithmetic",
+       "children": [
         {
-          "_type": "Instructions.Section",
-          "name": "SVE arithmetic",
-          "children": [
-            {
-              "_type": "Instructions.Instruction",
-              "name": "FADD",
-              "operation_id": "aarch64_sve_fadd",
-              "assembly": {
-                "symbols": [
-                  {"_type": "AST.Literal", "value": "FADD "},
-                  {"_type": "AST.RuleReference", "rule_id": "Zd"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_FMUL_HSD"},
-                  {"_type": "AST.RuleReference", "rule_id": "COMMA"},
-                  {"_type": "AST.RuleReference", "rule_id": "SPACE"},
-                  {"_type": "AST.RuleReference", "rule_id": "Zn"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_FMUL_HSD"},
-                  {"_type": "AST.RuleReference", "rule_id": "COMMA"},
-                  {"_type": "AST.RuleReference", "rule_id": "SPACE"},
-                  {"_type": "AST.RuleReference", "rule_id": "Zm"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_FMUL_HSD"}
-                ]
-              }
-            }
+         "_type": "Instructions.Instruction",
+         "name": "FADD",
+         "operation_id": "aarch64_sve_fadd",
+         "assembly": {
+          "symbols": [
+           {
+            "_type": "AST.Literal",
+            "value": "FADD "
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "Zd"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_FMUL_HSD"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "COMMA"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "Zn"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_FMUL_HSD"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "COMMA"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "Zm"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_FMUL_HSD"
+           }
           ]
+         }
         }
-      ]
+       ]
+      }
+     ]
     },
     {
-      "_type": "Instructions.InstructionSet",
-      "name": "AdvSIMD",
-      "children": [
+     "_type": "Instructions.InstructionSet",
+     "name": "AdvSIMD",
+     "children": [
+      {
+       "_type": "Instructions.Section",
+       "name": "AdvSIMD arithmetic",
+       "children": [
         {
-          "_type": "Instructions.Section",
-          "name": "AdvSIMD arithmetic",
-          "children": [
-            {
-              "_type": "Instructions.Instruction",
-              "name": "FADD",
-              "operation_id": "aarch64_advsimd_fadd",
-              "assembly": {
-                "symbols": [
-                  {"_type": "AST.Literal", "value": "FADD "},
-                  {"_type": "AST.RuleReference", "rule_id": "Vd"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_OPTION__4"},
-                  {"_type": "AST.RuleReference", "rule_id": "COMMA"},
-                  {"_type": "AST.RuleReference", "rule_id": "SPACE"},
-                  {"_type": "AST.RuleReference", "rule_id": "Vn"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_OPTION__4"},
-                  {"_type": "AST.RuleReference", "rule_id": "COMMA"},
-                  {"_type": "AST.RuleReference", "rule_id": "SPACE"},
-                  {"_type": "AST.RuleReference", "rule_id": "Vm"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_OPTION__4"}
-                ]
-              }
-            }
+         "_type": "Instructions.Instruction",
+         "name": "FADD",
+         "operation_id": "aarch64_advsimd_fadd",
+         "assembly": {
+          "symbols": [
+           {
+            "_type": "AST.Literal",
+            "value": "FADD "
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "Vd"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_OPTION__4"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "COMMA"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "Vn"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_OPTION__4"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "COMMA"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "Vm"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_OPTION__4"
+           }
           ]
+         }
         }
-      ]
+       ]
+      }
+     ]
     },
     {
-      "_type": "Instructions.InstructionSet",
-      "name": "SME",
-      "children": [
+     "_type": "Instructions.InstructionSet",
+     "name": "SME",
+     "children": [
+      {
+       "_type": "Instructions.Section",
+       "name": "SME matrix arithmetic",
+       "children": [
         {
-          "_type": "Instructions.Section",
-          "name": "SME matrix arithmetic",
-          "children": [
-            {
-              "_type": "Instructions.Instruction",
-              "name": "FADD",
-              "operation_id": "aarch64_sme_fadd",
-              "assembly": {
-                "symbols": [
-                  {"_type": "AST.Literal", "value": "FADD "},
-                  {"_type": "AST.RuleReference", "rule_id": "ZAd"},
-                  {"_type": "AST.Literal", "value": "."},
-                  {"_type": "AST.RuleReference", "rule_id": "T_OPTION__2"},
-                  {"_type": "AST.RuleReference", "rule_id": "LBRACKET"},
-                  {"_type": "AST.RuleReference", "rule_id": "ZM1_MORTLACH"},
-                  {"_type": "AST.RuleReference", "rule_id": "RBRACKET"}
-                ]
-              }
-            }
+         "_type": "Instructions.Instruction",
+         "name": "FADD",
+         "operation_id": "aarch64_sme_fadd",
+         "assembly": {
+          "symbols": [
+           {
+            "_type": "AST.Literal",
+            "value": "FADD "
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "ZAd"
+           },
+           {
+            "_type": "AST.Literal",
+            "value": "."
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "T_OPTION__2"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "LBRACKET"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "ZM1_MORTLACH"
+           },
+           {
+            "_type": "AST.RuleReference",
+            "rule_id": "RBRACKET"
+           }
           ]
+         }
         }
-      ]
+       ]
+      }
+     ]
     }
-  ]
+   ]
+  }
+ ]
 }

@@ -540,11 +540,6 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 return
             mnemonic = mnemonic_match.group(0)
             operand_form = tail.strip()
-            # A rule the placeholder table cannot instantiate leaves a raw
-            # "<RULE>" token. Show the mnemonic alone rather than leaking a
-            # template into a display.
-            if "<" in operand_form:
-                operand_form = ""
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
             key = (mnemonic, form.casefold())
             seen_enc = seen_keys.get(key)

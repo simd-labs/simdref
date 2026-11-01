@@ -1012,6 +1012,26 @@ def _identity_batch(
     return tuple(slots)
 
 
+def _mnemonic_has_rows(conn, text: str, semicolon_is_comment: bool) -> bool:
+    """Whether any catalog row carries the line's mnemonic.
+
+    A byte-identity miss over a mnemonic the catalog does not hold at all
+    (a RISC-V word op in a catalog without the word rows) stays unmarked:
+    every legacy lookup is mnemonic-keyed and finds nothing there, so the
+    line stays silent instead of reporting a miss by name. The same miss
+    over a held mnemonic (issue #49 vmovapd) must stay marked so the line
+    never joins a neighbour form.
+    """
+    parsed = _mnemonic_from_asm_line(text, semicolon_is_comment)
+    return (
+        bool(parsed)
+        and conn.execute(
+            "SELECT 1 FROM instructions_data WHERE mnemonic = ? LIMIT 1", (parsed[0],)
+        ).fetchone()
+        is not None
+    )
+
+
 def identity_keys(
     texts: Sequence[str], intel: bool | None, conn: sqlite3.Connection
 ) -> list[str | None]:
@@ -1024,9 +1044,11 @@ def identity_keys(
     arch) and the caller's old matcher answers that line unchanged.
     NO_CATALOG_ROW means byte identity identified the instruction and the
     catalog has no row for that form: the caller reports no measured row and
-    never guesses a neighbour form. ``intel`` is the file-type syntax flag;
-    None infers the x86 syntax from the text, and keeps the operand votes
-    neutral so a bare AArch64 or RISC-V line never reads as forced x86.
+    never guesses a neighbour form. The mark is dropped when the catalog
+    holds no row at all for the line's mnemonic; ``intel`` is the file-type
+    syntax flag; None infers the x86 syntax from the text, and keeps the
+    operand votes neutral so a bare AArch64 or RISC-V line never reads as
+    forced x86.
     """
     if not texts:
         return []
@@ -1050,7 +1072,15 @@ def identity_keys(
         mtime_ns = Path(catalog).stat().st_mtime_ns
     except OSError:
         return [None] * len(items)
-    return list(_identity_batch(items, vote, bool(intel), catalog, mtime_ns))
+    slots = list(_identity_batch(items, vote, bool(intel), catalog, mtime_ns))
+    return [
+        (
+            None
+            if slot == NO_CATALOG_ROW and not _mnemonic_has_rows(conn, text, bool(intel))
+            else slot
+        )
+        for text, slot in zip(items, slots)
+    ]
 
 
 def _hover_markdown(

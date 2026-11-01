@@ -635,12 +635,14 @@ class LspEndToEndTests(unittest.TestCase):
                     self.assertEqual(hints, [])
                     self.assertIsNone(hover)
         # "negw a0, a1" is the pseudo-op subw a0, zero, a1 (probed encoding
-        # [0x3b,0x05,0xb0,0x40]), so byte identity shows the SUBW row; the
-        # keyless fallback keeps the old matcher silent. Never x86 "add".
+        # [0x3b,0x05,0xb0,0x40]), so byte identity shows the SUBW row of its
+        # expansion; the keyless fallback keeps the old matcher silent. Never
+        # x86 "add". A catalog without the word rows holds no SUBW row to
+        # show, so the line stays silent like the word ops above.
         self.server.open(ASM_URI, "asm", "negw a0, a1\n")
         hover = self.server.hover(ASM_URI, 0, 1)
         hints = self.server.hints(ASM_URI)
-        if _identity_active():
+        if _identity_active() and _riscv_rows("subw"):
             self.assertIsNotNone(hover, "negw a0, a1 got no hover")
             self.assertNotIn("ADD", hover["contents"]["value"].splitlines()[1])
             self.assertTrue(hints, "negw a0, a1 got no hint")

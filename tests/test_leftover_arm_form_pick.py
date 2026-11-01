@@ -107,8 +107,11 @@ SME2_ROWS = [
 # ORR, sp or wsp is ADD immediate #0, and an immediate is MOVZ, MOVN or ORR
 # by its exact encoding.
 MOV_ALIAS_ROWS = [
-    ("mov za0h.b[w12, 0], p0/m, z0.b", "MOVA (<ZAD__ZERO><HV__7>.B[W1, #0], P0/M, Z1.B)"),
-    ("mov z0.b, p0/m, za0h.b[w12, 0]", "MOVA (Z0.B, P0/M, <ZAN__ZERO><HV__4>.B[W1, #0])"),
+    # The vendored AARCHMRS FAT-2025-09 revision spells the ZA tile "ZA0" as a
+    # literal; a newer revision names it with the ZAd__zero rule and renders
+    # "<ZAD__ZERO>". The pick is the same MOVA row either way.
+    ("mov za0h.b[w12, 0], p0/m, z0.b", "MOVA (ZA0<HV__7>.B[W1, #0], P0/M, Z1.B)"),
+    ("mov z0.b, p0/m, za0h.b[w12, 0]", "MOVA (Z0.B, P0/M, ZA0<HV__4>.B[W1, #0])"),
     ("mov x0, x1", "ORR (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)"),
     ("mov x29, sp", "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)"),
     ("mov x0, #0x10, lsl #16", "MOVZ (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)"),

@@ -6,12 +6,13 @@ form that happens to share the FADD mnemonic.
 
 3b: AARCHMRS rule tokens such as T_FMUL_HSD (float arrangement) and
 T_OPTION__4 (AdvSIMD arrangement option) render as the concrete "4S"
-instance like the existing T rule; tokens with no known instance drop
-the operand text so no raw "<...>" template reaches a display.
+instance like the existing T rule. A token with no known instance keeps
+its <RULE> placeholder in the form, like the rows the operand matcher
+reads.
 
 Fixture records: inline vaddq_f32 plus two FADD InstructionRecords for
-3a; tests/fixtures/b5/arm_fadd_aarchmrs.json holds three AARCHMRS FADD
-nodes (SVE, AdvSIMD, SME) for 3b.
+3a; tests/fixtures/b5/arm_fadd_aarchmrs.json holds an A64 set with three
+AARCHMRS FADD nodes (SVE, AdvSIMD, SME) for 3b.
 """
 
 from __future__ import annotations
@@ -72,21 +73,22 @@ class PlaceholderTests(unittest.TestCase):
         self.assertIn("FADD (Z0.4S, Z1.4S, Z2.4S)", forms)
         self.assertIn("FADD (V0.4S, V1.4S, V2.4S)", forms)
 
-    def test_no_template_placeholder_token_reaches_a_form(self):
+    def test_known_rules_render_concrete_and_unknown_keep_placeholders(self):
         from simdref.arm_instructions import parse_arm_instruction_payload
 
         records = parse_arm_instruction_payload(AARCHMRS.read_text())
-        for record in records:
-            self.assertNotIn("<", record.form)
-            self.assertNotIn(">", record.form)
+        by_isa = {tuple(record.isa): record.form for record in records}
+        self.assertNotIn("<", by_isa[("SVE",)])
+        self.assertNotIn("<", by_isa[("NEON",)])
+        self.assertIn("<ZM1_MORTLACH>", by_isa[("SME",)])
 
-    def test_unresolvable_operand_tokens_drop_the_operand_text(self):
+    def test_unresolvable_operand_tokens_keep_the_placeholder(self):
         from simdref.arm_instructions import parse_arm_instruction_payload
 
         records = parse_arm_instruction_payload(AARCHMRS.read_text())
         sme = [record for record in records if record.isa == ["SME"]]
         self.assertEqual(len(sme), 1)
-        self.assertEqual(sme[0].form, "FADD")
+        self.assertEqual(sme[0].form, "FADD (ZA0.4S[<ZM1_MORTLACH>])")
 
 
 if __name__ == "__main__":
