@@ -665,6 +665,15 @@ def measurement_rows(item) -> list[dict]:
                 # Fall back to TP so the CPI column shows it.
                 row["TP_loop"] = cpi
             row["source"] = details.get("source_kind") or "measured"
+            # Provenance keys ride along for the footnote; the exclude set
+            # keeps them out of the table columns.
+            for stored, key in (
+                ("source", "source_tool"),
+                ("source_version", "source_version"),
+                ("citation_url", "citation_url"),
+            ):
+                if details.get(stored):
+                    row[key] = details[stored]
             rows.append(row)
     return rows
 
@@ -801,6 +810,22 @@ def print_generic_table(
     console.print(Panel(table, title=title, border_style=border_style))
 
 
+def provenance_lines(rows: list[dict]) -> list[str]:
+    """One ``name version url`` line per distinct perf source in *rows*.
+
+    Rows without a ``source_tool`` add no line, so a record that lacks the
+    fields renders no footnote label.
+    """
+    parts: dict[str, tuple[str, str]] = {}
+    for row in rows:
+        name = row.get("source_tool")
+        if name and name not in parts:
+            parts[name] = (row.get("source_version", ""), row.get("citation_url", ""))
+    return [
+        " ".join(part for part in (name, *versions) if part) for name, versions in parts.items()
+    ]
+
+
 def print_perf_tables(rows: list[dict]) -> None:
     """Render one Rich panel per source kind (measured vs modeled).
 
@@ -817,6 +842,9 @@ def print_perf_tables(rows: list[dict]) -> None:
             exclude_keys=_MEASUREMENT_EXCLUDE_KEYS,
             include_extras=False,
         )
+        for line in provenance_lines(group):
+            # soft_wrap keeps the citation url in one piece for copying.
+            console.print(f"  [dim]{line}[/dim]", soft_wrap=True)
 
 
 def latency_pair_rows(item) -> list[dict]:
@@ -950,6 +978,9 @@ _MEASUREMENT_EXCLUDE_KEYS = {
     "uops_MS",
     "macro_fusible",
     "source",
+    "source_tool",
+    "source_version",
+    "citation_url",
 }
 
 
@@ -1099,6 +1130,8 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
     table.add_row("architecture", display_architecture(item.architecture))
     table.add_row("isa", ", ".join(item.isa) or "-")
     table.add_row("category", category_display_text(item))
+    if item.description:
+        table.add_row("description", item.description)
     for key in (
         "reference_url",
         "argument_preparation",

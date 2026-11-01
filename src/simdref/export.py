@@ -72,6 +72,13 @@ def _web_measurements(item) -> list[dict]:
             "uops": measurement.get("uops", "-"),
             "sourceKind": details.get("source_kind") or "measured",
         }
+        for stored, exported in (
+            ("source", "source"),
+            ("source_version", "sourceVersion"),
+            ("citation_url", "citationUrl"),
+        ):
+            if details.get(stored):
+                row[exported] = details[stored]
         pairs = [
             {
                 "start": pair["start"],

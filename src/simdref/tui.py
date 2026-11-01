@@ -126,6 +126,7 @@ from simdref.display import (
     operand_flags_text,
     perf_panel_border,
     perf_panel_title,
+    provenance_lines,
     split_perf_rows,
     isa_to_sub_isa,
     instruction_metadata_rows,
@@ -1886,6 +1887,8 @@ class SimdrefApp(App):
                 table.add_row(*cells)
             panel = Panel(table, title=perf_panel_title(kind), border_style=border)
             payload.append(("collapsible", panel, perf_panel_title(kind), False))
+            for line in provenance_lines(group):
+                payload.append(("static_markup", f"  [dim]{line}[/]"))
         self._append_latency_pair_sections(payload, item)
 
     def _append_latency_pair_sections(self, payload: list[tuple], item: InstructionRecord) -> None:

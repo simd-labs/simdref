@@ -1,0 +1,45 @@
+{
+  "intrinsic": {
+    "name": "_mm256_add_ps",
+    "signature": "__m256 _mm256_add_ps (__m256 a, __m256 b)",
+    "description": "Add packed single-precision (32-bit) floating-point elements in a and b, and store the results in dst.",
+    "header": "immintrin.h",
+    "architecture": "x86",
+    "isa": ["AVX"],
+    "category": "Arithmetic"
+  },
+  "instruction": {
+    "mnemonic": "FMLA",
+    "form": "FMLA Z0.S, Z1.S, Z2.S",
+    "summary": "Fused Multiply-Add of vectors",
+    "architecture": "arm",
+    "isa": ["SVE"],
+    "arch_details": {
+      "cortex-a72": {
+        "source": "llvm-mca",
+        "source_kind": "modeled",
+        "source_version": "22.1.8",
+        "applies_to": "mnemonic",
+        "citation_url": "https://llvm.org/docs/CommandGuide/llvm-mca.html",
+        "measurement": {"TP_loop": "4"},
+        "latencies": [{"cycles": "5"}]
+      },
+      "neoverse-n1": {
+        "source": "llvm-mca",
+        "source_kind": "modeled",
+        "source_version": "22.1.8",
+        "applies_to": "mnemonic",
+        "citation_url": "https://llvm.org/docs/CommandGuide/llvm-mca.html",
+        "measurement": {"TP_loop": "4"},
+        "latencies": [{"cycles": "4"}]
+      }
+    }
+  },
+  "measured_details": {
+    "SKL": {
+      "source_kind": "measured",
+      "measurement": {"TP_loop": "1.0", "uops": "1"},
+      "latencies": [{"cycles": "4"}]
+    }
+  }
+}
