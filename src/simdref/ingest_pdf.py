@@ -201,6 +201,9 @@ def merge_pdf_enrichment(
         return candidates
 
     for record in instructions:
+        # The Intel SDM holds x86 mnemonics only; arm reuses names like ADC.
+        if source_id == "intel-sdm" and record.architecture != "x86":
+            continue
         mnemonic = record.mnemonic.upper()
         payload = result.descriptions.get(mnemonic)
         if payload is None:
