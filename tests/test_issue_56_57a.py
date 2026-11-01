@@ -1,8 +1,8 @@
 """Issues #56 and #57a: A64 summaries from AARCHMRS data, B.cond rows.
 
 The fixture carries real nodes from AARCHMRS 2025-09 (MOVI, FMLA, LD4, LDP,
-B.cond, B) plus one operation title for MOVI, the only narrative field the
-payload can carry.
+B.cond, B), one scalar SUB (immediate) node, plus one operation title for
+MOVI, the only narrative field the payload can carry.
 """
 
 from __future__ import annotations
@@ -27,9 +27,11 @@ ACLE_FIXTURE = (
 EXPECTED_SUMMARIES = {
     # MOVI: operation title inside the AARCHMRS fixture.
     "MOVI": "Move Immediate.",
-    # FMLA and LD4: first sentence of the Arm ACLE intrinsics description.
+    # FMLA: first sentence of the Arm ACLE intrinsics description (NEON row).
     "FMLA": "Floating-point fused Multiply-Add to accumulator (vector).",
-    "LD4": "Load multiple 4-element structures to four registers.",
+    # LD4: its ldst/aslsdlse group infers A64, so the ACLE sentence is out
+    # of scope and the title-table text wins.
+    "LD4": "Load Multiple Structures.",
     # LDP: not in the ACLE data, so the title table wins.
     "LDP": "Load Pair of Registers.",
 }
@@ -110,6 +112,7 @@ class AcleSummaryMapTest(unittest.TestCase):
             {
                 "FMLA": "Floating-point fused Multiply-Add to accumulator (vector)",
                 "LD4": "Load multiple 4-element structures to four registers",
+                "SUB": "Subtract (vector)",
             },
         )
 
@@ -142,16 +145,29 @@ class A64SummaryTest(unittest.TestCase):
         self.assertEqual(movi.summary, "Move Immediate.")
 
     def test_acle_sentence_beats_the_mnemonic_table(self) -> None:
-        # FMLA and LD4 are in the ACLE sample; its first sentence wins over
-        # the title-table text (issue #56 follow-up).
+        # FMLA is in the ACLE sample and its group is NEON, so the first
+        # sentence wins over the title-table text (issue #56 follow-up).
         seen = {record.mnemonic: record.summary for record in self.records}
         self.assertEqual(seen["FMLA"], "Floating-point fused Multiply-Add to accumulator (vector).")
-        self.assertEqual(seen["LD4"], "Load multiple 4-element structures to four registers.")
+        # LD4 is in the ACLE sample too, but its group infers A64, so the
+        # title-table text stays (ACLE text describes vector forms only).
+        self.assertEqual(seen["LD4"], "Load Multiple Structures.")
 
     def test_title_table_survives_where_acle_is_silent(self) -> None:
         # LDP has no single-instruction ACLE entry, so the table text stays.
         ldp = next(record for record in self.records if record.mnemonic == "LDP")
         self.assertEqual(ldp.summary, "Load Pair of Registers.")
+
+    def test_scalar_sub_row_gets_no_vector_summary(self) -> None:
+        # Scalar/base rows share the mnemonic with a SIMD form, but the ACLE
+        # sentence describes the vector form, so the scalar row falls back.
+        sub = next(record for record in self.records if record.mnemonic == "SUB")
+        self.assertNotIn("(vector)", sub.summary)
+        self.assertEqual(sub.summary, "Subtract operands.")
+
+    def test_neon_fmla_row_keeps_the_acle_sentence(self) -> None:
+        fmla = next(record for record in self.records if record.mnemonic == "FMLA")
+        self.assertEqual(fmla.summary, "Floating-point fused Multiply-Add to accumulator (vector).")
 
     def test_fallback_is_a_real_sentence(self) -> None:
         # A mnemonic without a data title or a table entry keeps a generated

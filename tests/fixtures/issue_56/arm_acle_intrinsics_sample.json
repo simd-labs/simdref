@@ -69,5 +69,19 @@
         ]
       }
     ]
+  },
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vsubq_s32",
+    "Architectures": ["A64"],
+    "description": "Subtract (vector). This instruction subtracts the elements in the second source vector from the corresponding elements in the first source vector, and places the results in the destination vector.",
+    "instructions": [
+      {
+        "preamble": "",
+        "list": [
+          {"base_instruction": "SUB", "url": "", "operands": "Vd.4S, Vn.4S, Vm.4S"}
+        ]
+      }
+    ]
   }
 ]

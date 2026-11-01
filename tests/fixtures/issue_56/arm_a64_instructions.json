@@ -2091,6 +2091,133 @@
        ]
       }
      ]
+    },
+    {
+     "_type": "Instruction.Group",
+     "name": "addsub_imm",
+     "children": [
+      {
+       "encoding": {
+        "_type": "Instruction.Encodeset.Encodeset",
+        "width": 32,
+        "values": [
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 31,
+           "width": 1
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'1'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'1'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 30,
+           "width": 1
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'1'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'1'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 29,
+           "width": 1
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 24,
+           "width": 5
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'10001'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'10001'"
+          }
+         }
+        ]
+       },
+       "_type": "Instruction.Instruction",
+       "name": "SUB_64_addsub_imm",
+       "operation_id": "SUB_addsub_imm",
+       "assembly": {
+        "_type": "Instruction.Assembly",
+        "description": {
+         "_type": "Description",
+         "after": null,
+         "before": null
+        },
+        "symbols": [
+         {
+          "_type": "Instruction.Symbols.Literal",
+          "value": "SUB"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "SPACE"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "XdSP_option"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "XnSP_option"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "imm_option"
+         }
+        ]
+       }
+      }
+     ]
     }
    ]
   }

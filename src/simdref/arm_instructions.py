@@ -51,6 +51,11 @@ _ARM_INTRINSICS_JSON_PATHS: tuple[Path, ...] = (
 
 _ACLE_SUMMARY_CAP = 160
 
+# ISA words _infer_aarchmrs_isa returns for SIMD/SVE/SME forms. ACLE
+# intrinsics text describes those vector forms, so only rows of one of
+# these families take the ACLE sentence.
+_SIMD_ISAS = frozenset({"NEON", "SVE", "SVE2", "SME", "SME2", "MVE"})
+
 
 def _acle_first_sentence(description: str) -> str:
     clean = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html.unescape(description))).strip()
@@ -134,13 +139,16 @@ _CONDITION_CODES: tuple[str, ...] = (
 )
 
 
-def _generated_summary(mnemonic: str) -> str:
+def _generated_summary(mnemonic: str, isa: list[str] | None = None) -> str:
     core = mnemonic.strip().upper()
     if not core:
         return "Arm instruction."
-    acle = _acle_instruction_summaries().get(core)
-    if acle:
-        return f"{acle}."
+    if isa is None or _SIMD_ISAS.intersection(isa):
+        # Scalar/base rows share the mnemonic with the vector form but must
+        # not take its ACLE text; they fall through to table and generated.
+        acle = _acle_instruction_summaries().get(core)
+        if acle:
+            return f"{acle}."
     title = _AARCHMRS_TITLES.get(core)
     if title:
         return f"{title}."
@@ -321,9 +329,10 @@ def _normalize_instruction_item(item: dict[str, Any]) -> InstructionRecord | Non
         if operands and not operands.upper().startswith(f"{mnemonic} (")
         else operands
     )
+    isa = _infer_arm_isa(item)
     summary = _strip_text(
         item.get("summary") or item.get("brief") or item.get("title")
-    ) or _generated_summary(mnemonic)
+    ) or _generated_summary(mnemonic, isa)
     if not summary.endswith("."):
         summary += "."
     url = _strip_text(item.get("url") or item.get("source_url") or item.get("reference_url"))
@@ -332,7 +341,7 @@ def _normalize_instruction_item(item: dict[str, Any]) -> InstructionRecord | Non
         form=form,
         summary=summary,
         architecture="arm",
-        isa=_infer_arm_isa(item),
+        isa=isa,
         metadata=_collect_metadata(item, url=url),
         aliases=_collect_aliases(item),
         description=_description_sections(item),
@@ -675,6 +684,7 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             if not mnemonic_match:
                 return
             mnemonic = mnemonic_match.group(0)
+            isa = _infer_aarchmrs_isa(group_path)
             operand_form = tail.strip()
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
             metadata = {
@@ -699,7 +709,7 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                             ),
                             summary="Branch conditionally.",
                             architecture="arm",
-                            isa=_infer_aarchmrs_isa(group_path),
+                            isa=isa,
                             metadata=dict(metadata),
                             source="arm-a64",
                             enc_bits=enc_bits,
@@ -718,7 +728,7 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 form = f"{form} [{str(node.get('name') or '').strip()}]"
                 key = (mnemonic, form.casefold())
             seen_keys[key] = (enc_mask, enc_match)
-            summary = _aarchmrs_title(node, operations) or _generated_summary(mnemonic)
+            summary = _aarchmrs_title(node, operations) or _generated_summary(mnemonic, isa)
             if not summary.endswith("."):
                 summary += "."
             records.append(
@@ -727,7 +737,7 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                     form=form,
                     summary=summary,
                     architecture="arm",
-                    isa=_infer_aarchmrs_isa(group_path),
+                    isa=isa,
                     metadata=metadata,
                     source="arm-a64",
                     enc_bits=enc_bits,
