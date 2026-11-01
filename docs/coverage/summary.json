@@ -1,15 +1,15 @@
 {
   "catalog": {
-    "generated_at": "2026-05-25T08:54:20+00:00",
-    "instructions": 29423,
-    "intrinsics": 92837
+    "generated_at": "2026-11-01T03:56:37+00:00",
+    "instructions": 27208,
+    "intrinsics": 95794
   },
   "sources": {
     "arm-a64": {
       "coverage": 0.9823182711198428,
       "extra_sample": [],
       "extra_total": 0,
-      "fetched_url": "/home/runner/work/simdref/simdref/vendor/arm/AARCHMRS_OPENSOURCE_A_profile_FAT-2025-09_ASL0.tar.gz",
+      "fetched_url": "/home/marco/.hermes/cache/scratch/simdref-sources/wt/INT/vendor/arm/AARCHMRS_OPENSOURCE_A_profile_FAT-2025-09_ASL0.tar.gz",
       "fetched_version": "archive:AARCHMRS_OPENSOURCE_A_profile_FAT-2025-09_ASL0.tar.gz:Instructions.json",
       "label": "Arm AARCHMRS A64",
       "local": 1500,
@@ -46,7 +46,7 @@
       "upstream": 1527
     },
     "arm-intrinsics": {
-      "coverage": 0.6998341625207297,
+      "coverage": 0.7281772953414745,
       "extra_sample": [
         "svaba_n_s16",
         "svaba_n_s32",
@@ -74,12 +74,12 @@
         "svabalb_s32",
         "svabalb_s64"
       ],
-      "extra_total": 6149,
-      "fetched_url": "/home/runner/work/simdref/simdref/vendor/arm",
+      "extra_total": 7037,
+      "fetched_url": "/home/marco/.hermes/cache/scratch/simdref-sources/wt/INT/vendor/arm",
       "fetched_version": "local-json-bundle",
       "label": "Arm ACLE intrinsics",
-      "local": 10791,
-      "matched": 4642,
+      "local": 11867,
+      "matched": 4830,
       "missing_sample": [
         "asrl",
         "lsll",
@@ -107,7 +107,7 @@
         "svaclt",
         "svadalp_m"
       ],
-      "missing_total": 1991,
+      "missing_total": 1803,
       "threshold": 0.65,
       "upstream": 6633
     },
@@ -115,43 +115,43 @@
       "coverage": 1.0,
       "extra_sample": [],
       "extra_total": 0,
-      "fetched_url": "https://cdrdv2.intel.com/v1/dl/getContent/764289?fileName=Intel-Intrinsics-Guide-Offline-3.6.4.zip",
-      "fetched_version": "offline-zip-download",
+      "fetched_url": "/home/marco/.hermes/cache/scratch/simdref-sources/wt/INT/vendor/intel/Intel-Intrinsics-Guide-Offline-3.6.9.zip",
+      "fetched_version": "offline-package:Intel-Intrinsics-Guide-Offline-3.6.9",
       "label": "Intel Intrinsics Guide",
-      "local": 7381,
-      "matched": 7381,
+      "local": 7126,
+      "matched": 7126,
       "missing_sample": [],
       "missing_total": 0,
       "threshold": 0.99,
-      "upstream": 7381
+      "upstream": 7126
     },
     "riscv-rvv": {
       "coverage": 1.0,
       "extra_sample": [],
       "extra_total": 0,
-      "fetched_url": "/home/runner/work/simdref/simdref/vendor/riscv/rvv_intrinsics_bundle.json",
+      "fetched_url": "/home/marco/.hermes/cache/scratch/simdref-sources/wt/INT/vendor/riscv/rvv_intrinsics_bundle.json",
       "fetched_version": "local-json:rvv_intrinsics_bundle.json",
       "label": "RISC-V RVV intrinsics",
-      "local": 74289,
-      "matched": 74289,
+      "local": 76781,
+      "matched": 76781,
       "missing_sample": [],
       "missing_total": 0,
       "threshold": 0.99,
-      "upstream": 74289
+      "upstream": 76781
     },
     "riscv-unified-db": {
       "coverage": 1.0,
       "extra_sample": [],
       "extra_total": 0,
-      "fetched_url": "/home/runner/work/simdref/simdref/vendor/riscv/unified_db_bundle.json",
+      "fetched_url": "/home/marco/.hermes/cache/scratch/simdref-sources/wt/INT/vendor/riscv/unified_db_bundle.json",
       "fetched_version": "local-json:unified_db_bundle.json",
       "label": "RISC-V unified DB",
-      "local": 672,
-      "matched": 672,
+      "local": 677,
+      "matched": 677,
       "missing_sample": [],
       "missing_total": 0,
       "threshold": 0.99,
-      "upstream": 672
+      "upstream": 677
     },
     "uops-info": {
       "coverage": 0.9942074776197999,
@@ -183,8 +183,8 @@
         "REPE CMPSW"
       ],
       "extra_total": 670,
-      "fetched_url": "https://uops.info/instructions.xml",
-      "fetched_version": "live",
+      "fetched_url": "/home/marco/.hermes/cache/scratch/simdref-sources/wt/INT/vendor/uops/instructions.xml",
+      "fetched_version": "local-xml:instructions.xml",
       "label": "uops.info instructions.xml",
       "local": 2558,
       "matched": 1888,
