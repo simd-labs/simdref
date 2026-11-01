@@ -1,0 +1,12 @@
+3.1 Instruction tables
+Table 26: AArch64 ASIMD integer instructions
+                       Instruction            AArch64                     Exec           Execution            Utilized         Notes
+                       Group                  Instructions                Latency        Throughput           Pipeline
+                                                                                                              s
+                       ASIMD arith,         ADDV, SADDLV,                 3              1                    V1               -
+                       reduce, 4H/4S        UADDLV
+                       ASIMD arith,         ADDV, SADDLV,                 5              1                    V1, V            -
+                       reduce, 8B/8H        UADDLV
+                       ASIMD arith,         ADDV, SADDLV,                 6               1/2                 V1               -
+                       reduce, 16B          UADDLV
+4.1 Dispatch constraints

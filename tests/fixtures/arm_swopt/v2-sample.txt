@@ -1,0 +1,32 @@
+3.1 Instruction tables
+Table 3-3 AArch64 Arithmetic and logical instructions
+Instruction Group                     AArch64              Exec           Execution            Utilized       Notes
+                                      Instructions         Latency        Throughput           Pipelines
+ALU, basic                            ADD, ADC, AND,       1              6                    I              -
+                                      BIC, EON, EOR,
+                                      ORN, ORR, SUB,
+                                      SBC
+ALU, basic, flagset                   ADDS, ADCS,          1              3                    F              -
+                                      ANDS, BICS,
+                                      SUBS, SBCS
+Table 3-15 AArch64 ASIMD integer instructions
+Instruction Group                  AArch64              Exec           Execution            Utilized       Notes
+                                   Instructions         Latency        Throughput           Pipelines
+ASIMD absolute diff                SABD, UABD           2              4                    V              -
+ASIMD absolute diff accum          SABA, UABA           4(1)           2                    V13            2
+ASIMD absolute diff accum long SABAL(2),                4(1)           2                    V13            2
+                               UABAL(2)
+ASIMD absolute diff long           SABDL(2),            2              4                    V              -
+                                   UABDL(2)
+ASIMD arith, basic                 ABS, ADD, NEG, 2                    4                    V              -
+                                   SADDL(2),
+                                   SADDW(2),
+                                   SHADD, SHSUB,
+                                   SSUBL(2),
+                                   SSUBW(2), SUB,
+                                   UADDL(2),
+                                   UADDW(2),
+                                   UHADD, UHSUB,
+                                   USUBL(2),
+                                   USUBW(2)
+4.1 Dispatch constraints

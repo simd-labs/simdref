@@ -1,0 +1,3277 @@
+{
+ "cpu": "neoverse-n1",
+ "source_version": "Issue 4.0",
+ "citation_url": "https://documentation-service.arm.com/static/6687d73a69e89f01e39c4507?token=",
+ "groups": [
+  {
+   "group": "Branch, immed",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "B",
+   "notes": "-",
+   "mnemonics": [
+    "B"
+   ]
+  },
+  {
+   "group": "Branch, register",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "B",
+   "notes": "-",
+   "mnemonics": [
+    "BR",
+    "RET"
+   ]
+  },
+  {
+   "group": "Branch and link, immed",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "I, B",
+   "notes": "-",
+   "mnemonics": [
+    "BL"
+   ]
+  },
+  {
+   "group": "Branch and link, register (reg != lr)",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "I, B",
+   "notes": "-",
+   "mnemonics": [
+    "BLR"
+   ]
+  },
+  {
+   "group": "Branch and link, register (reg == lr)",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "I, B",
+   "notes": "-",
+   "mnemonics": [
+    "BLR"
+   ]
+  },
+  {
+   "group": "Compare and branch",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "B",
+   "notes": "-",
+   "mnemonics": [
+    "CBZ",
+    "CBNZ",
+    "TBZ",
+    "TBNZ"
+   ]
+  },
+  {
+   "group": "Arithmetic, basic",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "",
+   "mnemonics": [
+    "ADD{S}",
+    "ADC{S}",
+    "SUB{S}",
+    "SBC{S}"
+   ]
+  },
+  {
+   "group": "Arithmetic, extend and shift",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "",
+   "mnemonics": [
+    "ADD{S}",
+    "SUB{S}"
+   ]
+  },
+  {
+   "group": "Arithmetic, LSL shift, shift <= 4",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "",
+   "mnemonics": [
+    "ADD{S}",
+    "SUB{S}"
+   ]
+  },
+  {
+   "group": "Arithmetic, LSR/ASR/ROR shift or LSL shift > 4",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "",
+   "mnemonics": [
+    "ADD{S}",
+    "SUB{S}"
+   ]
+  },
+  {
+   "group": "Conditional compare",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "",
+   "mnemonics": [
+    "CCMN",
+    "CCMP"
+   ]
+  },
+  {
+   "group": "Conditional select",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "",
+   "mnemonics": [
+    "CSEL",
+    "CSINC",
+    "CSINV",
+    "CSNEG"
+   ]
+  },
+  {
+   "group": "Logical, basic",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "",
+   "mnemonics": [
+    "AND{S}",
+    "BIC{S}",
+    "EON",
+    "EOR",
+    "ORN",
+    "ORR"
+   ]
+  },
+  {
+   "group": "Logical, shift, no flagset",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "",
+   "mnemonics": [
+    "AND",
+    "BIC",
+    "EON",
+    "EOR",
+    "ORN",
+    "ORR"
+   ]
+  },
+  {
+   "group": "Logical, shift, flagset",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "",
+   "mnemonics": [
+    "ANDS",
+    "BICS"
+   ]
+  },
+  {
+   "group": "Divide, W-form",
+   "latency": "5 to 12",
+   "throughput": "1/12 to 1/5",
+   "pipelines": "M",
+   "notes": "1",
+   "mnemonics": [
+    "SDIV",
+    "UDIV"
+   ]
+  },
+  {
+   "group": "Divide, X-form",
+   "latency": "5 to 20",
+   "throughput": "1/20 to 1/5",
+   "pipelines": "M",
+   "notes": "1",
+   "mnemonics": [
+    "SDIV",
+    "UDIV"
+   ]
+  },
+  {
+   "group": "Multiply accumulate, W- form",
+   "latency": "2(1)",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "2",
+   "mnemonics": [
+    "MADD",
+    "MSUB"
+   ]
+  },
+  {
+   "group": "Multiply accumulate, X- form",
+   "latency": "4(3)",
+   "throughput": "1/3",
+   "pipelines": "M",
+   "notes": "2, 4",
+   "mnemonics": [
+    "MADD",
+    "MSUB"
+   ]
+  },
+  {
+   "group": "Multiply accumulate long",
+   "latency": "2(1)",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "2",
+   "mnemonics": [
+    "SMADDL",
+    "SMSUBL",
+    "UMADDL",
+    "UMSUBL"
+   ]
+  },
+  {
+   "group": "Multiply high",
+   "latency": "5(3)",
+   "throughput": "1/4",
+   "pipelines": "M",
+   "notes": "5",
+   "mnemonics": [
+    "SMULH",
+    "UMULH"
+   ]
+  },
+  {
+   "group": "Address generation",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "ADR",
+    "ADRP"
+   ]
+  },
+  {
+   "group": "Bitfield extract, one reg",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "EXTR"
+   ]
+  },
+  {
+   "group": "Bitfield extract, two regs",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "I, M",
+   "notes": "-",
+   "mnemonics": [
+    "EXTR"
+   ]
+  },
+  {
+   "group": "Bitfield move, basic",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "SBFM",
+    "UBFM"
+   ]
+  },
+  {
+   "group": "Bitfield move, insert",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "-",
+   "mnemonics": [
+    "BFM"
+   ]
+  },
+  {
+   "group": "Count leading",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "CLS",
+    "CLZ"
+   ]
+  },
+  {
+   "group": "Move immed",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "MOVN",
+    "MOVK",
+    "MOVZ"
+   ]
+  },
+  {
+   "group": "Reverse bits/bytes",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "RBIT",
+    "REV",
+    "REV16",
+    "REV32"
+   ]
+  },
+  {
+   "group": "Variable shift",
+   "latency": "1",
+   "throughput": "3",
+   "pipelines": "I",
+   "notes": "-",
+   "mnemonics": [
+    "ASRV",
+    "LSLV",
+    "LSRV",
+    "RORV"
+   ]
+  },
+  {
+   "group": "Load register, literal",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LDR",
+    "LDRSW",
+    "PRFM"
+   ]
+  },
+  {
+   "group": "Load register, unscaled immed",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDUR",
+    "LDURB",
+    "LDURH",
+    "LDURSB",
+    "LDURSH",
+    "LDURSW",
+    "PRFUM"
+   ]
+  },
+  {
+   "group": "Load register, immed post-index",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRB",
+    "LDRH",
+    "LDRSB",
+    "LDRSH",
+    "LDRSW"
+   ]
+  },
+  {
+   "group": "Load register, immed pre-index",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRB",
+    "LDRH",
+    "LDRSB",
+    "LDRSH",
+    "LDRSW"
+   ]
+  },
+  {
+   "group": "Load register, immed unprivileged",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDTR",
+    "LDTRB",
+    "LDTRH",
+    "LDTRSB",
+    "LDTRSH",
+    "LDTRSW"
+   ]
+  },
+  {
+   "group": "Load register, unsigned immed",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRB",
+    "LDRH",
+    "LDRSB",
+    "LDRSH",
+    "LDRSW",
+    "PRFM"
+   ]
+  },
+  {
+   "group": "Load register, register offset, basic",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRB",
+    "LDRH",
+    "LDRSB",
+    "LDRSH",
+    "LDRSW",
+    "PRFM"
+   ]
+  },
+  {
+   "group": "Load register, register offset, scale by 4/8",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRSW",
+    "PRFM"
+   ]
+  },
+  {
+   "group": "Load register, register offset, scale by 2",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "I, L",
+   "notes": "",
+   "mnemonics": [
+    "LDRH",
+    "LDRSH"
+   ]
+  },
+  {
+   "group": "Load register, register offset, extend",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRB",
+    "LDRH",
+    "LDRSB",
+    "LDRSH",
+    "LDRSW",
+    "PRFM"
+   ]
+  },
+  {
+   "group": "Load register, register offset, extend, scale by 4/8",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDR",
+    "LDRSW",
+    "PRFM"
+   ]
+  },
+  {
+   "group": "Load register, register offset, extend, scale by 2",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "I, L",
+   "notes": "",
+   "mnemonics": [
+    "LDRH",
+    "LDRSH"
+   ]
+  },
+  {
+   "group": "Load pair, signed immed offset, normal, W-form",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDP",
+    "LDNP"
+   ]
+  },
+  {
+   "group": "Load pair, signed immed offset, normal, X-form",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "L",
+   "notes": "",
+   "mnemonics": [
+    "LDP",
+    "LDNP"
+   ]
+  },
+  {
+   "group": "Load pair, signed immed offset, signed words, base != SP",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "I, L",
+   "notes": "",
+   "mnemonics": [
+    "LDPSW"
+   ]
+  },
+  {
+   "group": "Load pair, signed immed offset, signed words, base = SP",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "I, L",
+   "notes": "",
+   "mnemonics": [
+    "LDPSW"
+   ]
+  },
+  {
+   "group": "Load pair, immed post-index, normal",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "L, I",
+   "notes": "",
+   "mnemonics": [
+    "LDP"
+   ]
+  },
+  {
+   "group": "Load pair, immed post-index, signed words",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "I, L",
+   "notes": "",
+   "mnemonics": [
+    "LDPSW"
+   ]
+  },
+  {
+   "group": "Load pair, immed pre- index, normal",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "L, I",
+   "notes": "",
+   "mnemonics": [
+    "LDP"
+   ]
+  },
+  {
+   "group": "Load pair, immed pre- index, signed words",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "I, L",
+   "notes": "",
+   "mnemonics": [
+    "LDPSW"
+   ]
+  },
+  {
+   "group": "Store register, unscaled immed",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STUR",
+    "STURB",
+    "STURH"
+   ]
+  },
+  {
+   "group": "Store register, immed post-index",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR",
+    "STRB",
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store register, immed pre-index",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR",
+    "STRB",
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store register, immed unprivileged",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STTR",
+    "STTRB",
+    "STTRH"
+   ]
+  },
+  {
+   "group": "Store register, unsigned immed",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR",
+    "STRB",
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store register, register offset, basic",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR",
+    "STRB",
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store register, register offset, scaled by 4/8",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store register, register offset, scaled by 2",
+   "latency": "2",
+   "throughput": "3/2",
+   "pipelines": "I, L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store register, register offset, extend",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR",
+    "STRB",
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store register, register offset, extend, scale by 4/8",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store register, register offset, extend, scale by 1",
+   "latency": "2",
+   "throughput": "3/2",
+   "pipelines": "I, L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STRH"
+   ]
+  },
+  {
+   "group": "Store pair, immed offset, W-form",
+   "latency": "1",
+   "throughput": "2",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STP",
+    "STNP"
+   ]
+  },
+  {
+   "group": "Store pair, immed offset, X-form",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STP",
+    "STNP"
+   ]
+  },
+  {
+   "group": "Store pair, immed post- index, W-form",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store pair, immed post- index, X-form",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store pair, immed pre- index, W-form",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store pair, immed pre- index, X-form",
+   "latency": "1",
+   "throughput": "1",
+   "pipelines": "L, D",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "FP absolute value",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FABS"
+   ]
+  },
+  {
+   "group": "FP arithmetic",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FADD",
+    "FSUB"
+   ]
+  },
+  {
+   "group": "FP compare",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCCMP{E}",
+    "FCMP{E}"
+   ]
+  },
+  {
+   "group": "FP divide, H-form",
+   "latency": "7",
+   "throughput": "4/7",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "FDIV"
+   ]
+  },
+  {
+   "group": "FP divide, S-form",
+   "latency": "7 to 10",
+   "throughput": "4/9 to 4/7",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "FDIV"
+   ]
+  },
+  {
+   "group": "FP divide, D-form",
+   "latency": "7 to 15",
+   "throughput": "1/7 to 2/7",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "FDIV"
+   ]
+  },
+  {
+   "group": "FP min/max",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMIN",
+    "FMINNM",
+    "FMAX",
+    "FMAXNM"
+   ]
+  },
+  {
+   "group": "FP multiply FP multiply accumulate",
+   "latency": "3",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "2",
+   "mnemonics": [
+    "FMUL",
+    "FNMUL",
+    "FMADD",
+    "FMSUB",
+    "FNMADD",
+    "FNMSUB"
+   ]
+  },
+  {
+   "group": "FP negate",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FNEG"
+   ]
+  },
+  {
+   "group": "FP round to integral",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FRINTA",
+    "FRINTI",
+    "FRINTM",
+    "FRINTN",
+    "FRINTP",
+    "FRINTX",
+    "FRINTZ"
+   ]
+  },
+  {
+   "group": "FP select",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FCSEL"
+   ]
+  },
+  {
+   "group": "FP square root, H-form",
+   "latency": "7",
+   "throughput": "4/7",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "FSQRT"
+   ]
+  },
+  {
+   "group": "FP square root, S-form",
+   "latency": "7 to 10",
+   "throughput": "4/9 to 4/7",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "FSQRT"
+   ]
+  },
+  {
+   "group": "FP square root, D-form",
+   "latency": "7 to 17",
+   "throughput": "1/8 to 2/7",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "FSQRT"
+   ]
+  },
+  {
+   "group": "FP convert, from vec to vec reg",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVT",
+    "FCVTXN"
+   ]
+  },
+  {
+   "group": "FP convert, from gen to vec reg",
+   "latency": "6",
+   "throughput": "1",
+   "pipelines": "M, V0",
+   "notes": "-",
+   "mnemonics": [
+    "SCVTF",
+    "UCVTF"
+   ]
+  },
+  {
+   "group": "FP convert, from vec to gen reg",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0, V1",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTAS",
+    "FCVTAU",
+    "FCVTMS",
+    "FCVTMU",
+    "FCVTNS",
+    "FCVTNU",
+    "FCVTPS",
+    "FCVTPU",
+    "FCVTZS",
+    "FCVTZU"
+   ]
+  },
+  {
+   "group": "FP move, immed",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMOV"
+   ]
+  },
+  {
+   "group": "FP move, register",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMOV"
+   ]
+  },
+  {
+   "group": "FP transfer, from gen to vec reg",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "-",
+   "mnemonics": [
+    "FMOV"
+   ]
+  },
+  {
+   "group": "FP transfer, from vec to gen reg",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "FMOV"
+   ]
+  },
+  {
+   "group": "Load vector reg, unscaled immed",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LDUR"
+   ]
+  },
+  {
+   "group": "Load vector reg, immed post-index",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, immed pre-index",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, unsigned immed",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, register offset, basic",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, register offset, scale, S/D-form",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, register offset, scale, H/Q-form",
+   "latency": "6",
+   "throughput": "2",
+   "pipelines": "I, L",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, register offset, extend",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, register offset, extend, scale, S/D-form",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector reg, register offset, extend, scale, H/Q-form",
+   "latency": "6",
+   "throughput": "2",
+   "pipelines": "I, L",
+   "notes": "-",
+   "mnemonics": [
+    "LDR"
+   ]
+  },
+  {
+   "group": "Load vector pair, immed offset, S/D-form",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDP",
+    "LDNP"
+   ]
+  },
+  {
+   "group": "Load vector pair, immed offset, Q-form",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LDP",
+    "LDNP"
+   ]
+  },
+  {
+   "group": "Load vector pair, immed post-index, S/D-form",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "I, L",
+   "notes": "-",
+   "mnemonics": [
+    "LDP"
+   ]
+  },
+  {
+   "group": "Load vector pair, immed post-index, Q-form",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDP"
+   ]
+  },
+  {
+   "group": "Load vector pair, immed pre-index, S/D-form",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "I, L",
+   "notes": "-",
+   "mnemonics": [
+    "LDP"
+   ]
+  },
+  {
+   "group": "Load vector pair, immed pre-index, Q-form",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "LDP"
+   ]
+  },
+  {
+   "group": "Store vector reg, unscaled immed, B/H/S/D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "STUR"
+   ]
+  },
+  {
+   "group": "Store vector reg, unscaled immed, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, I",
+   "notes": "-",
+   "mnemonics": [
+    "STUR"
+   ]
+  },
+  {
+   "group": "Store vector reg, immed post-index, B/H/S/D- form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, immed post-index, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, immed pre-index, B/H/S/D- form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, immed pre-index, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, unsigned immed, B/H/S/D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, unsigned immed, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, basic, B/H/S/D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, basic, Q- form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, scale, H- form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "I, L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, scale, S/D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, scale, Q- form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "I, L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, extend, B/H/S/D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, extend, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, extend, scale, H-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "I, L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, extend, scale, S/D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector reg, register offset, extend, scale, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "I, L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STR"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed offset, S-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP",
+    "STNP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed offset, D-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP",
+    "STNP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed offset, Q-form",
+   "latency": "3",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP",
+    "STNP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed post-index, S-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed post-index, D-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed post-index, Q-form",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed pre-index, S-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed pre-index, D-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "Store vector pair, immed pre-index, Q-form",
+   "latency": "3",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "STP"
+   ]
+  },
+  {
+   "group": "ASIMD absolute diff",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "SABD",
+    "UABD"
+   ]
+  },
+  {
+   "group": "ASIMD absolute diff accum",
+   "latency": "4(1)",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "2",
+   "mnemonics": [
+    "SABA",
+    "UABA"
+   ]
+  },
+  {
+   "group": "ASIMD absolute diff accum long",
+   "latency": "4(1)",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "2",
+   "mnemonics": [
+    "SABAL(2)",
+    "UABAL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD absolute diff long",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "SABDL(2)",
+    "UABDL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD arith, basic",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "ABS",
+    "ADD",
+    "NEG",
+    "SADDL(2)",
+    "SADDW(2)",
+    "SHADD",
+    "SHSUB",
+    "SSUBL(2)",
+    "SSUBW(2)",
+    "SUB",
+    "UADDL(2)",
+    "UADDW(2)",
+    "UHADD",
+    "UHSUB",
+    "USUBL(2)",
+    "USUBW(2)"
+   ]
+  },
+  {
+   "group": "ASIMD arith, complex",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "ADDHN(2)",
+    "RADDHN(2)",
+    "RSUBHN(2)",
+    "SQABS",
+    "SQADD",
+    "SQNEG",
+    "SQSUB",
+    "SRHADD",
+    "SUBHN(2)",
+    "SUQADD",
+    "UQADD",
+    "UQSUB",
+    "URHADD",
+    "USQADD"
+   ]
+  },
+  {
+   "group": "ASIMD arith, pair-wise",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "ADDP",
+    "SADDLP",
+    "UADDLP"
+   ]
+  },
+  {
+   "group": "ASIMD arith, reduce, 4H/4S",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "ADDV",
+    "SADDLV",
+    "UADDLV"
+   ]
+  },
+  {
+   "group": "ASIMD arith, reduce, 8B/8H",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "V1, V",
+   "notes": "-",
+   "mnemonics": [
+    "ADDV",
+    "SADDLV",
+    "UADDLV"
+   ]
+  },
+  {
+   "group": "ASIMD arith, reduce, 16B",
+   "latency": "6",
+   "throughput": "1/2",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "ADDV",
+    "SADDLV",
+    "UADDLV"
+   ]
+  },
+  {
+   "group": "ASIMD compare",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "CMEQ",
+    "CMGE",
+    "CMGT",
+    "CMHI",
+    "CMHS",
+    "CMLE",
+    "CMLT",
+    "CMTST"
+   ]
+  },
+  {
+   "group": "ASIMD dot product",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "SDOT",
+    "UDOT"
+   ]
+  },
+  {
+   "group": "ASIMD logical",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "AND",
+    "BIC",
+    "EOR",
+    "MOV",
+    "MVN",
+    "ORN",
+    "ORR",
+    "NOT"
+   ]
+  },
+  {
+   "group": "ASIMD max/min, basic and pair- wise",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "SMAX",
+    "SMAXP",
+    "SMIN",
+    "SMINP",
+    "UMAX",
+    "UMAXP",
+    "UMIN",
+    "UMINP"
+   ]
+  },
+  {
+   "group": "ASIMD max/min, reduce, 4H/4S",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "SMAXV",
+    "SMINV",
+    "UMAXV",
+    "UMINV"
+   ]
+  },
+  {
+   "group": "ASIMD max/min, reduce, 8B/8H",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "V1, V",
+   "notes": "-",
+   "mnemonics": [
+    "SMAXV",
+    "SMINV",
+    "UMAXV",
+    "UMINV"
+   ]
+  },
+  {
+   "group": "ASIMD max/min, reduce, 16B",
+   "latency": "6",
+   "throughput": "1/2",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "SMAXV",
+    "SMINV",
+    "UMAXV",
+    "UMINV"
+   ]
+  },
+  {
+   "group": "ASIMD multiply, D-form",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "MUL",
+    "SQDMULH",
+    "SQRDMULH"
+   ]
+  },
+  {
+   "group": "ASIMD multiply, Q-form",
+   "latency": "5",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "MUL",
+    "SQDMULH",
+    "SQRDMULH"
+   ]
+  },
+  {
+   "group": "ASIMD multiply accumulate, D- form",
+   "latency": "4(1)",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "MLA",
+    "MLS"
+   ]
+  },
+  {
+   "group": "ASIMD multiply accumulate, Q- form",
+   "latency": "5(2)",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "MLA",
+    "MLS"
+   ]
+  },
+  {
+   "group": "ASIMD multiply accumulate high, D-form",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SQRDMLAH",
+    "SQRDMLSH"
+   ]
+  },
+  {
+   "group": "ASIMD multiply accumulate high, Q-form",
+   "latency": "5",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SQRDMLAH",
+    "SQRDMLSH"
+   ]
+  },
+  {
+   "group": "ASIMD multiply accumulate long",
+   "latency": "4(1)",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "1",
+   "mnemonics": [
+    "SMLAL(2)",
+    "SMLSL(2)",
+    "UMLAL(2)",
+    "UMLSL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD multiply accumulate saturating long",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SQDMLAL(2)",
+    "SQDMLSL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD multiply/multiply long (8x8) polynomial, D- form",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "3",
+   "mnemonics": [
+    "PMUL",
+    "PMULL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD multiply/multiply long (8x8) polynomial, Q- form",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "3",
+   "mnemonics": [
+    "PMUL",
+    "PMULL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD multiply long",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SMULL(2)",
+    "UMULL(2)",
+    "SQDMULL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD pairwise add and accumulate long",
+   "latency": "4(1)",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "2",
+   "mnemonics": [
+    "SADALP",
+    "UADALP"
+   ]
+  },
+  {
+   "group": "ASIMD shift accumulate",
+   "latency": "4(1)",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "2",
+   "mnemonics": [
+    "SSRA",
+    "SRSRA",
+    "USRA",
+    "URSRA"
+   ]
+  },
+  {
+   "group": "ASIMD shift by immed, basic",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "SHL",
+    "SHLL(2)",
+    "SHRN(2)",
+    "SSHLL(2)",
+    "SSHR",
+    "SXTL(2)",
+    "USHLL(2)",
+    "USHR",
+    "UXTL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD shift by immed and insert, basic",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "SLI",
+    "SRI"
+   ]
+  },
+  {
+   "group": "ASIMD shift by immed, complex",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "RSHRN(2)",
+    "SQRSHRN(2)",
+    "SQRSHRUN(2)",
+    "SQSHL{U}",
+    "SQSHRN(2)",
+    "SQSHRUN(2)",
+    "SRSHR",
+    "UQRSHRN(2)",
+    "UQSHL",
+    "UQSHRN(2)",
+    "URSHR"
+   ]
+  },
+  {
+   "group": "ASIMD shift by register, basic",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "SSHL",
+    "USHL"
+   ]
+  },
+  {
+   "group": "ASIMD shift by register, complex",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "-",
+   "mnemonics": [
+    "SRSHL",
+    "SQRSHL",
+    "SQSHL",
+    "URSHL",
+    "UQRSHL",
+    "UQSHL"
+   ]
+  },
+  {
+   "group": "ASIMD FP absolute value/difference",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FABS",
+    "FABD"
+   ]
+  },
+  {
+   "group": "ASIMD FP arith, normal",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FABD",
+    "FADD",
+    "FSUB",
+    "FADDP"
+   ]
+  },
+  {
+   "group": "ASIMD FP compare",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FACGE",
+    "FACGT",
+    "FCMEQ",
+    "FCMGE",
+    "FCMGT",
+    "FCMLE",
+    "FCMLT"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, long (F16 to F32)",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, long (F32 to F64)",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, narrow (F32 to F16)",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTN(2)"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, narrow (F64 to F32)",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTN(2)",
+    "FCVTXN(2)"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, other, D- form F32 and Q- form F64",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTAS",
+    "FCVTAU",
+    "FCVTMS",
+    "FCVTMU",
+    "FCVTNS",
+    "FCVTNU",
+    "FCVTPS",
+    "FCVTPU",
+    "FCVTZS",
+    "FCVTZU",
+    "SCVTF",
+    "UCVTF"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, other, D- form F16 and Q- form F32",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTAS",
+    "FCVTAU",
+    "FCVTMS",
+    "FCVTMU",
+    "FCVTNS",
+    "FCVTNU",
+    "FCVTPS",
+    "FCVTPU",
+    "FCVTZS",
+    "FCVTZU",
+    "SCVTF",
+    "UCVTF"
+   ]
+  },
+  {
+   "group": "ASIMD FP convert, other, Q- form F16",
+   "latency": "6",
+   "throughput": "1/4",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FCVTAS",
+    "FCVTAU",
+    "FCVTMS",
+    "FCVTMU",
+    "FCVTNS",
+    "FCVTNU",
+    "FCVTPS",
+    "FCVTPU",
+    "FCVTZS",
+    "FCVTZU",
+    "SCVTF",
+    "UCVTF"
+   ]
+  },
+  {
+   "group": "ASIMD FP divide, D-form, F16",
+   "latency": "7",
+   "throughput": "1/7",
+   "pipelines": "V0",
+   "notes": "3",
+   "mnemonics": [
+    "FDIV"
+   ]
+  },
+  {
+   "group": "ASIMD FP divide, D-form, F32 ASIMD FP divide, Q-form, F16 ASIMD FP divide, Q-form, F32 ASIMD FP divide, Q-form, F64",
+   "latency": "7 to 10",
+   "throughput": "2/9 to 2/7",
+   "pipelines": "V0",
+   "notes": "3",
+   "mnemonics": [
+    "FDIV"
+   ]
+  },
+  {
+   "group": "ASIMD FP max/min, normal",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMAX",
+    "FMAXNM",
+    "FMIN",
+    "FMINNM"
+   ]
+  },
+  {
+   "group": "ASIMD FP max/min, pairwise",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMAXP",
+    "FMAXNMP",
+    "FMINP",
+    "FMINNMP"
+   ]
+  },
+  {
+   "group": "ASIMD FP max/min, reduce",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMAXV",
+    "FMAXNMV",
+    "FMINV",
+    "FMINNMV"
+   ]
+  },
+  {
+   "group": "ASIMD FP max/min, reduce, Q-form F16",
+   "latency": "8",
+   "throughput": "2/3",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FMAXV",
+    "FMAXNMV",
+    "FMINV",
+    "FMINNMV"
+   ]
+  },
+  {
+   "group": "ASIMD FP multiply ASIMD FP multiply accumulate",
+   "latency": "3",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "2",
+   "mnemonics": [
+    "FMUL",
+    "FMULX",
+    "FMLA",
+    "FMLS"
+   ]
+  },
+  {
+   "group": "ASIMD FP multiply accumulate long",
+   "latency": "5(2)",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "1",
+   "mnemonics": [
+    "FMLAL(2)",
+    "FMLSL(2)"
+   ]
+  },
+  {
+   "group": "ASIMD FP negate",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "FNEG"
+   ]
+  },
+  {
+   "group": "ASIMD FP round, D-form F32 and Q-form F64",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FRINTA",
+    "FRINTI",
+    "FRINTM",
+    "FRINTN",
+    "FRINTP",
+    "FRINTX",
+    "FRINTZ"
+   ]
+  },
+  {
+   "group": "ASIMD FP round, D-form F16 and Q-form F32",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FRINTA",
+    "FRINTI",
+    "FRINTM",
+    "FRINTN",
+    "FRINTP",
+    "FRINTX",
+    "FRINTZ"
+   ]
+  },
+  {
+   "group": "ASIMD FP round, Q-form F16",
+   "latency": "6",
+   "throughput": "1/4",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "FRINTA",
+    "FRINTI",
+    "FRINTM",
+    "FRINTN",
+    "FRINTP",
+    "FRINTX",
+    "FRINTZ"
+   ]
+  },
+  {
+   "group": "ASIMD FP square root, D-form, F16",
+   "latency": "7",
+   "throughput": "1/7",
+   "pipelines": "V0",
+   "notes": "3",
+   "mnemonics": [
+    "FSQRT"
+   ]
+  },
+  {
+   "group": "ASIMD FP square root, D-form, F32 ASIMD FP square root, Q-form, F16 ASIMD FP square root, Q-form, F32 ASIMD FP square root, Q-form, F64",
+   "latency": "7 to 10",
+   "throughput": "2/9 to 2/7",
+   "pipelines": "V0",
+   "notes": "3",
+   "mnemonics": [
+    "FSQRT"
+   ]
+  },
+  {
+   "group": "ASIMD bit reverse",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "-",
+   "mnemonics": [
+    "RBIT"
+   ]
+  },
+  {
+   "group": "ASIMD bitwise insert",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "BIF",
+    "BIT",
+    "BSL"
+   ]
+  },
+  {
+   "group": "ASIMD count",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "CLS",
+    "CLZ",
+    "CNT"
+   ]
+  },
+  {
+   "group": "ASIMD duplicate, gen reg",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "M",
+   "notes": "",
+   "mnemonics": [
+    "DUP"
+   ]
+  },
+  {
+   "group": "ASIMD duplicate, element",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "DUP"
+   ]
+  },
+  {
+   "group": "ASIMD extract",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "EXT"
+   ]
+  },
+  {
+   "group": "ASIMD extract narrow",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "XTN"
+   ]
+  },
+  {
+   "group": "ASIMD extract narrow, saturating",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "",
+   "mnemonics": [
+    "SQXTN(2)",
+    "SQXTUN(2)",
+    "UQXTN(2)"
+   ]
+  },
+  {
+   "group": "ASIMD insert, element to element",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "INS"
+   ]
+  },
+  {
+   "group": "ASIMD move, FP immed",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "FMOV"
+   ]
+  },
+  {
+   "group": "ASIMD move, integer immed",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "MOVI",
+    "MVNI"
+   ]
+  },
+  {
+   "group": "ASIMD reciprocal estimate, D-form F32 and F64",
+   "latency": "3",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "",
+   "mnemonics": [
+    "FRECPE",
+    "FRECPX",
+    "FRSQRTE",
+    "URECPE",
+    "URSQRTE"
+   ]
+  },
+  {
+   "group": "ASIMD reciprocal estimate, D-form F16 and Q-form F32",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V0",
+   "notes": "",
+   "mnemonics": [
+    "FRECPE",
+    "FRECPX",
+    "FRSQRTE",
+    "URECPE",
+    "URSQRTE"
+   ]
+  },
+  {
+   "group": "ASIMD reciprocal estimate, Q-form F16",
+   "latency": "6",
+   "throughput": "1/4",
+   "pipelines": "V0",
+   "notes": "",
+   "mnemonics": [
+    "FRECPE",
+    "FRECPX",
+    "FRSQRTE",
+    "URECPE",
+    "URSQRTE"
+   ]
+  },
+  {
+   "group": "ASIMD reciprocal step",
+   "latency": "4",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "FRECPS",
+    "FRSQRTS"
+   ]
+  },
+  {
+   "group": "ASIMD reverse",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "REV16",
+    "REV32",
+    "REV64"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup, 1 or 2 table regs",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBL"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup, 3 table regs",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBL"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup, 4 table regs",
+   "latency": "4",
+   "throughput": "2/3",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBL"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup extension, 1 table reg",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBX"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup extension, 2 table reg",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBX"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup extension, 3 table reg",
+   "latency": "6",
+   "throughput": "2/3",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBX"
+   ]
+  },
+  {
+   "group": "ASIMD table lookup extension, 4 table reg",
+   "latency": "6",
+   "throughput": "2/5",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TBX"
+   ]
+  },
+  {
+   "group": "ASIMD transfer, element to gen reg",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V1",
+   "notes": "",
+   "mnemonics": [
+    "UMOV",
+    "SMOV"
+   ]
+  },
+  {
+   "group": "ASIMD transfer, gen reg to element",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "M, V",
+   "notes": "",
+   "mnemonics": [
+    "INS"
+   ]
+  },
+  {
+   "group": "ASIMD transpose",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "TRN1",
+    "TRN2"
+   ]
+  },
+  {
+   "group": "ASIMD unzip/zip",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "V",
+   "notes": "",
+   "mnemonics": [
+    "UZP1",
+    "UZP2",
+    "ZIP1",
+    "ZIP2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 1 reg, D-form",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 1 reg, Q-form",
+   "latency": "5",
+   "throughput": "2",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 2 reg, D-form",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 2 reg, Q-form",
+   "latency": "5",
+   "throughput": "1",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 3 reg, D-form",
+   "latency": "6",
+   "throughput": "2/3",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 3 reg, Q-form",
+   "latency": "6",
+   "throughput": "2/3",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 4 reg, D-form",
+   "latency": "6",
+   "throughput": "1/2",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, multiple, 4 reg, Q-form",
+   "latency": "6",
+   "throughput": "1/2",
+   "pipelines": "L",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, one lane, B/H/S",
+   "latency": "7",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, one lane, D",
+   "latency": "7",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD1"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, all lanes, D-form, B/H/S",
+   "latency": "7",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD1R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, all lanes, D-form, D",
+   "latency": "7",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD1R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 1 element, all lanes, Q-form",
+   "latency": "7",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD1R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, multiple, D-form, B/H/S",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, multiple, Q-form, B/H/S",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, multiple, Q-form, D",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, one lane, B/H",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, one lane, S",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, one lane, D",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, all lanes, D-form, B/H/S",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, all lanes, D-form, D",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 2 element, all lanes, Q-form",
+   "latency": "7",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD2R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, multiple, D-form, B/H/S",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, multiple, Q-form, B/H/S",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, multiple, Q-form, D",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, one lane, B/H",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, one lane, S",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, one lane, D",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, all lanes, D-form, B/H/S",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, all lanes, D-form, D",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, all lanes, Q-form, B/H/S",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 3 element, all lanes, Q-form, D",
+   "latency": "7",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD3R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, multiple, D-form, B/H/S",
+   "latency": "8",
+   "throughput": "2/7",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, multiple, Q-form, B/H/S",
+   "latency": "10",
+   "throughput": "1/5",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, multiple, Q-form, D",
+   "latency": "10",
+   "throughput": "1/5",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, one lane, B/H",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, one lane, S",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, one lane, D",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, all lanes, D-form, B/H/S",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, all lanes, D-form, D",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, all lanes, Q-form, B/H/S",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4R"
+   ]
+  },
+  {
+   "group": "ASIMD load, 4 element, all lanes, Q-form, D (ASIMD load, writeback form)",
+   "latency": "8",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "LD4R"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 1 reg, D-form",
+   "latency": "2",
+   "throughput": "2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 1 reg, Q-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 2 reg, D-form",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 2 reg, Q-form",
+   "latency": "3",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 3 reg, D-form",
+   "latency": "3",
+   "throughput": "2/3",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 3 reg, Q-form",
+   "latency": "4",
+   "throughput": "1/3",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 4 reg, D-form",
+   "latency": "3",
+   "throughput": "1/2",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, multiple, 4 reg, Q-form",
+   "latency": "5",
+   "throughput": "1/4",
+   "pipelines": "L, V",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, one lane, B/H/S",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 1 element, one lane, D",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST1"
+   ]
+  },
+  {
+   "group": "ASIMD store, 2 element, multiple, D-form, B/H/S",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST2"
+   ]
+  },
+  {
+   "group": "ASIMD store, 2 element, multiple, Q-form, B/H/S",
+   "latency": "5",
+   "throughput": "1/2",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST2"
+   ]
+  },
+  {
+   "group": "ASIMD store, 2 element, multiple, Q-form, D",
+   "latency": "5",
+   "throughput": "1/2",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST2"
+   ]
+  },
+  {
+   "group": "ASIMD store, 2 element, one lane, B/H/S",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST2"
+   ]
+  },
+  {
+   "group": "ASIMD store, 2 element, one lane, D",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST2"
+   ]
+  },
+  {
+   "group": "ASIMD store, 3 element, multiple, D-form, B/H/S",
+   "latency": "5",
+   "throughput": "1/2",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST3"
+   ]
+  },
+  {
+   "group": "ASIMD store, 3 element, multiple, Q-form, B/H/S",
+   "latency": "6",
+   "throughput": "1/3",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST3"
+   ]
+  },
+  {
+   "group": "ASIMD store, 3 element, multiple, Q-form, D",
+   "latency": "6",
+   "throughput": "1/3",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST3"
+   ]
+  },
+  {
+   "group": "ASIMD store, 3 element, one lane, B/H",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST3"
+   ]
+  },
+  {
+   "group": "ASIMD store, 3 element, one lane, S",
+   "latency": "4",
+   "throughput": "1/2",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST3"
+   ]
+  },
+  {
+   "group": "ASIMD store, 3 element, one lane, D",
+   "latency": "5",
+   "throughput": "1/2",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST3"
+   ]
+  },
+  {
+   "group": "ASIMD store, 4 element, multiple, D-form, B/H/S",
+   "latency": "7",
+   "throughput": "1/3",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST4"
+   ]
+  },
+  {
+   "group": "ASIMD store, 4 element, multiple, Q-form, B/H/S",
+   "latency": "9",
+   "throughput": "1/6",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST4"
+   ]
+  },
+  {
+   "group": "ASIMD store, 4 element, multiple, Q-form, D ASIMD store, 4 element, one lane, B/H ASIMD store, 4 element, one lane, S ASIMD store, 4 element, one lane, D (ASIMD store, writeback form)",
+   "latency": "6",
+   "throughput": "1/4",
+   "pipelines": "V, L",
+   "notes": "-",
+   "mnemonics": [
+    "ST4"
+   ]
+  },
+  {
+   "group": "Crypto AES ops",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "AESD",
+    "AESE",
+    "AESIMC",
+    "AESMC"
+   ]
+  },
+  {
+   "group": "Crypto polynomial (64x64) multiply long",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "PMULL"
+   ]
+  },
+  {
+   "group": "Crypto SHA1 hash acceleration op",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SHA1H"
+   ]
+  },
+  {
+   "group": "Crypto SHA1 hash acceleration ops",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SHA1C",
+    "SHA1M",
+    "SHA1P"
+   ]
+  },
+  {
+   "group": "Crypto SHA1 schedule acceleration ops",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SHA1SU0",
+    "SHA1SU1"
+   ]
+  },
+  {
+   "group": "Crypto SHA256 hash acceleration ops",
+   "latency": "4",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SHA256H",
+    "SHA256H2"
+   ]
+  },
+  {
+   "group": "Crypto SHA256 schedule acceleration ops",
+   "latency": "2",
+   "throughput": "1",
+   "pipelines": "V0",
+   "notes": "-",
+   "mnemonics": [
+    "SHA256SU0",
+    "SHA256SU1"
+   ]
+  }
+ ]
+}
