@@ -262,3 +262,104 @@ def perf_row_values(details: dict[str, Any]) -> tuple[str, str]:
     measurement = details.get("measurement") or {}
     cpi = measurement.get("TP_loop") or measurement.get("TP") or "-"
     return lat, cpi
+
+
+# ---------------------------------------------------------------------------
+# Latency per operand pair (uops.info start_op -> target_op detail)
+# ---------------------------------------------------------------------------
+
+_LATENCY_VALUE_KEYS = ("cycles", "cycles_mem", "cycles_addr", "cycles_addr_index")
+_VECTOR_LABELS = {"128": "xmm", "256": "ymm", "512": "zmm", "64": "mm"}
+_GPR_LABELS = {"32": "r32"}
+
+
+def _pair_value(latency: dict[str, Any]) -> str | None:
+    """One bounded cycle string for a latency entry (``"3"``, ``"3-5"``, ``"<=7"``).
+
+    Range rows (``min_cycles``/``max_cycles``) join the bounds with ``-``.
+    A bound flagged ``*_is_upper_bound`` gets the ``<=`` mark uops.info
+    shows. Returns ``None`` when the entry has no cycle data.
+    """
+    mem_is_upper = latency.get("cycles_mem_is_upper_bound") == "1"
+    for key in _LATENCY_VALUE_KEYS:
+        value = latency.get(key)
+        if value:
+            if key == "cycles_mem" and mem_is_upper and _is_numeric(value) and float(value) == 0:
+                # Same "not measured" zero convention as latency_cycle_values.
+                continue
+            if latency.get(f"{key}_is_upper_bound") == "1":
+                return f"<={value}"
+            return value
+        lo = latency.get(f"min_{key}")
+        hi = latency.get(f"max_{key}")
+        if lo or hi:
+            lo_t = f"<={lo}" if lo and latency.get(f"min_{key}_is_upper_bound") == "1" else lo
+            hi_t = f"<={hi}" if hi and latency.get(f"max_{key}_is_upper_bound") == "1" else hi
+            if lo and hi:
+                return f"{lo_t}-{hi_t}"
+            return f"{lo_t}-" if lo else f"-{hi_t}"
+    return None
+
+
+def _operand_label(operands: list[dict[str, Any]] | None, idx: Any) -> str:
+    """Compact operand label for a pair endpoint, matching the uops.info style.
+
+    Register operands map by width to ``xmm``/``ymm``/``zmm``/``mm``/``r32``
+    plus a zero-based number (start_op 2 -> xmm1). Other types use the raw
+    type (``mem``, ``imm``, ``flags``). Unknown operands fall back to the
+    raw start_op index.
+    """
+    idx_str = str(idx)
+    for operand in operands or []:
+        if str(operand.get("idx")) != idx_str:
+            continue
+        typ = operand.get("type") or ""
+        width = str(operand.get("width") or "")
+        if typ == "reg":
+            base = _VECTOR_LABELS.get(width) or _GPR_LABELS.get(width) or "reg"
+            if base != "reg" and idx_str.isdigit():
+                return f"{base}{int(idx_str) - 1}"
+            return base
+        return typ or idx_str
+    return idx_str
+
+
+def latency_pairs(details: dict[str, Any], operands=None) -> list[dict[str, str]]:
+    """Per-operand-pair latency entries for one ``arch_details`` row.
+
+    Each entry is ``{"start", "target", "value"}`` with an optional
+    ``same_reg`` key when the source row carries ``cycles_same_reg``.
+
+    shortcut: show only the first cycle key with data (cycles, mem, addr,
+    addr_index) per pair. Upgrade if a pair ever needs both.
+    """
+    pairs: list[dict[str, str]] = []
+    for latency in details.get("latencies") or []:
+        value = _pair_value(latency)
+        if value is None:
+            continue
+        pair = {
+            "start": _operand_label(operands, latency.get("start_op", "")),
+            "target": _operand_label(operands, latency.get("target_op", "")),
+            "value": value,
+        }
+        same_reg = latency.get("cycles_same_reg")
+        if same_reg:
+            pair["same_reg"] = same_reg
+        pairs.append(pair)
+    return pairs
+
+
+def _pair_segment(pair: dict[str, str]) -> str:
+    segment = f"{pair['value']} ({pair['start']}->{pair['target']}"
+    if pair.get("same_reg"):
+        segment += f", same reg {pair['same_reg']}"
+    return segment + ")"
+
+
+def latency_pair_text(details: dict[str, Any], operands=None) -> str:
+    """Compact pair line like ``3-5 (xmm1->xmm0), <=7 (mem->xmm0)``.
+
+    Empty when the row has no pair data, so callers show no label at all.
+    """
+    return ", ".join(_pair_segment(pair) for pair in latency_pairs(details, operands))

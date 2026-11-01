@@ -1,0 +1,23 @@
+{
+  "mnemonic": "VDIVPD",
+  "form": "VDIVPD (XMM, XMM, M128)",
+  "summary": "Divide packed doubles.",
+  "architecture": "x86",
+  "isa": ["AVX"],
+  "operand_details": [
+    {"idx": "1", "r": "1", "w": "1", "type": "reg", "width": "128", "xtype": "f64", "name": "REG1"},
+    {"idx": "2", "r": "1", "w": "", "type": "reg", "width": "128", "xtype": "f64", "name": "REG2"},
+    {"idx": "3", "r": "1", "w": "", "type": "mem", "width": "128", "xtype": "f64", "name": "MEM1"}
+  ],
+  "arch_details": {
+    "SNB": {
+      "source_kind": "measured",
+      "measurement": {"TP_loop": "10.00", "uops": "2"},
+      "latencies": [
+        {"start_op": "2", "target_op": "1", "min_cycles": "10", "max_cycles": "22", "max_cycles_is_upper_bound": "1"},
+        {"start_op": "3", "target_op": "1", "cycles_addr": "8", "cycles_addr_is_upper_bound": "1"},
+        {"start_op": "1", "target_op": "1", "cycles": "13", "cycles_same_reg": "10"}
+      ]
+    }
+  }
+}

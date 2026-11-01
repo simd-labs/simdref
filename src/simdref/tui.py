@@ -127,6 +127,7 @@ from simdref.display import (
     split_perf_rows,
     isa_to_sub_isa,
     instruction_metadata_rows,
+    latency_pair_rows,
     normalize_isa_token,
     strip_instruction_decorators,
     measurement_rows,
@@ -1885,6 +1886,25 @@ class SimdrefApp(App):
                 table.add_row(*cells)
             panel = Panel(table, title=perf_panel_title(kind), border_style=border)
             payload.append(("collapsible", panel, perf_panel_title(kind), False))
+        self._append_latency_pair_sections(payload, item)
+
+    def _append_latency_pair_sections(self, payload: list[tuple], item: InstructionRecord) -> None:
+        """Per-operand-pair latency under the perf tables, one panel per kind.
+
+        Pairs come from latency_pair_rows, so a record without pair data
+        adds no panel and no empty label.
+        """
+        label_map = {"uarch": "microarch", "latency_pairs": "LAT per pair"}
+        for kind, group in split_perf_rows(latency_pair_rows(item)):
+            title = f"latency per operand pair ({kind})"
+            border = perf_panel_border(kind)
+            table = Table(header_style=f"bold {border}", expand=True)
+            for col in ("uarch", "latency_pairs"):
+                table.add_column(label_map[col], no_wrap=(col == "uarch"))
+            for row in sorted(group, key=lambda r: uarch_sort_key(r.get("uarch", ""))):
+                table.add_row(display_uarch(str(row["uarch"])), row["latency_pairs"])
+            panel = Panel(table, title=title, border_style=border)
+            payload.append(("collapsible", panel, title, False))
 
     def _append_description_sections(
         self, payload: list[tuple], description: dict[str, str]

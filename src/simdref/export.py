@@ -41,7 +41,7 @@ from simdref.display import (
     isa_to_sub_isa,
     strip_instruction_decorators,
 )
-from simdref.perf import perf_row_values, variant_perf_summary
+from simdref.perf import latency_pairs, perf_row_values, variant_perf_summary
 from simdref.pdfrefs import normalize_pdf_refs
 from simdref.storage import derive_arm_arch
 
@@ -58,18 +58,29 @@ def _web_measurements(item) -> list[dict]:
         if not measurement:
             continue
         lat, cpi = perf_row_values(details)
-        rows.append(
+        row = {
+            "uarch": uarch,
+            "ports": measurement.get("ports", "-"),
+            "latency": lat,
+            "tpLoop": cpi,
+            "tpUnrolled": measurement.get("TP_unrolled", "-"),
+            "tpPorts": measurement.get("TP_ports", "-"),
+            "uops": measurement.get("uops", "-"),
+            "sourceKind": details.get("source_kind") or "measured",
+        }
+        pairs = [
             {
-                "uarch": uarch,
-                "ports": measurement.get("ports", "-"),
-                "latency": lat,
-                "tpLoop": cpi,
-                "tpUnrolled": measurement.get("TP_unrolled", "-"),
-                "tpPorts": measurement.get("TP_ports", "-"),
-                "uops": measurement.get("uops", "-"),
-                "sourceKind": details.get("source_kind") or "measured",
+                "start": pair["start"],
+                "target": pair["target"],
+                "value": pair["value"],
+                **({"sameReg": pair["same_reg"]} if pair.get("same_reg") else {}),
             }
-        )
+            for pair in latency_pairs(details, item.operand_details)
+        ]
+        # Detail-chunk only, key omitted when the row has no pair data.
+        if pairs:
+            row["latencyPairs"] = pairs
+        rows.append(row)
     return rows
 
 

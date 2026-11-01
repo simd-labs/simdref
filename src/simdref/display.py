@@ -18,7 +18,9 @@ from rich.rule import Rule
 from rich.table import Table
 
 from simdref.perf import (
+    best_latency_labeled,
     latency_cycle_values,
+    latency_pair_text,
     perf_row_values,
     variant_perf_summary,
     variant_perf_summary_labeled,
@@ -517,7 +519,29 @@ def instruction_markdown(item, conn=None) -> str:
             + "\n".join(f"- `{name}`" for name in item.linked_intrinsics)
         )
     lines.extend(_perf_markdown_lines(measurement_rows(item)))
+    lines.extend(_latency_pair_hover_lines(item))
     return "\n\n".join(lines)
+
+
+def _latency_pair_hover_lines(item) -> list[str]:
+    """One short hover line with the latency of each operand pair.
+
+    Uses the core that supplied the best displayed latency; when no core
+    has a latency value, uses the first core that carries pair data. A
+    record without pair data adds no line at all.
+    """
+    core = best_latency_labeled(item.arch_details).core
+    if not core:
+        for candidate, candidate_details in item.arch_details.items():
+            if latency_pair_text(candidate_details, item.operand_details):
+                core = candidate
+                break
+        else:
+            return []
+    text = latency_pair_text(item.arch_details[core], item.operand_details)
+    if not text:
+        return []
+    return [f"**lat pairs ({core}).** {text}"]
 
 
 def _perf_markdown_lines(rows: list[dict]) -> list[str]:
@@ -684,6 +708,7 @@ _GENERIC_TABLE_LABEL_MAP = {
     "TP": "CPI",
     "TP_no_interiteration": "cycle/instr (no interiteration)",
     "kind": "op",
+    "latency_pairs": "LAT per pair",
 }
 
 
@@ -790,6 +815,45 @@ def print_perf_tables(rows: list[dict]) -> None:
             preferred_order=_MEASUREMENT_PREFERRED_ORDER,
             border_style=perf_panel_border(kind),
             exclude_keys=_MEASUREMENT_EXCLUDE_KEYS,
+            include_extras=False,
+        )
+
+
+def latency_pair_rows(item) -> list[dict]:
+    """Pair-detail rows: one per microarchitecture that carries latency pairs.
+
+    Rows that have no pair data are absent, so a record without the field
+    renders nothing (no empty pair label).
+    """
+    rows: list[dict] = []
+    for arch, details in item.arch_details.items():
+        text = latency_pair_text(details, item.operand_details)
+        if not text:
+            continue
+        rows.append(
+            {
+                "uarch": arch,
+                "latency_pairs": text,
+                "source": details.get("source_kind") or "measured",
+            }
+        )
+    return rows
+
+
+def print_latency_pair_tables(item) -> None:
+    """Render the per-operand-pair latency under the perf tables.
+
+    One panel per source kind, matching print_perf_tables. Pairs are the
+    uops.info start_op -> target_op cycle bounds with the ``<=``
+    upper-bound mark and the same-register latency when the row has it.
+    """
+    for kind, group in split_perf_rows(latency_pair_rows(item)):
+        print_generic_table(
+            group,
+            f"latency per operand pair ({kind})",
+            preferred_order=["uarch", "latency_pairs"],
+            border_style=perf_panel_border(kind),
+            exclude_keys={"source"},
             include_extras=False,
         )
 
@@ -1039,6 +1103,7 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
         )
         print_operand_block(primary)
         print_perf_tables(measurement_rows(primary))
+        print_latency_pair_tables(primary)
 
 
 def render_instruction_sections(
@@ -1068,6 +1133,7 @@ def render_instruction_sections(
     print_intrinsic_mapping(catalog, item, conn=conn)
     print_operand_block(item)
     print_perf_tables(measurement_rows(item))
+    print_latency_pair_tables(item)
 
 
 def render_instruction(catalog, item, conn=None, short: bool = False, full: bool = False) -> None:
