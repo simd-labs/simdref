@@ -579,13 +579,14 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("JMP (M64)", hover)
 
     def test_arm_scalar_lines_keep_the_arm_form(self):
-        # The labels are the ones the base commit 94d7a53 gives. "r0" and a bare "sp"
-        # are not x86 registers, and a "#16" immediate excludes x86 forms.
+        # The labels are the ACLE first-sentence summaries the arm rows carry
+        # now. "r0" and a bare "sp" are not x86 registers, and a "#16"
+        # immediate excludes x86 forms.
         lines = ("sub sp, sp, #16", "add sp, sp, #16", "add r0, r1, r2", "add r8, r9, #16")
         self.server.open(ASM_URI, "asm", "\n".join(lines) + "\n")
         self.assertEqual(
             [h["label"] for h in self.server.hints(ASM_URI)],
-            ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
+            ["Subtract (vector).", "Add (vector).", "Add (vector).", "Add (vector)."],
         )
 
     def test_arm_three_register_add_keeps_the_arm_form(self):
@@ -597,9 +598,9 @@ class LspEndToEndTests(unittest.TestCase):
         value = hover["contents"]["value"]
         for x86_token in ("R16", "R64", "M16", "I16"):
             self.assertNotIn(x86_token, value, f"hover named an x86 form: {x86_token}")
-        self.assertIn("Add operands.", value)
+        self.assertIn("Add (vector).", value)
         hints = self.server.hints(ASM_URI)
-        self.assertEqual([h["label"] for h in hints], ["Add operands."])
+        self.assertEqual([h["label"] for h in hints], ["Add (vector)."])
 
     def test_riscv_word_ops_do_not_resolve_to_x86(self):
         # A catalog with the RISC-V word rows shows the RISC-V form; without
@@ -749,7 +750,9 @@ class LspEndToEndTests(unittest.TestCase):
         result = self.server.hover(uri, 0, 1)
         self.assertIsNotNone(result, "hover on an arm vector add returned null")
         value = result["contents"]["value"]
-        self.assertIn("V0.%3CT_OPTION%3E", value)
+        # The picked row's key holds the rendered arrangement now (the
+        # case-folded rule lookup expands T_option to 4S), in the deep link.
+        self.assertIn("ADD%20(V0.4S%2C%20V1.4S%2C%20V2.4S)", value)
         self.assertNotIn("V0.<T_OPTION>", value)
         self.assertNotIn("ADD (R16", value)
 
