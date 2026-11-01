@@ -11,6 +11,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from simdref import display
+from simdref.export import _instr_perf_map
+from simdref.models import Catalog, InstructionRecord
 from simdref.annotate import (
     AnnotateOptions,
     annotate_stream,
@@ -146,3 +149,35 @@ def test_vzeroupper_zen2_keeps_measured_cpi_and_uops(monkeypatch):
     row = _annotate(monkeypatch, rec, "vzeroupper", "ZEN2")
     assert row["cpi"] == 5.0
     assert row["uops"] == 12
+
+
+def test_ret_snb_harness_cpi_dropped_in_export_map_and_display_list():
+    # The export perf map and the display variant table passed only
+    # arch_details, so the RET SNB harness CPI leaked on those surfaces.
+    record = InstructionRecord(
+        mnemonic="RET",
+        form="",
+        summary="Return from procedure.",
+        isa=[],
+        metadata={"iclass": "RET_NEAR"},
+        arch_details={
+            "SNB": {
+                "measurement": {
+                    "TP_unrolled": "33.80",
+                    "TP_loop": "31.08",
+                    "TP_ports": "6.00",
+                    "uops": "3",
+                },
+            },
+        },
+    )
+    catalog = Catalog(
+        intrinsics=[],
+        instructions=[record],
+        sources=[],
+        generated_at="2026-01-01T00:00:00Z",
+    )
+    assert _instr_perf_map(catalog)[record.db_key] == ("-", "-")
+    with display.console.capture() as capture:
+        display.render_instruction_variants("ret", [record])
+    assert "33.8" not in capture.get()

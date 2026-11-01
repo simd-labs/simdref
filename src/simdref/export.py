@@ -42,7 +42,7 @@ from simdref.display import (
     isa_to_sub_isa,
     strip_instruction_decorators,
 )
-from simdref.perf import best_numeric, latency_cycle_values, variant_perf_summary
+from simdref.perf import best_numeric, latency_cycle_values, record_iclass, variant_perf_summary
 from simdref.pdfrefs import normalize_pdf_refs
 from simdref.storage import derive_arm_arch
 
@@ -179,7 +179,7 @@ def _isa_config() -> dict:
 def _instr_perf_map(catalog: Catalog) -> dict[str, tuple[str, str]]:
     perf: dict[str, tuple[str, str]] = {}
     for item in catalog.instructions:
-        lat, cpi = variant_perf_summary(item.arch_details)
+        lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
         perf[item.db_key] = (lat, cpi)
     return perf
 
