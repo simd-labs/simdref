@@ -41,7 +41,12 @@ from simdref.display import (
     isa_to_sub_isa,
     strip_instruction_decorators,
 )
-from simdref.perf import latency_pairs, perf_row_values, variant_perf_summary
+from simdref.perf import (
+    latency_pairs,
+    perf_family_label,
+    perf_row_values,
+    variant_perf_summary,
+)
 from simdref.pdfrefs import normalize_pdf_refs
 from simdref.storage import derive_arm_arch
 
@@ -72,6 +77,9 @@ def _web_measurements(item) -> list[dict]:
             "uops": measurement.get("uops", "-"),
             "sourceKind": details.get("source_kind") or "measured",
         }
+        family = perf_family_label(uarch)
+        if family:
+            row["family"] = family
         for stored, exported in (
             ("source", "source"),
             ("source_version", "sourceVersion"),

@@ -361,6 +361,11 @@ _RULE_PLACEHOLDER: dict[str, str] = {
     "T__2": "4S",
     "T__3": "4S",
     "T__4": "4S",
+    # Parameterised arrangement rules carry the element-size options in the
+    # name (T_FMUL_HSD = H/S/D floats, T_OPTION = AdvSIMD options). The 4S
+    # instance matches the width policy of the plain T rule above.
+    "T_FMUL_HSD": "4S",
+    "T_OPTION": "4S",
     "size": "4S",
     "size__1": "4S",
 }
@@ -467,6 +472,11 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             if not mnemonic or not re.match(r"^[A-Z][A-Z0-9]*$", mnemonic):
                 return
             operand_form = tail.strip()
+            # A rule the placeholder table cannot instantiate leaves a raw
+            # "<RULE>" token. Show the mnemonic alone rather than leaking a
+            # template into a display.
+            if "<" in operand_form:
+                operand_form = ""
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
             key = (mnemonic, form.casefold())
             if key in seen_keys:

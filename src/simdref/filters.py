@@ -63,7 +63,7 @@ FAMILY_SUB_ORDER: dict[str, list[str]] = {
         "GFNI",
     ],
     "AMX": ["AMX-TILE", "AMX-INT8", "AMX-BF16", "AMX-FP16", "AMX-COMPLEX"],
-    "Arm": ["NEON", "SVE", "SVE2"],
+    "Arm": ["NEON", "SVE", "SVE2", "SME"],
     "RISC-V": ["V", "ZVE", "ZV"],
 }
 
@@ -72,7 +72,7 @@ DEFAULT_SUBS: dict[str, set[str]] = {
     "AVX": {"AVX", "AVX2", "FMA", "F16C"},
     "AVX-512": {"AVX512F", "AVX512VL", "AVX512BW", "AVX512DQ", "AVX512CD"},
     "AMX": {"AMX-TILE", "AMX-INT8", "AMX-BF16"},
-    "Arm": {"NEON", "SVE", "SVE2"},
+    "Arm": {"NEON", "SVE", "SVE2", "SME"},
     "RISC-V": {"V", "ZVE", "ZV"},
 }
 

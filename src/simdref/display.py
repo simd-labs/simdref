@@ -381,7 +381,7 @@ def isa_family(isa: str) -> str:
         return "x86"
     if d == "SVML":
         return "SVML"
-    if d in {"AARCH64", "NEON"} or d.startswith("SVE"):
+    if d in {"AARCH64", "NEON", "SME"} or d.startswith("SVE"):
         return "Arm"
     if d == "V" or d.startswith("RV") or d.startswith("ZV") or d.startswith("ZVE"):
         return "RISC-V"

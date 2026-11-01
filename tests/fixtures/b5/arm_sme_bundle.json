@@ -1,0 +1,70 @@
+[
+  {
+    "SIMD_ISA": ["SME and SME2"],
+    "required_streaming_features": {
+      "title": "Required streaming features",
+      "intro": "This intrinsic requires architecture features to run in streaming mode.",
+      "features": "FEAT_SME"
+    },
+    "name": "svld1_hor_vnum_za128",
+    "return_type": {"return_base_type": "void", "element_bit_size": "128", "value": "void"},
+    "sme_modes": ["__arm_streaming", "__arm_inout(\"za\")"],
+    "arguments": [
+      "uint64_t tile",
+      "uint32_t slice",
+      "svbool_t pg",
+      "void const * ptr",
+      "int64_t vnum"
+    ],
+    "Architectures": ["A64"],
+    "Arguments_Preparation": {
+      "tile": {"ZA array tile": "ZA0H.Q"},
+      "slice": {"register": "Wreg2"},
+      "pg": {"register": "Preg1"},
+      "ptr": {"register": "Xreg3"}
+    },
+    "instruction_group": "Load|Consecutive",
+    "results": [],
+    "description": "Contiguous load of quadwords to 128-bit element ZA tile slice",
+    "instructions": [
+      {
+        "preamble": "",
+        "list": [
+          {
+            "base_instruction": "LD1Q",
+            "url": "https://developer.arm.com/documentation/ddi0602/2025-06/SME-Instructions/LD1Q",
+            "operands": "{ZA0H.Q[Wreg1, 0]}, Preg1/Z, [Xreg1]"
+          }
+        ]
+      }
+    ],
+    "Operation": ""
+  },
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vaddq_f32",
+    "return_type": {"return_base_type": "float", "element_bit_size": "32", "value": "float32x4_t"},
+    "arguments": ["float32x4_t a", "float32x4_t b"],
+    "Architectures": ["v7/A32/A64"],
+    "Arguments_Preparation": {
+      "a": {"register": "Vn.4S"},
+      "b": {"register": "Vm.4S"}
+    },
+    "instruction_group": "Arithmetic|Add",
+    "results": [{"result": "Vd.4S"}],
+    "description": "Floating-point add of 32-bit lanes",
+    "instructions": [
+      {
+        "preamble": "This intrinsic compiles to the following instructions:",
+        "list": [
+          {
+            "base_instruction": "FADD",
+            "url": "https://developer.arm.com/documentation/ddi0602/2025-06/SIMD-FP-Instructions/FADD--vector-",
+            "operands": "Vd.4S,Vn.4S,Vm.4S"
+          }
+        ]
+      }
+    ],
+    "Operation": ""
+  }
+]

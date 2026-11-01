@@ -18,6 +18,38 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
+from simdref.perf_sources.cores import core_architecture
+
+# x86 vendor sets mirror the web's current labels so old rows keep the same
+# group names. Non-x86 cores group by architecture, never by a fixed vendor.
+_X86_AMD_CORES = {"ZEN5", "ZEN4", "ZEN3", "ZEN2", "ZEN1", "ZEN+"}
+_X86_SERVER_CORES = {"EMR", "CLX", "SKX", "CNL"}
+
+
+def perf_family_label(uarch: str) -> str:
+    """Vendor/family label for a perf-group header, per core_architecture.
+
+    Returns "" when the core is unknown so callers show no label rather
+    than guess one.
+    """
+    if not uarch:
+        return ""
+    core = uarch.strip().upper()
+    if core in _X86_AMD_CORES:
+        return "AMD"
+    if core in _X86_SERVER_CORES:
+        return "Intel Server"
+    architecture = core_architecture(uarch)
+    if architecture is None:
+        return ""
+    if architecture == "x86":
+        return "Intel Client"
+    if architecture == "aarch64":
+        return "Arm"
+    if architecture == "riscv":
+        return "RISC-V"
+    return ""
+
 
 class PerfValue(NamedTuple):
     """A labeled performance value.
