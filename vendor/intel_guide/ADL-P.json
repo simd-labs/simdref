@@ -1,0 +1,4688 @@
+{
+ "source": "intel-guide",
+ "source_version": "3.6.9",
+ "citation_url": "https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html",
+ "core": "ADL-P",
+ "rows": [
+  {
+   "mnemonic": "ADCX",
+   "form": "ADCX_GPR32d_GPR32d",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADCX",
+   "form": "ADCX_GPR64q_GPR64q",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADC",
+   "form": "ADC_GPRv_GPRv_11",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADDPD",
+   "form": "ADDPD_XMMpd_XMMpd",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADDPS",
+   "form": "ADDPS_XMMps_XMMps",
+   "latency": "",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADDSD",
+   "form": "ADDSD_XMMsd_XMMsd",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADDSS",
+   "form": "ADDSS_XMMss_XMMss",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADDSUBPD",
+   "form": "ADDSUBPD_XMMpd_XMMpd",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADDSUBPS",
+   "form": "ADDSUBPS_XMMps_XMMps",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADOX",
+   "form": "ADOX_GPR32d_GPR32d",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ADOX",
+   "form": "ADOX_GPR64q_GPR64q",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "AESDECLAST",
+   "form": "AESDECLAST_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "AESDEC",
+   "form": "AESDEC_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "AESENCLAST",
+   "form": "AESENCLAST_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "AESENC",
+   "form": "AESENC_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "AESIMC",
+   "form": "AESIMC_XMMdq_XMMdq",
+   "latency": "6",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "ANDNPD",
+   "form": "ANDNPD_XMMxuq_XMMxuq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "ANDNPS",
+   "form": "ANDNPS_XMMxud_XMMxud",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "ANDN",
+   "form": "ANDN_VGPR32d_VGPR32d_VGPR32d",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "ANDN",
+   "form": "ANDN_VGPR64q_VGPR64q_VGPR64q",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "ANDPD",
+   "form": "ANDPD_XMMxuq_XMMxuq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "ANDPS",
+   "form": "ANDPS_XMMxud_XMMxud",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BEXTR",
+   "form": "BEXTR_VGPR32d_VGPR32d_VGPR32d",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BEXTR",
+   "form": "BEXTR_VGPR64q_VGPR64q_VGPR64q",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BLENDPD",
+   "form": "BLENDPD_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLENDPS",
+   "form": "BLENDPS_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLSI",
+   "form": "BLSI_VGPR32d_VGPR32d",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLSI",
+   "form": "BLSI_VGPR64q_VGPR64q",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLSMSK",
+   "form": "BLSMSK_VGPR32d_VGPR32d",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLSMSK",
+   "form": "BLSMSK_VGPR64q_VGPR64q",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLSR",
+   "form": "BLSR_VGPR32d_VGPR32d",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BLSR",
+   "form": "BLSR_VGPR64q_VGPR64q",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "BSF",
+   "form": "BSF_GPRv_GPRv",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BSR",
+   "form": "BSR_GPRv_GPRv",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BSWAP",
+   "form": "BSWAP_GPRv",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BTC",
+   "form": "BTC_GPRv_GPRv",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BTR",
+   "form": "BTR_GPRv_GPRv",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BTS",
+   "form": "BTS_GPRv_GPRv",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BT",
+   "form": "BT_GPRv_GPRv",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BZHI",
+   "form": "BZHI_VGPR32d_VGPR32d_VGPR32d",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "BZHI",
+   "form": "BZHI_VGPR64q_VGPR64q_VGPR64q",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CMPPD",
+   "form": "CMPPD_XMMpd_XMMpd_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "CMPPS",
+   "form": "CMPPS_XMMps_XMMps_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "CMPSD",
+   "form": "CMPSD_XMM_XMMsd_XMMsd_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "CMPSS",
+   "form": "CMPSS_XMMss_XMMss_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "COMISD",
+   "form": "COMISD_XMMsd_XMMsd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "COMISS",
+   "form": "COMISS_XMMss_XMMss",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CRC32",
+   "form": "CRC32_GPRyy_GPR8b",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CRC32",
+   "form": "CRC32_GPRyy_GPRv",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTDQ2PS",
+   "form": "CVTDQ2PS_XMMps_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "CVTPD2DQ",
+   "form": "CVTPD2DQ_XMMdq_XMMpd",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTPD2PI",
+   "form": "CVTPD2PI_MMXq_XMMpd",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTPD2PS",
+   "form": "CVTPD2PS_XMMps_XMMpd",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTPI2PD",
+   "form": "CVTPI2PD_XMMpd_MMXq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTPI2PS",
+   "form": "CVTPI2PS_XMMq_MMXq",
+   "latency": "6",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTPS2DQ",
+   "form": "CVTPS2DQ_XMMdq_XMMps",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "CVTPS2PD",
+   "form": "CVTPS2PD_XMMpd_XMMq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTPS2PI",
+   "form": "CVTPS2PI_MMXq_XMMq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSD2SI",
+   "form": "CVTSD2SI_GPR32d_XMMsd",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSD2SI",
+   "form": "CVTSD2SI_GPR64q_XMMsd",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSD2SS",
+   "form": "CVTSD2SS_XMMss_XMMsd",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSI2SD",
+   "form": "CVTSI2SD_XMMsd_GPR32d",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSI2SD",
+   "form": "CVTSI2SD_XMMsd_GPR64q",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSI2SS",
+   "form": "CVTSI2SS_XMMss_GPR32d",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSI2SS",
+   "form": "CVTSI2SS_XMMss_GPR64q",
+   "latency": "6",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "CVTSS2SD",
+   "form": "CVTSS2SD_XMMsd_XMMss",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSS2SI",
+   "form": "CVTSS2SI_GPR32d_XMMss",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTSS2SI",
+   "form": "CVTSS2SI_GPR64q_XMMss",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTPD2DQ",
+   "form": "CVTTPD2DQ_XMMdq_XMMpd",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTPD2PI",
+   "form": "CVTTPD2PI_MMXq_XMMpd",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTPS2DQ",
+   "form": "CVTTPS2DQ_XMMdq_XMMps",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "CVTTPS2PI",
+   "form": "CVTTPS2PI_MMXq_XMMq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTSD2SI",
+   "form": "CVTTSD2SI_GPR32d_XMMsd",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTSD2SI",
+   "form": "CVTTSD2SI_GPR64q_XMMsd",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTSS2SI",
+   "form": "CVTTSS2SI_GPR32d_XMMss",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "CVTTSS2SI",
+   "form": "CVTTSS2SI_GPR64q_XMMss",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "DIVPD",
+   "form": "DIVPD_XMMpd_XMMpd",
+   "latency": "14",
+   "cpi": "4"
+  },
+  {
+   "mnemonic": "DIVPS",
+   "form": "DIVPS_XMMps_XMMps",
+   "latency": "11",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "DIVSD",
+   "form": "DIVSD_XMMsd_XMMsd",
+   "latency": "14",
+   "cpi": "4"
+  },
+  {
+   "mnemonic": "DIVSS",
+   "form": "DIVSS_XMMss_XMMss",
+   "latency": "11",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "DPPD",
+   "form": "DPPD_XMMdq_XMMdq_IMMb",
+   "latency": "9",
+   "cpi": ""
+  },
+  {
+   "mnemonic": "EXTRACTPS",
+   "form": "EXTRACTPS_GPR32d_XMMdq_IMMb",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "HADDPD",
+   "form": "HADDPD_XMMpd_XMMpd",
+   "latency": "5",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "HADDPS",
+   "form": "HADDPS_XMMps_XMMps",
+   "latency": "",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "HSUBPD",
+   "form": "HSUBPD_XMMpd_XMMpd",
+   "latency": "5",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "HSUBPS",
+   "form": "HSUBPS_XMMps_XMMps",
+   "latency": "",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "INSERTPS",
+   "form": "INSERTPS_XMMps_XMMps_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "LDDQU",
+   "form": "LDDQU_XMMpd_MEMdq",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "LZCNT",
+   "form": "LZCNT_GPRv_GPRv",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MAXPD",
+   "form": "MAXPD_XMMpd_XMMpd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MAXPS",
+   "form": "MAXPS_XMMps_XMMps",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MAXSD",
+   "form": "MAXSD_XMMsd_XMMsd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MAXSS",
+   "form": "MAXSS_XMMss_XMMss",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MINPD",
+   "form": "MINPD_XMMpd_XMMpd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MINPS",
+   "form": "MINPS_XMMps_XMMps",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MINSD",
+   "form": "MINSD_XMMsd_XMMsd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MINSS",
+   "form": "MINSS_XMMss_XMMss",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVAPD",
+   "form": "MOVAPD_MEMpd_XMMpd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVAPD",
+   "form": "MOVAPD_XMMpd_MEMpd",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVAPS",
+   "form": "MOVAPS_MEMps_XMMps",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVAPS",
+   "form": "MOVAPS_XMMps_MEMps",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVBE",
+   "form": "MOVBE_GPRv_MEMv",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVBE",
+   "form": "MOVBE_MEMv_GPRv",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVDDUP",
+   "form": "MOVDDUP_XMMdq_MEMq",
+   "latency": "",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVDQ2Q",
+   "form": "MOVDQ2Q_MMXq_XMMq",
+   "latency": "1",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "MOVDQA",
+   "form": "MOVDQA_MEMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVDQA",
+   "form": "MOVDQA_XMMdq_MEMdq",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVDQU",
+   "form": "MOVDQU_MEMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVDQU",
+   "form": "MOVDQU_XMMdq_MEMdq",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "MOVD_GPR32_MMXd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "MOVD_GPR32_XMMd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "MOVD_MEMd_XMMd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "MOVD_MMXq_GPR32",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "MOVD_XMMdq_GPR32",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVD",
+   "form": "MOVD_XMMdq_MEMd",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVHLPS",
+   "form": "MOVHLPS_XMMq_XMMq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVHPD",
+   "form": "MOVHPD_MEMq_XMMsd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVHPD",
+   "form": "MOVHPD_XMMsd_MEMq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVHPS",
+   "form": "MOVHPS_MEMq_XMMps",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVHPS",
+   "form": "MOVHPS_XMMq_MEMq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVLHPS",
+   "form": "MOVLHPS_XMMq_XMMq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVLPD",
+   "form": "MOVLPD_MEMq_XMMsd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVLPD",
+   "form": "MOVLPD_XMMsd_MEMq",
+   "latency": "7",
+   "cpi": ""
+  },
+  {
+   "mnemonic": "MOVLPS",
+   "form": "MOVLPS_XMMq_MEMq",
+   "latency": "7",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVMSKPD",
+   "form": "MOVMSKPD_GPR32_XMMpd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVMSKPS",
+   "form": "MOVMSKPS_GPR32_XMMps",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVQ2DQ",
+   "form": "MOVQ2DQ_XMMdq_MMXq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_GPR64_MMXq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_GPR64_XMMq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_MEMq_XMMq_0F7E",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_MMXq_GPR64",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_XMMdq_GPR64",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_XMMdq_MEMq_0F6E",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_XMMdq_MEMq_0F7E",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVQ",
+   "form": "MOVQ_XMMdq_XMMq_0F7E",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVSD",
+   "form": "MOVSD_XMM_MEMsd_XMMsd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVSD",
+   "form": "MOVSD_XMM_XMMdq_MEMsd",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVSD",
+   "form": "MOVSD_XMM_XMMsd_XMMsd_0F10",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVSHDUP",
+   "form": "MOVSHDUP_XMMps_XMMps",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVSLDUP",
+   "form": "MOVSLDUP_XMMps_XMMps",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVSS",
+   "form": "MOVSS_MEMss_XMMss",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVSS",
+   "form": "MOVSS_XMMdq_MEMss",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVSS",
+   "form": "MOVSS_XMMss_XMMss_0F10",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVUPD",
+   "form": "MOVUPD_MEMpd_XMMpd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVUPD",
+   "form": "MOVUPD_XMMpd_MEMpd",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MOVUPS",
+   "form": "MOVUPS_MEMps_XMMps",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MOVUPS",
+   "form": "MOVUPS_XMMps_MEMps",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "MPSADBW",
+   "form": "MPSADBW_XMMdq_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MULPD",
+   "form": "MULPD_XMMpd_XMMpd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MULPS",
+   "form": "MULPS_XMMps_XMMps",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MULSD",
+   "form": "MULSD_XMMsd_XMMsd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MULSS",
+   "form": "MULSS_XMMss_XMMss",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "MULX",
+   "form": "MULX_VGPR32d_VGPR32d_MEMd",
+   "latency": "9",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "MULX",
+   "form": "MULX_VGPR64q_VGPR64q_MEMq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "ORPD",
+   "form": "ORPD_XMMxuq_XMMxuq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "ORPS",
+   "form": "ORPS_XMMxud_XMMxud",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "OR",
+   "form": "OR_GPRv_IMMb",
+   "latency": "1",
+   "cpi": "0.2"
+  },
+  {
+   "mnemonic": "PABSB",
+   "form": "PABSB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PABSB",
+   "form": "PABSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PABSD",
+   "form": "PABSD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PABSD",
+   "form": "PABSD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PABSW",
+   "form": "PABSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PABSW",
+   "form": "PABSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PACKSSDW",
+   "form": "PACKSSDW_MMXq_MMXq",
+   "latency": "4",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PACKSSDW",
+   "form": "PACKSSDW_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PACKSSWB",
+   "form": "PACKSSWB_MMXq_MMXq",
+   "latency": "4",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PACKSSWB",
+   "form": "PACKSSWB_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PACKUSDW",
+   "form": "PACKUSDW_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PACKUSWB",
+   "form": "PACKUSWB_MMXq_MMXq",
+   "latency": "4",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PACKUSWB",
+   "form": "PACKUSWB_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PADDB",
+   "form": "PADDB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDB",
+   "form": "PADDB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PADDD",
+   "form": "PADDD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDD",
+   "form": "PADDD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PADDQ",
+   "form": "PADDQ_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDQ",
+   "form": "PADDQ_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PADDSB",
+   "form": "PADDSB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PADDSB",
+   "form": "PADDSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDSW",
+   "form": "PADDSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PADDSW",
+   "form": "PADDSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDUSB",
+   "form": "PADDUSB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PADDUSB",
+   "form": "PADDUSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDUSW",
+   "form": "PADDUSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PADDUSW",
+   "form": "PADDUSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDW",
+   "form": "PADDW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PADDW",
+   "form": "PADDW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PALIGNR",
+   "form": "PALIGNR_MMXq_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PALIGNR",
+   "form": "PALIGNR_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PANDN",
+   "form": "PANDN_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PANDN",
+   "form": "PANDN_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PAND",
+   "form": "PAND_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PAND",
+   "form": "PAND_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PAVGB",
+   "form": "PAVGB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PAVGB",
+   "form": "PAVGB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PAVGW",
+   "form": "PAVGW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PAVGW",
+   "form": "PAVGW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PBLENDW",
+   "form": "PBLENDW_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCLMULQDQ",
+   "form": "PCLMULQDQ_XMMdq_XMMdq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPEQB",
+   "form": "PCMPEQB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPEQB",
+   "form": "PCMPEQB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPEQD",
+   "form": "PCMPEQD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPEQD",
+   "form": "PCMPEQD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPEQQ",
+   "form": "PCMPEQQ_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPEQW",
+   "form": "PCMPEQW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPEQW",
+   "form": "PCMPEQW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPGTB",
+   "form": "PCMPGTB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPGTB",
+   "form": "PCMPGTB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPGTD",
+   "form": "PCMPGTD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPGTD",
+   "form": "PCMPGTD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPGTQ",
+   "form": "PCMPGTQ_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPGTW",
+   "form": "PCMPGTW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PCMPGTW",
+   "form": "PCMPGTW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PCMPISTRI",
+   "form": "PCMPISTRI_XMMdq_XMMdq_IMMb",
+   "latency": "11",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "PCMPISTRM",
+   "form": "PCMPISTRM_XMMdq_XMMdq_IMMb",
+   "latency": "",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "PDEP",
+   "form": "PDEP_VGPR32d_VGPR32d_VGPR32d",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PDEP",
+   "form": "PDEP_VGPR64q_VGPR64q_VGPR64q",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXTRB",
+   "form": "PEXTRB_GPR32d_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXTRD",
+   "form": "PEXTRD_GPR32d_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXTRQ",
+   "form": "PEXTRQ_GPR64q_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXTRW",
+   "form": "PEXTRW_GPR32_MMXq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXTRW",
+   "form": "PEXTRW_GPR32_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXT",
+   "form": "PEXT_VGPR32d_VGPR32d_VGPR32d",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PEXT",
+   "form": "PEXT_VGPR64q_VGPR64q_VGPR64q",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHADDD",
+   "form": "PHADDD_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHADDSW",
+   "form": "PHADDSW_MMXq_MMXq",
+   "latency": "",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PHADDSW",
+   "form": "PHADDSW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHADDW",
+   "form": "PHADDW_MMXq_MMXq",
+   "latency": "3",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PHADDW",
+   "form": "PHADDW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHMINPOSUW",
+   "form": "PHMINPOSUW_XMMdq_XMMdq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHSUBD",
+   "form": "PHSUBD_MMXq_MMXq",
+   "latency": "3",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PHSUBD",
+   "form": "PHSUBD_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHSUBSW",
+   "form": "PHSUBSW_MMXq_MMXq",
+   "latency": "",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PHSUBSW",
+   "form": "PHSUBSW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PHSUBW",
+   "form": "PHSUBW_MMXq_MMXq",
+   "latency": "3",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PHSUBW",
+   "form": "PHSUBW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PINSRB",
+   "form": "PINSRB_XMMdq_GPR32d_IMMb",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PINSRD",
+   "form": "PINSRD_XMMdq_GPR32d_IMMb",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PINSRQ",
+   "form": "PINSRQ_XMMdq_GPR64q_IMMb",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PINSRW",
+   "form": "PINSRW_MMXq_GPR32_IMMb",
+   "latency": "2",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "PINSRW",
+   "form": "PINSRW_XMMdq_GPR32_IMMb",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMADDUBSW",
+   "form": "PMADDUBSW_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMADDUBSW",
+   "form": "PMADDUBSW_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMADDWD",
+   "form": "PMADDWD_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMADDWD",
+   "form": "PMADDWD_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMAXSB",
+   "form": "PMAXSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMAXSD",
+   "form": "PMAXSD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMAXSW",
+   "form": "PMAXSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMAXSW",
+   "form": "PMAXSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMAXUB",
+   "form": "PMAXUB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMAXUB",
+   "form": "PMAXUB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMAXUD",
+   "form": "PMAXUD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMAXUW",
+   "form": "PMAXUW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMINSB",
+   "form": "PMINSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMINSD",
+   "form": "PMINSD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMINSW",
+   "form": "PMINSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMINSW",
+   "form": "PMINSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMINUB",
+   "form": "PMINUB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMINUB",
+   "form": "PMINUB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMINUD",
+   "form": "PMINUD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMINUW",
+   "form": "PMINUW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVMSKB",
+   "form": "PMOVMSKB_GPR32_MMXq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMOVMSKB",
+   "form": "PMOVMSKB_GPR32_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMOVSXBD",
+   "form": "PMOVSXBD_XMMdq_XMMd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVSXBQ",
+   "form": "PMOVSXBQ_XMMdq_XMMw",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVSXBW",
+   "form": "PMOVSXBW_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVSXDQ",
+   "form": "PMOVSXDQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVSXWD",
+   "form": "PMOVSXWD_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVSXWQ",
+   "form": "PMOVSXWQ_XMMdq_XMMd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVZXBD",
+   "form": "PMOVZXBD_XMMdq_XMMd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVZXBQ",
+   "form": "PMOVZXBQ_XMMdq_XMMw",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVZXBW",
+   "form": "PMOVZXBW_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVZXDQ",
+   "form": "PMOVZXDQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVZXWD",
+   "form": "PMOVZXWD_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMOVZXWQ",
+   "form": "PMOVZXWQ_XMMdq_XMMd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMULDQ",
+   "form": "PMULDQ_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMULHRSW",
+   "form": "PMULHRSW_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMULHRSW",
+   "form": "PMULHRSW_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMULHUW",
+   "form": "PMULHUW_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMULHUW",
+   "form": "PMULHUW_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMULHW",
+   "form": "PMULHW_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMULHW",
+   "form": "PMULHW_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMULLD",
+   "form": "PMULLD_XMMdq_XMMdq",
+   "latency": "10",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMULLW",
+   "form": "PMULLW_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMULLW",
+   "form": "PMULLW_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PMULUDQ",
+   "form": "PMULUDQ_MMXq_MMXq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PMULUDQ",
+   "form": "PMULUDQ_XMMdq_XMMdq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "POPCNT",
+   "form": "POPCNT_GPRv_GPRv",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "POR",
+   "form": "POR_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "POR",
+   "form": "POR_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PREFETCHNTA",
+   "form": "PREFETCHNTA_MEMmprefetch",
+   "latency": "0",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PREFETCHT0",
+   "form": "PREFETCHT0_MEMmprefetch",
+   "latency": "0",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PREFETCHT1",
+   "form": "PREFETCHT1_MEMmprefetch",
+   "latency": "0",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PREFETCHT2",
+   "form": "PREFETCHT2_MEMmprefetch",
+   "latency": "0",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PSADBW",
+   "form": "PSADBW_MMXq_MMXq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSADBW",
+   "form": "PSADBW_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSHUFB",
+   "form": "PSHUFB_MMXq_MMXq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSHUFB",
+   "form": "PSHUFB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSHUFD",
+   "form": "PSHUFD_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSHUFHW",
+   "form": "PSHUFHW_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSHUFLW",
+   "form": "PSHUFLW_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSHUFW",
+   "form": "PSHUFW_MMXq_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSIGNB",
+   "form": "PSIGNB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSIGNB",
+   "form": "PSIGNB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSIGND",
+   "form": "PSIGND_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSIGND",
+   "form": "PSIGND_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSIGNW",
+   "form": "PSIGNW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSIGNW",
+   "form": "PSIGNW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSLLDQ",
+   "form": "PSLLDQ_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSLLD",
+   "form": "PSLLD_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSLLD",
+   "form": "PSLLD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSLLD",
+   "form": "PSLLD_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSLLD",
+   "form": "PSLLD_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSLLQ",
+   "form": "PSLLQ_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSLLQ",
+   "form": "PSLLQ_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSLLQ",
+   "form": "PSLLQ_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSLLQ",
+   "form": "PSLLQ_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSLLW",
+   "form": "PSLLW_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSLLW",
+   "form": "PSLLW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSLLW",
+   "form": "PSLLW_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSLLW",
+   "form": "PSLLW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSRAD",
+   "form": "PSRAD_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRAD",
+   "form": "PSRAD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRAD",
+   "form": "PSRAD_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSRAD",
+   "form": "PSRAD_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSRAW",
+   "form": "PSRAW_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRAW",
+   "form": "PSRAW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRAW",
+   "form": "PSRAW_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSRAW",
+   "form": "PSRAW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSRLDQ",
+   "form": "PSRLDQ_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSRLD",
+   "form": "PSRLD_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRLD",
+   "form": "PSRLD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRLD",
+   "form": "PSRLD_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": ""
+  },
+  {
+   "mnemonic": "PSRLD",
+   "form": "PSRLD_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSRLQ",
+   "form": "PSRLQ_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRLQ",
+   "form": "PSRLQ_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRLQ",
+   "form": "PSRLQ_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSRLQ",
+   "form": "PSRLQ_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSRLW",
+   "form": "PSRLW_MMXq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRLW",
+   "form": "PSRLW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSRLW",
+   "form": "PSRLW_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSRLW",
+   "form": "PSRLW_XMMdq_XMMdq",
+   "latency": "2",
+   "cpi": "0.666666667"
+  },
+  {
+   "mnemonic": "PSUBB",
+   "form": "PSUBB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBB",
+   "form": "PSUBB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PSUBD",
+   "form": "PSUBD_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBD",
+   "form": "PSUBD_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PSUBQ",
+   "form": "PSUBQ_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBQ",
+   "form": "PSUBQ_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PSUBSB",
+   "form": "PSUBSB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSUBSB",
+   "form": "PSUBSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBSW",
+   "form": "PSUBSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSUBSW",
+   "form": "PSUBSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBUSB",
+   "form": "PSUBUSB_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSUBUSB",
+   "form": "PSUBUSB_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBUSW",
+   "form": "PSUBUSW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PSUBUSW",
+   "form": "PSUBUSW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBW",
+   "form": "PSUBW_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PSUBW",
+   "form": "PSUBW_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "PTEST",
+   "form": "PTEST_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PUNPCKHBW",
+   "form": "PUNPCKHBW_MMXq_MMXd",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PUNPCKHBW",
+   "form": "PUNPCKHBW_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKHDQ",
+   "form": "PUNPCKHDQ_MMXq_MMXd",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PUNPCKHDQ",
+   "form": "PUNPCKHDQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKHQDQ",
+   "form": "PUNPCKHQDQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKHWD",
+   "form": "PUNPCKHWD_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKLBW",
+   "form": "PUNPCKLBW_MMXq_MMXd",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PUNPCKLBW",
+   "form": "PUNPCKLBW_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKLDQ",
+   "form": "PUNPCKLDQ_MMXq_MMXd",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PUNPCKLDQ",
+   "form": "PUNPCKLDQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKLQDQ",
+   "form": "PUNPCKLQDQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PUNPCKLWD",
+   "form": "PUNPCKLWD_MMXq_MMXd",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "PUNPCKLWD",
+   "form": "PUNPCKLWD_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PXOR",
+   "form": "PXOR_MMXq_MMXq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "PXOR",
+   "form": "PXOR_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "RCPPS",
+   "form": "RCPPS_XMMps_XMMps",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "RCPSS",
+   "form": "RCPSS_XMMss_XMMss",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "ROL",
+   "form": "ROL_GPRv_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ROR",
+   "form": "ROR_GPRv_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "ROUNDPD",
+   "form": "ROUNDPD_XMMpd_XMMpd_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "ROUNDPS",
+   "form": "ROUNDPS_XMMps_XMMps_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "ROUNDSD",
+   "form": "ROUNDSD_XMMq_XMMq_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "ROUNDSS",
+   "form": "ROUNDSS_XMMd_XMMd_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "RSQRTPS",
+   "form": "RSQRTPS_XMMps_XMMps",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "RSQRTSS",
+   "form": "RSQRTSS_XMMss_XMMss",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "SBB",
+   "form": "SBB_GPRv_GPRv_19",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "SHA1MSG1",
+   "form": "SHA1MSG1_XMMi32_XMMi32_SHA",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "SHA1NEXTE",
+   "form": "SHA1NEXTE_XMMi32_XMMi32_SHA",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "SHA1RNDS4",
+   "form": "SHA1RNDS4_XMMi32_XMMi32_IMM8_SHA",
+   "latency": "4",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "SHA256MSG2",
+   "form": "SHA256MSG2_XMMi32_XMMi32_SHA",
+   "latency": "6",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "SHA256RNDS2",
+   "form": "SHA256RNDS2_XMMi32_XMMi32_SHA",
+   "latency": "4",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "SHUFPD",
+   "form": "SHUFPD_XMMpd_XMMpd_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "SHUFPS",
+   "form": "SHUFPS_XMMps_XMMps_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "SQRTPD",
+   "form": "SQRTPD_XMMpd_XMMpd",
+   "latency": "18",
+   "cpi": "6"
+  },
+  {
+   "mnemonic": "SQRTPS",
+   "form": "SQRTPS_XMMps_XMMps",
+   "latency": "12",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "SQRTSD",
+   "form": "SQRTSD_XMMsd_XMMsd",
+   "latency": "18",
+   "cpi": "6"
+  },
+  {
+   "mnemonic": "SQRTSS",
+   "form": "SQRTSS_XMMss_XMMss",
+   "latency": "12",
+   "cpi": "3"
+  },
+  {
+   "mnemonic": "SUBPD",
+   "form": "SUBPD_XMMpd_XMMpd",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "SUBPS",
+   "form": "SUBPS_XMMps_XMMps",
+   "latency": "",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "SUBSD",
+   "form": "SUBSD_XMMsd_XMMsd",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "SUBSS",
+   "form": "SUBSS_XMMss_XMMss",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "TZCNT",
+   "form": "TZCNT_GPRv_GPRv",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "UCOMISD",
+   "form": "UCOMISD_XMMsd_XMMsd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "UCOMISS",
+   "form": "UCOMISS_XMMss_XMMss",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "UNPCKHPD",
+   "form": "UNPCKHPD_XMMpd_XMMq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "UNPCKHPS",
+   "form": "UNPCKHPS_XMMps_XMMdq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "UNPCKLPD",
+   "form": "UNPCKLPD_XMMpd_XMMq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "UNPCKLPS",
+   "form": "UNPCKLPS_XMMps_XMMq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VADDPD",
+   "form": "VADDPD_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VADDPS",
+   "form": "VADDPS_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VADDSUBPD",
+   "form": "VADDSUBPD_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VADDSUBPS",
+   "form": "VADDSUBPS_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VAESDECLAST",
+   "form": "VAESDECLAST_YMMu128_YMMu128_YMMu128",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VAESDEC",
+   "form": "VAESDEC_YMMu128_YMMu128_YMMu128",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VAESENCLAST",
+   "form": "VAESENCLAST_YMMu128_YMMu128_YMMu128",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VAESENC",
+   "form": "VAESENC_YMMu128_YMMu128_YMMu128",
+   "latency": "3",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VANDNPD",
+   "form": "VANDNPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VANDNPS",
+   "form": "VANDNPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VANDPD",
+   "form": "VANDPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VANDPS",
+   "form": "VANDPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBLENDPD",
+   "form": "VBLENDPD_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBLENDPS",
+   "form": "VBLENDPS_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBLENDVPD",
+   "form": "VBLENDVPD_YMMqq_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VBLENDVPS",
+   "form": "VBLENDVPS_YMMqq_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VBROADCASTF128",
+   "form": "VBROADCASTF128_YMMqq_MEMdq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBROADCASTI128",
+   "form": "VBROADCASTI128_YMMqq_MEMdq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBROADCASTSD",
+   "form": "VBROADCASTSD_YMMqq_MEMq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBROADCASTSD",
+   "form": "VBROADCASTSD_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VBROADCASTSS",
+   "form": "VBROADCASTSS_XMMdq_MEMd",
+   "latency": "6",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBROADCASTSS",
+   "form": "VBROADCASTSS_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VBROADCASTSS",
+   "form": "VBROADCASTSS_YMMqq_MEMd",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VBROADCASTSS",
+   "form": "VBROADCASTSS_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCMPPD",
+   "form": "VCMPPD_XMMdq_XMMdq_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCMPPD",
+   "form": "VCMPPD_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCMPPS",
+   "form": "VCMPPS_XMMdq_XMMdq_XMMdq_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCMPPS",
+   "form": "VCMPPS_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCMPSD",
+   "form": "VCMPSD_XMMdq_XMMdq_XMMq_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCMPSS",
+   "form": "VCMPSS_XMMdq_XMMdq_XMMd_IMMb",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCVTDQ2PD",
+   "form": "VCVTDQ2PD_YMMqq_XMMdq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTDQ2PS",
+   "form": "VCVTDQ2PS_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCVTPD2DQ",
+   "form": "VCVTPD2DQ_XMMdq_YMMqq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTPD2PS",
+   "form": "VCVTPD2PS_XMMdq_YMMqq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTPH2PS",
+   "form": "VCVTPH2PS_XMMdq_XMMq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTPH2PS",
+   "form": "VCVTPH2PS_YMMqq_XMMdq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2DQ",
+   "form": "VCVTPS2DQ_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VCVTPS2PD",
+   "form": "VCVTPS2PD_YMMqq_XMMdq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2PH",
+   "form": "VCVTPS2PH_XMMdq_YMMqq_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTPS2PH",
+   "form": "VCVTPS2PH_XMMq_XMMdq_IMMb",
+   "latency": "6",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTTPD2DQ",
+   "form": "VCVTTPD2DQ_XMMdq_YMMqq",
+   "latency": "7",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VCVTTPS2DQ",
+   "form": "VCVTTPS2DQ_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VDIVPD",
+   "form": "VDIVPD_YMMqq_YMMqq_YMMqq",
+   "latency": "14",
+   "cpi": "8"
+  },
+  {
+   "mnemonic": "VDIVPS",
+   "form": "VDIVPS_YMMqq_YMMqq_YMMqq",
+   "latency": "11",
+   "cpi": "5"
+  },
+  {
+   "mnemonic": "VEXTRACTF128",
+   "form": "VEXTRACTF128_XMMdq_YMMdq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VEXTRACTI128",
+   "form": "VEXTRACTI128_XMMdq_YMMqq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VFMADD132PD",
+   "form": "VFMADD132PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD132PD",
+   "form": "VFMADD132PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD132PS",
+   "form": "VFMADD132PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD132PS",
+   "form": "VFMADD132PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD132SD",
+   "form": "VFMADD132SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD132SS",
+   "form": "VFMADD132SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD213PD",
+   "form": "VFMADD213PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD213PD",
+   "form": "VFMADD213PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD213PS",
+   "form": "VFMADD213PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD213PS",
+   "form": "VFMADD213PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD213SD",
+   "form": "VFMADD213SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD213SS",
+   "form": "VFMADD213SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD231PD",
+   "form": "VFMADD231PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD231PD",
+   "form": "VFMADD231PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD231PS",
+   "form": "VFMADD231PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD231PS",
+   "form": "VFMADD231PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD231SD",
+   "form": "VFMADD231SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADD231SS",
+   "form": "VFMADD231SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PD",
+   "form": "VFMADDSUB132PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PD",
+   "form": "VFMADDSUB132PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PS",
+   "form": "VFMADDSUB132PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB132PS",
+   "form": "VFMADDSUB132PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PD",
+   "form": "VFMADDSUB213PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PD",
+   "form": "VFMADDSUB213PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PS",
+   "form": "VFMADDSUB213PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB213PS",
+   "form": "VFMADDSUB213PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PD",
+   "form": "VFMADDSUB231PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PD",
+   "form": "VFMADDSUB231PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PS",
+   "form": "VFMADDSUB231PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMADDSUB231PS",
+   "form": "VFMADDSUB231PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB132PD",
+   "form": "VFMSUB132PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB132PD",
+   "form": "VFMSUB132PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB132PS",
+   "form": "VFMSUB132PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB132PS",
+   "form": "VFMSUB132PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB132SD",
+   "form": "VFMSUB132SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB132SS",
+   "form": "VFMSUB132SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB213PD",
+   "form": "VFMSUB213PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB213PD",
+   "form": "VFMSUB213PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB213PS",
+   "form": "VFMSUB213PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB213PS",
+   "form": "VFMSUB213PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB213SD",
+   "form": "VFMSUB213SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB213SS",
+   "form": "VFMSUB213SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB231PD",
+   "form": "VFMSUB231PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB231PD",
+   "form": "VFMSUB231PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB231PS",
+   "form": "VFMSUB231PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB231PS",
+   "form": "VFMSUB231PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB231SD",
+   "form": "VFMSUB231SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUB231SS",
+   "form": "VFMSUB231SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PD",
+   "form": "VFMSUBADD132PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PD",
+   "form": "VFMSUBADD132PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PS",
+   "form": "VFMSUBADD132PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD132PS",
+   "form": "VFMSUBADD132PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PD",
+   "form": "VFMSUBADD213PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PD",
+   "form": "VFMSUBADD213PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PS",
+   "form": "VFMSUBADD213PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD213PS",
+   "form": "VFMSUBADD213PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PD",
+   "form": "VFMSUBADD231PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PD",
+   "form": "VFMSUBADD231PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PS",
+   "form": "VFMSUBADD231PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFMSUBADD231PS",
+   "form": "VFMSUBADD231PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD132PD",
+   "form": "VFNMADD132PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD132PD",
+   "form": "VFNMADD132PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD132PS",
+   "form": "VFNMADD132PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD132PS",
+   "form": "VFNMADD132PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD132SD",
+   "form": "VFNMADD132SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD132SS",
+   "form": "VFNMADD132SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD213PD",
+   "form": "VFNMADD213PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD213PD",
+   "form": "VFNMADD213PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD213PS",
+   "form": "VFNMADD213PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD213PS",
+   "form": "VFNMADD213PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD213SD",
+   "form": "VFNMADD213SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD213SS",
+   "form": "VFNMADD213SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD231PD",
+   "form": "VFNMADD231PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD231PD",
+   "form": "VFNMADD231PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD231PS",
+   "form": "VFNMADD231PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD231PS",
+   "form": "VFNMADD231PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD231SD",
+   "form": "VFNMADD231SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMADD231SS",
+   "form": "VFNMADD231SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB132PD",
+   "form": "VFNMSUB132PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB132PD",
+   "form": "VFNMSUB132PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB132PS",
+   "form": "VFNMSUB132PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB132PS",
+   "form": "VFNMSUB132PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB132SD",
+   "form": "VFNMSUB132SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB132SS",
+   "form": "VFNMSUB132SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB213PD",
+   "form": "VFNMSUB213PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB213PD",
+   "form": "VFNMSUB213PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB213PS",
+   "form": "VFNMSUB213PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB213PS",
+   "form": "VFNMSUB213PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB213SD",
+   "form": "VFNMSUB213SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB213SS",
+   "form": "VFNMSUB213SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB231PD",
+   "form": "VFNMSUB231PD_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB231PD",
+   "form": "VFNMSUB231PD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB231PS",
+   "form": "VFNMSUB231PS_XMMdq_XMMdq_XMMdq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB231PS",
+   "form": "VFNMSUB231PS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB231SD",
+   "form": "VFNMSUB231SD_XMMdq_XMMq_XMMq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VFNMSUB231SS",
+   "form": "VFNMSUB231SS_XMMdq_XMMd_XMMd",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VHADDPD",
+   "form": "VHADDPD_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "VHADDPS",
+   "form": "VHADDPS_YMMqq_YMMqq_YMMqq",
+   "latency": "",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "VHSUBPD",
+   "form": "VHSUBPD_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "VHSUBPS",
+   "form": "VHSUBPS_YMMqq_YMMqq_YMMqq",
+   "latency": "",
+   "cpi": "2"
+  },
+  {
+   "mnemonic": "VINSERTF128",
+   "form": "VINSERTF128_YMMqq_YMMqq_XMMdq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VINSERTI128",
+   "form": "VINSERTI128_YMMqq_YMMqq_XMMdq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VLDDQU",
+   "form": "VLDDQU_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMASKMOVPD",
+   "form": "VMASKMOVPD_MEMdq_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMASKMOVPD",
+   "form": "VMASKMOVPD_MEMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMASKMOVPD",
+   "form": "VMASKMOVPD_XMMdq_XMMdq_MEMdq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMASKMOVPD",
+   "form": "VMASKMOVPD_YMMqq_YMMqq_MEMqq",
+   "latency": "8",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMASKMOVPS",
+   "form": "VMASKMOVPS_MEMdq_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMASKMOVPS",
+   "form": "VMASKMOVPS_MEMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMASKMOVPS",
+   "form": "VMASKMOVPS_XMMdq_XMMdq_MEMdq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMASKMOVPS",
+   "form": "VMASKMOVPS_YMMqq_YMMqq_MEMqq",
+   "latency": "8",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMAXPD",
+   "form": "VMAXPD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMAXPS",
+   "form": "VMAXPS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMINPD",
+   "form": "VMINPD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMINPS",
+   "form": "VMINPS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVAPD",
+   "form": "VMOVAPD_MEMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVAPD",
+   "form": "VMOVAPD_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMOVAPS",
+   "form": "VMOVAPS_MEMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVAPS",
+   "form": "VMOVAPS_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMOVDDUP",
+   "form": "VMOVDDUP_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMOVDQA",
+   "form": "VMOVDQA_MEMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVDQA",
+   "form": "VMOVDQA_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMOVDQU",
+   "form": "VMOVDQU_MEMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVDQU",
+   "form": "VMOVDQU_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMOVD",
+   "form": "VMOVD_GPR32d_XMMd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMOVMSKPD",
+   "form": "VMOVMSKPD_GPR32d_YMMqq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMOVMSKPS",
+   "form": "VMOVMSKPS_GPR32d_YMMqq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMOVSD",
+   "form": "VMOVSD_MEMq_XMMq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVSHDUP",
+   "form": "VMOVSHDUP_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVSLDUP",
+   "form": "VMOVSLDUP_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVSS",
+   "form": "VMOVSS_MEMd_XMMd",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVUPD",
+   "form": "VMOVUPD_MEMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVUPD",
+   "form": "VMOVUPD_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMOVUPS",
+   "form": "VMOVUPS_MEMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMOVUPS",
+   "form": "VMOVUPS_YMMqq_MEMqq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VMPSADBW",
+   "form": "VMPSADBW_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VMULPD",
+   "form": "VMULPD_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VMULPS",
+   "form": "VMULPS_YMMqq_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VORPD",
+   "form": "VORPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VORPS",
+   "form": "VORPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPABSB",
+   "form": "VPABSB_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPABSD",
+   "form": "VPABSD_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPABSW",
+   "form": "VPABSW_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPACKSSDW",
+   "form": "VPACKSSDW_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPACKSSWB",
+   "form": "VPACKSSWB_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPACKUSDW",
+   "form": "VPACKUSDW_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPACKUSWB",
+   "form": "VPACKUSWB_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPADDB",
+   "form": "VPADDB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPADDD",
+   "form": "VPADDD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPADDQ",
+   "form": "VPADDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPADDSB",
+   "form": "VPADDSB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPADDSW",
+   "form": "VPADDSW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPADDUSB",
+   "form": "VPADDUSB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPADDUSW",
+   "form": "VPADDUSW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPADDW",
+   "form": "VPADDW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPALIGNR",
+   "form": "VPALIGNR_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPANDN",
+   "form": "VPANDN_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPAND",
+   "form": "VPAND_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPAVGB",
+   "form": "VPAVGB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPAVGW",
+   "form": "VPAVGW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPBLENDD",
+   "form": "VPBLENDD_XMMdq_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPBLENDD",
+   "form": "VPBLENDD_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPBLENDVB",
+   "form": "VPBLENDVB_YMMqq_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBLENDW",
+   "form": "VPBLENDW_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPBROADCASTB",
+   "form": "VPBROADCASTB_XMMdq_XMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTB",
+   "form": "VPBROADCASTB_YMMqq_XMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTD",
+   "form": "VPBROADCASTD_XMMdq_XMMd",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTD",
+   "form": "VPBROADCASTD_YMMqq_XMMd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTQ",
+   "form": "VPBROADCASTQ_XMMdq_XMMq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTQ",
+   "form": "VPBROADCASTQ_YMMqq_XMMq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTW",
+   "form": "VPBROADCASTW_XMMdq_XMMw",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPBROADCASTW",
+   "form": "VPBROADCASTW_YMMqq_XMMw",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPCLMULQDQ",
+   "form": "VPCLMULQDQ_YMMu128_YMMu64_YMMu64_IMM8",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPCMPEQB",
+   "form": "VPCMPEQB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPCMPEQD",
+   "form": "VPCMPEQD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPCMPEQQ",
+   "form": "VPCMPEQQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPCMPEQW",
+   "form": "VPCMPEQW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPCMPGTB",
+   "form": "VPCMPGTB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPCMPGTD",
+   "form": "VPCMPGTD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPCMPGTQ",
+   "form": "VPCMPGTQ_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPCMPGTW",
+   "form": "VPCMPGTW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPBUSDS",
+   "form": "VPDPBUSDS_XMMi32_XMMu32_XMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPBUSDS",
+   "form": "VPDPBUSDS_YMMi32_YMMu32_YMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPBUSD",
+   "form": "VPDPBUSD_XMMi32_XMMu32_XMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPBUSD",
+   "form": "VPDPBUSD_YMMi32_YMMu32_YMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPWSSDS",
+   "form": "VPDPWSSDS_XMMi32_XMMu32_XMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPWSSDS",
+   "form": "VPDPWSSDS_YMMi32_YMMu32_YMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPWSSD",
+   "form": "VPDPWSSD_XMMi32_XMMu32_XMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPDPWSSD",
+   "form": "VPDPWSSD_YMMi32_YMMu32_YMMu32",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPERM2F128",
+   "form": "VPERM2F128_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERM2I128",
+   "form": "VPERM2I128_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMD",
+   "form": "VPERMD_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "VPERMILPD_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "VPERMILPD_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "VPERMILPD_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPD",
+   "form": "VPERMILPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "VPERMILPS_XMMdq_XMMdq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "VPERMILPS_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "VPERMILPS_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMILPS",
+   "form": "VPERMILPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMPD",
+   "form": "VPERMPD_YMMqq_YMMqq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMPS",
+   "form": "VPERMPS_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPERMQ",
+   "form": "VPERMQ_YMMqq_YMMqq_IMMb",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPHADDD",
+   "form": "VPHADDD_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPHADDSW",
+   "form": "VPHADDSW_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPHADDW",
+   "form": "VPHADDW_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPHSUBD",
+   "form": "VPHSUBD_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPHSUBSW",
+   "form": "VPHSUBSW_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPHSUBW",
+   "form": "VPHSUBW_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMADDUBSW",
+   "form": "VPMADDUBSW_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMADDWD",
+   "form": "VPMADDWD_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMASKMOVD",
+   "form": "VPMASKMOVD_MEMdq_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMASKMOVD",
+   "form": "VPMASKMOVD_MEMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMASKMOVD",
+   "form": "VPMASKMOVD_XMMdq_XMMdq_MEMdq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPMASKMOVD",
+   "form": "VPMASKMOVD_YMMqq_YMMqq_MEMqq",
+   "latency": "8",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPMASKMOVQ",
+   "form": "VPMASKMOVQ_MEMdq_XMMdq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMASKMOVQ",
+   "form": "VPMASKMOVQ_MEMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMASKMOVQ",
+   "form": "VPMASKMOVQ_XMMdq_XMMdq_MEMdq",
+   "latency": "7",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPMASKMOVQ",
+   "form": "VPMASKMOVQ_YMMqq_YMMqq_MEMqq",
+   "latency": "8",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPMAXSB",
+   "form": "VPMAXSB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMAXSD",
+   "form": "VPMAXSD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMAXSW",
+   "form": "VPMAXSW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMAXUB",
+   "form": "VPMAXUB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMAXUD",
+   "form": "VPMAXUD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMAXUW",
+   "form": "VPMAXUW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMINSB",
+   "form": "VPMINSB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMINSD",
+   "form": "VPMINSD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMINSW",
+   "form": "VPMINSW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMINUB",
+   "form": "VPMINUB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMINUD",
+   "form": "VPMINUD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMINUW",
+   "form": "VPMINUW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMOVMSKB",
+   "form": "VPMOVMSKB_GPR32d_YMMqq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXBD",
+   "form": "VPMOVSXBD_YMMqq_XMMq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXBQ",
+   "form": "VPMOVSXBQ_YMMqq_XMMd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXBW",
+   "form": "VPMOVSXBW_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXDQ",
+   "form": "VPMOVSXDQ_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXWD",
+   "form": "VPMOVSXWD_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVSXWQ",
+   "form": "VPMOVSXWQ_YMMqq_XMMq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVZXBD",
+   "form": "VPMOVZXBD_YMMqq_XMMq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVZXBQ",
+   "form": "VPMOVZXBQ_YMMqq_XMMd",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVZXBW",
+   "form": "VPMOVZXBW_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVZXDQ",
+   "form": "VPMOVZXDQ_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVZXWD",
+   "form": "VPMOVZXWD_YMMqq_XMMdq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMOVZXWQ",
+   "form": "VPMOVZXWQ_YMMqq_XMMq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMULDQ",
+   "form": "VPMULDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMULHRSW",
+   "form": "VPMULHRSW_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMULHUW",
+   "form": "VPMULHUW_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMULHW",
+   "form": "VPMULHW_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMULLD",
+   "form": "VPMULLD_YMMqq_YMMqq_YMMqq",
+   "latency": "10",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPMULLW",
+   "form": "VPMULLW_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPMULUDQ",
+   "form": "VPMULUDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPOR",
+   "form": "VPOR_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPSADBW",
+   "form": "VPSADBW_YMMqq_YMMqq_YMMqq",
+   "latency": "3",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSHUFB",
+   "form": "VPSHUFB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSHUFD",
+   "form": "VPSHUFD_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSHUFHW",
+   "form": "VPSHUFHW_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSHUFLW",
+   "form": "VPSHUFLW_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSIGNB",
+   "form": "VPSIGNB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSIGND",
+   "form": "VPSIGND_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSIGNW",
+   "form": "VPSIGNW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLDQ",
+   "form": "VPSLLDQ_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLD",
+   "form": "VPSLLD_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLD",
+   "form": "VPSLLD_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSLLQ",
+   "form": "VPSLLQ_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLQ",
+   "form": "VPSLLQ_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSLLVD",
+   "form": "VPSLLVD_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLVD",
+   "form": "VPSLLVD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLVQ",
+   "form": "VPSLLVQ_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLVQ",
+   "form": "VPSLLVQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLW",
+   "form": "VPSLLW_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSLLW",
+   "form": "VPSLLW_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSRAD",
+   "form": "VPSRAD_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRAD",
+   "form": "VPSRAD_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSRAVD",
+   "form": "VPSRAVD_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRAVD",
+   "form": "VPSRAVD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRAW",
+   "form": "VPSRAW_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRAW",
+   "form": "VPSRAW_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSRLDQ",
+   "form": "VPSRLDQ_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLD",
+   "form": "VPSRLD_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLD",
+   "form": "VPSRLD_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSRLQ",
+   "form": "VPSRLQ_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLQ",
+   "form": "VPSRLQ_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSRLVD",
+   "form": "VPSRLVD_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLVD",
+   "form": "VPSRLVD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLVQ",
+   "form": "VPSRLVQ_XMMdq_XMMdq_XMMdq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLVQ",
+   "form": "VPSRLVQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLW",
+   "form": "VPSRLW_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSRLW",
+   "form": "VPSRLW_YMMqq_YMMqq_XMMq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPSUBB",
+   "form": "VPSUBB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPSUBD",
+   "form": "VPSUBD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPSUBQ",
+   "form": "VPSUBQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPSUBSB",
+   "form": "VPSUBSB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSUBSW",
+   "form": "VPSUBSW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSUBUSB",
+   "form": "VPSUBUSB_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSUBUSW",
+   "form": "VPSUBUSW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPSUBW",
+   "form": "VPSUBW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VPTEST",
+   "form": "VPTEST_YMMqq_YMMqq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VPUNPCKHBW",
+   "form": "VPUNPCKHBW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKHDQ",
+   "form": "VPUNPCKHDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKHQDQ",
+   "form": "VPUNPCKHQDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKHWD",
+   "form": "VPUNPCKHWD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKLBW",
+   "form": "VPUNPCKLBW_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKLDQ",
+   "form": "VPUNPCKLDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKLQDQ",
+   "form": "VPUNPCKLQDQ_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPUNPCKLWD",
+   "form": "VPUNPCKLWD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VPXOR",
+   "form": "VPXOR_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VRCPPS",
+   "form": "VRCPPS_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VROUNDPD",
+   "form": "VROUNDPD_YMMqq_YMMqq_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VROUNDPS",
+   "form": "VROUNDPS_YMMqq_YMMqq_IMMb",
+   "latency": "8",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VRSQRTPS",
+   "form": "VRSQRTPS_YMMqq_YMMqq",
+   "latency": "4",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VSHUFPD",
+   "form": "VSHUFPD_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VSHUFPS",
+   "form": "VSHUFPS_YMMqq_YMMqq_YMMqq_IMMb",
+   "latency": "1",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VSQRTPD",
+   "form": "VSQRTPD_YMMqq_YMMqq",
+   "latency": "18",
+   "cpi": "12"
+  },
+  {
+   "mnemonic": "VSQRTPS",
+   "form": "VSQRTPS_YMMqq_YMMqq",
+   "latency": "12",
+   "cpi": "6"
+  },
+  {
+   "mnemonic": "VSUBPD",
+   "form": "VSUBPD_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VSUBPS",
+   "form": "VSUBPS_YMMqq_YMMqq_YMMqq",
+   "latency": "2",
+   "cpi": "0.5"
+  },
+  {
+   "mnemonic": "VTESTPD",
+   "form": "VTESTPD_XMMdq_XMMdq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VTESTPD",
+   "form": "VTESTPD_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VTESTPS",
+   "form": "VTESTPS_XMMdq_XMMdq",
+   "latency": "",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VTESTPS",
+   "form": "VTESTPS_YMMqq_YMMqq",
+   "latency": "5",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VUNPCKHPD",
+   "form": "VUNPCKHPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VUNPCKHPS",
+   "form": "VUNPCKHPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VUNPCKLPD",
+   "form": "VUNPCKLPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VUNPCKLPS",
+   "form": "VUNPCKLPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "1"
+  },
+  {
+   "mnemonic": "VXORPD",
+   "form": "VXORPD_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "VXORPS",
+   "form": "VXORPS_YMMqq_YMMqq_YMMqq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "XORPD",
+   "form": "XORPD_XMMxuq_XMMxuq",
+   "latency": "1",
+   "cpi": "0.333333333"
+  },
+  {
+   "mnemonic": "XORPS",
+   "form": "XORPS_XMMxud_XMMxud",
+   "latency": "1",
+   "cpi": "0.333333333"
+  }
+ ]
+}

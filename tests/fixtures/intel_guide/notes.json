@@ -1,0 +1,4 @@
+{ "notes": [
+    { "note_name": "sae_note", "note_value":"<br />Exceptions can be suppressed by passing \"_MM_FROUND_NO_EXC\" in the \"sae\" parameter."},
+    { "note_name": "round_note", "note_value":"<br />Rounding is done according to the \"rounding[3:0]\" parameter."}
+]}
