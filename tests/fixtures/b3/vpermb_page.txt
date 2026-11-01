@@ -1,0 +1,21 @@
+VPERMB—Permute Packed Bytes Elements
+ Opcode/                                    Op/     64/32        CPUID Feature   Description
+ Instruction                                En      bit Mode     Flag
+                                                    Support
+ EVEX.128.66.0F38.W0 8D /r                  A       V/V          (AVX512VL AND   Permute bytes in xmm3/m128 using byte indexes
+ VPERMB xmm1 {k1}{z}, xmm2,                                      AVX512_VBMI)    in xmm2 and store the result in xmm1 using
+ xmm3/m128                                                       OR AVX10.1      writemask k1.
+ EVEX.256.66.0F38.W0 8D /r                  A       V/V          AVX512VL        Permute bytes in ymm3/m256 using byte indexes
+ VPERMB ymm1 {k1}{z}, ymm2,                                      AVX512_VBMI)    in ymm2 and store the result in ymm1 using
+ ymm3/m256                                                       OR AVX10.1      writemask k1.
+ EVEX.512.66.0F38.W0 8D /r                  A       V/V          AVX512_VBMI     Permute bytes in zmm3/m512 using byte indexes
+ VPERMB zmm1 {k1}{z}, zmm2,                                      OR AVX10.1      in zmm2 and store the result in zmm1 using
+ zmm3/m512                                                                       writemask k1.
+
+
+
+                                                      Instruction Operand Encoding
+   Op/En       Tuple Type            Operand 1                    Operand 2           Operand 3                Operand 4
+     A          Full Mem           ModRM:reg (w)                 EVEX.vvvv (r)       ModRM:r/m (r)                N/A
+
+Description

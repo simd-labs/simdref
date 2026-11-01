@@ -1,0 +1,16 @@
+ADCX—Unsigned Integer Addition of Two Operands With Carry Flag
+ Opcode/                               Op/     64/32bit     CPUID       Description
+ Instruction                           En      Mode         Feature
+                                               Support      Flag
+ 66 0F 38 F6 /r                        RM      V/V          ADX         Unsigned addition of r32 with CF, r/m32 to r32, writes CF.
+ ADCX r32, r/m32
+ 66 REX.w 0F 38 F6 /r                  RM      V/N.E.       ADX         Unsigned addition of r64 with CF, r/m64 to r64, writes CF.
+ ADCX r64, r/m64
+
+
+
+                                                     Instruction Operand Encoding
+      Op/En                Operand 1                      Operand 2                    Operand 3                    Operand 4
+        RM              ModRM:reg (r, w)                ModRM:r/m (r)                      N/A                          N/A
+
+Description

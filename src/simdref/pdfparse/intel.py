@@ -118,6 +118,238 @@ _CODE_SECTIONS: frozenset[str] = frozenset(
     }
 )
 
+# ---------------------------------------------------------------------------
+# Opcode table and Instruction Operand Encoding table
+#
+# The tables sit between the title and the first section heading. Section
+# extraction cannot keep them (they have no heading), so they get their own
+# parser over the title page lines. Column layout text has two or more spaces
+# between cells; PyMuPDF page prep joins cells with single spaces, which the
+# opcode-row regex accepts. Operand encoding rows need the wide gaps, so the
+# PyMuPDF fast path may skip that table.
+OPCODE_MODES_SECTION = "Opcode & Modes"
+OPERAND_ENCODING_SECTION = "Operand Encoding"
+
+_MODE_TOKEN_RE = r"V|I|N\.E\.|N\.N\.|N\.P\.|N\.S\.|N\."
+# Longest alternative first, so RM does not shadow RMI etc.
+_OP_EN_TOKEN_RE = (
+    r"M1T|MIT|RMI|MRI|RVM|MVR|VRM|RVM|RM|M1|MI|MR|AM|MA|"
+    r"ZO|XO|OI|IO|TT|TI|NP|A|B|C|D|E|I|M|O|P|S|T"
+)
+_OP_EN_FULL_RE = re.compile(rf"(?:{_OP_EN_TOKEN_RE})")
+_HEX_BYTE_RE = r"[0-9A-Fa-f]{2}"
+_IMM_SUFFIX_RE = r"(?:cb|cw|cd|cp|co|ct|ib|iw|id|io|is4)"
+_PREFIX_OPCODE_RE = (
+    rf"(?:VEX|EVEX|XOP)\.[0-9A-Za-z.]+(?:\s+{_HEX_BYTE_RE})+"
+    rf"(?:\s*/[0-7a-z]+)?(?:\s+{_IMM_SUFFIX_RE})*"
+)
+_OPCODE_TOK_RE = rf"(?:NP|NFx|RNE|REX\.?[Ww]?|F2|F3|\+|{_HEX_BYTE_RE})"
+_LEGACY_OPCODE_RE = (
+    rf"(?:{_OPCODE_TOK_RE}\s+)*{_OPCODE_TOK_RE}"
+    rf"(?:\s*/[0-7a-z]+)?(?:\s+{_IMM_SUFFIX_RE})*"
+)
+_OPCODE_ROW_RE = re.compile(
+    rf"^\s*(?P<opcode>{_PREFIX_OPCODE_RE}|{_LEGACY_OPCODE_RE})\s+"
+    rf"(?P<op_en>{_OP_EN_TOKEN_RE})\s+"
+    rf"(?P<mode_64>{_MODE_TOKEN_RE})\s?/\s?(?P<mode_32>{_MODE_TOKEN_RE})"
+    rf"(?:\s+(?P<cpuid>.*))?$"
+)
+_OPERAND_ENCODING_CAPTION_RE = re.compile(r"Instruction Operand Encoding")
+
+
+def _oe_header_shape(cells: list[str]) -> tuple[bool, bool]:
+    """Recognise an Operand Encoding header. Returns (is_header, has_tuple).
+
+    PyMuPDF drops the caption and the Op/En cell, so the header may read
+    bare "Tuple Type / Operand 1 .." or only "Operand 1 ..".
+    """
+    texts = [cell.strip() for cell in cells]
+    if not texts:
+        return False, False
+    if texts[0].startswith("Op/En"):
+        return True, any("Tuple Type" in cell for cell in texts)
+    has_operand_columns = all(re.fullmatch(r"Operand \d+", text) for text in texts)
+    if has_operand_columns:
+        return True, False
+    if "Tuple Type" in texts and any(text.startswith("Operand") for text in texts):
+        return True, True
+    return False, False
+
+
+def _token_is_isa(token: str) -> bool:
+    """A CPUID flag token: uppercase letters, digits and _ . - only."""
+    bare = token.strip("()")
+    if not bare:
+        return token in ("(", ")")
+    if bare in ("AND", "OR"):
+        return True
+    return len(bare) >= 2 and all(c.isupper() or c.isdigit() or c in "_.-" for c in bare)
+
+
+def _isa_prefix(text: str) -> str:
+    """Keep the CPUID flag tokens and cut the glued description column."""
+    out: list[str] = []
+    for token in text.split():
+        if _token_is_isa(token):
+            out.append(token)
+        else:
+            break
+    return " ".join(out)
+
+
+def _isa_cell(cell: str) -> bool:
+    tokens = cell.split()
+    return bool(tokens) and all(_token_is_isa(token) for token in tokens)
+
+
+def parse_opcode_table(lines: list[str]):
+    """Parse the SDM opcode table into mode and CPUID rows per form.
+
+    Returns a list of dicts with opcode, op_en, mode_64, mode_32 and cpuid.
+    Lines without a table give an empty list.
+    """
+    rows: list[dict[str, str]] = []
+    stop_captions = ("Description", "Operation")
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
+        stripped = line.strip().rstrip(":")
+        if _OPERAND_ENCODING_CAPTION_RE.search(line) or stripped in stop_captions:
+            break
+        match = _OPCODE_ROW_RE.match(line)
+        if match is None:
+            idx += 1
+            continue
+        row = {
+            "opcode": " ".join(match["opcode"].split()),
+            "op_en": match["op_en"],
+            "mode_64": match["mode_64"],
+            "mode_32": match["mode_32"],
+            "cpuid": _isa_prefix(match["cpuid"] or ""),
+        }
+        # Follow-on lines carry the wrapped CPUID cells (and the operand
+        # form, kept in uops, not here).
+        idx += 1
+        while idx < len(lines):
+            follow = lines[idx]
+            if not follow.strip() or _OPCODE_ROW_RE.match(follow):
+                break
+            follow_stripped = follow.strip()
+            if _OPERAND_ENCODING_CAPTION_RE.search(follow) or follow_stripped in stop_captions:
+                break
+            follow_cells = re.split(r"\s{2,}", follow_stripped)
+            if _oe_header_shape(follow_cells)[0]:
+                break
+            for cell in follow_cells:
+                if _isa_cell(cell):
+                    row["cpuid"] = " ".join(part for part in (row["cpuid"], cell) if part)
+            idx += 1
+        rows.append(row)
+    for row in rows:
+        if not row["cpuid"]:
+            del row["cpuid"]
+    return rows
+
+
+def parse_operand_encoding_table(lines: list[str]):
+    """Parse the Instruction Operand Encoding table.
+
+    Returns a list of dicts with op_en, tuple_type and operands. N/A cells
+    are dropped. Lines without the table give an empty list.
+    """
+    rows: list[dict[str, object]] = []
+    active = False
+    has_tuple = False
+    seen_header = False
+    for idx, line in enumerate(lines):
+        cells = re.split(r"\s{2,}", line.strip())
+        is_header, header_has_tuple = _oe_header_shape(cells)
+        if not active:
+            if is_header or _OPERAND_ENCODING_CAPTION_RE.search(line):
+                active = True
+            else:
+                continue
+        elif not is_header:
+            if not line.strip():
+                if seen_header or rows:
+                    break
+                continue
+        if is_header:
+            has_tuple = header_has_tuple
+            seen_header = True
+            continue
+        if not line.strip():
+            continue
+        first = cells[0].strip()
+        if not seen_header:
+            continue
+        if line.strip().lower() in _ALL_HEADING_NAMES:
+            break
+        if _OP_EN_FULL_RE.fullmatch(first) is None:
+            break
+        offset = 2 if has_tuple else 1
+        operands = [
+            cell.strip() for cell in cells[offset:] if cell.strip() and cell.strip() != "N/A"
+        ]
+        tuple_type = cells[1].strip() if has_tuple and len(cells) > 1 else ""
+        if tuple_type == "N/A":
+            tuple_type = ""
+        if not operands and not tuple_type:
+            continue
+        rows.append({"op_en": first, "tuple_type": tuple_type, "operands": operands})
+    return rows
+
+
+def _mode_row_text(row: dict[str, str]) -> str:
+    text = (
+        f"{row['opcode']} ({row['op_en']}): 64-bit {row['mode_64']}, compat/legacy {row['mode_32']}"
+    )
+    if row.get("cpuid"):
+        text += f"; CPUID {row['cpuid']}"
+    return text
+
+
+def _operand_encoding_row_text(row: dict[str, object]) -> str:
+    parts = "; ".join(row["operands"])
+    if row["tuple_type"]:
+        parts = f"{parts}; tuple: {row['tuple_type']}" if parts else f"tuple: {row['tuple_type']}"
+    return f"{row['op_en']}: {parts}"
+
+
+def form_table_sections(lines: list[str]) -> dict[str, str]:
+    """Section text for the SDM opcode table and Operand Encoding table."""
+    sections: dict[str, str] = {}
+    mode_rows = parse_opcode_table(lines)
+    if mode_rows:
+        sections[OPCODE_MODES_SECTION] = "\n".join(_mode_row_text(row) for row in mode_rows)
+    encoding_rows = parse_operand_encoding_table(lines)
+    if encoding_rows:
+        sections[OPERAND_ENCODING_SECTION] = "\n".join(
+            _operand_encoding_row_text(row) for row in encoding_rows
+        )
+    return sections
+
+
+def _cell_joined_lines(lines: list[tuple[float, float, float, str]]) -> list[str]:
+    """Join same-row table cells with a wide gap (PyMuPDF gives one line
+    per cell). Prose lines stay single-cell and pass through unchanged."""
+    groups: list[list[tuple[float, str]]] = []
+    group_tops: list[float] = []
+    for top, _size, x0, text in lines:
+        if groups and abs(top - group_tops[-1]) <= 2.0:
+            groups[-1].append((x0, text))
+        else:
+            groups.append([(x0, text)])
+            group_tops.append(top)
+    out: list[str] = []
+    for group in groups:
+        group.sort()
+        joined = "  ".join(text for _x0, text in group if text).strip()
+        if joined:
+            out.append(joined)
+    return out
+
+
 # All heading names (lowercase) for content-based heading detection.
 # Some Intel SDM pages format section headings at body text size.
 _ALL_HEADING_NAMES: frozenset[str] = frozenset(
@@ -588,6 +820,15 @@ def parse_intel_sdm(
                 cleaned = "\n".join(paragraphs).strip()
             if cleaned:
                 sections[canonical] = cleaned
+
+        # The opcode table and the Operand Encoding table sit above the
+        # first heading, so heading extraction never keeps them. Parse them
+        # from the title page lines.
+        title_page = prepared_pages.get(page_start)
+        if title_page is not None:
+            page_texts = _cell_joined_lines(title_page.body_lines)
+            for key, value in form_table_sections(page_texts).items():
+                sections.setdefault(key, value)
 
         payload = PdfDescriptionPayload(
             sections=sections,

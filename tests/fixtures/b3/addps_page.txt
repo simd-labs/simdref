@@ -1,0 +1,32 @@
+ADDPS—Add Packed Single Precision Floating-Point Values
+ Opcode/                                    Op /     64/32 bit   CPUID Feature    Description
+ Instruction                                En       Mode        Flag
+                                                     Support
+ NP 0F 58 /r                                A        V/V         SSE              Add packed single precision floating-point values
+ ADDPS xmm1, xmm2/m128                                                            from xmm2/m128 to xmm1 and store result in
+                                                                                  xmm1.
+ VEX.128.0F.WIG 58 /r                       B        V/V         AVX              Add packed single precision floating-point values
+ VADDPS xmm1,xmm2, xmm3/m128                                                      from xmm3/m128 to xmm2 and store result in
+                                                                                  xmm1.
+ VEX.256.0F.WIG 58 /r                       B        V/V         AVX              Add packed single precision floating-point values
+ VADDPS ymm1, ymm2, ymm3/m256                                                     from ymm3/m256 to ymm2 and store result in
+                                                                                  ymm1.
+ EVEX.128.0F.W0 58 /r                       C        V/V         (AVX512VL AND Add packed single precision floating-point values
+ VADDPS xmm1 {k1}{z}, xmm2,                                      AVX512F) OR   from xmm3/m128/m32bcst to xmm2 and store
+ xmm3/m128/m32bcst                                               AVX10.1       result in xmm1 with writemask k1.
+ EVEX.256.0F.W0 58 /r                       C        V/V         (AVX512VL AND Add packed single precision floating-point values
+ VADDPS ymm1 {k1}{z}, ymm2,                                      AVX512F) OR   from ymm3/m256/m32bcst to ymm2 and store
+ ymm3/m256/m32bcst                                               AVX10.1       result in ymm1 with writemask k1.
+ EVEX.512.0F.W0 58 /r                       C        V/V         AVX512F OR       Add packed single precision floating-point values
+ VADDPS zmm1 {k1}{z}, zmm2,                                      AVX10.1          from zmm3/m512/m32bcst to zmm2 and store
+ zmm3/m512/m32bcst {er}                                                           result in zmm1 with writemask k1.
+
+
+
+                                                     Instruction Operand Encoding
+     Op/En         Tuple Type            Operand 1                Operand 2                Operand 3                 Operand 4
+       A               N/A           ModRM:reg (r, w)            ModRM:r/m (r)                  N/A                      N/A
+       B               N/A            ModRM:reg (w)              VEX.vvvv (r)            ModRM:r/m (r)                   N/A
+       C               Full           ModRM:reg (w)              EVEX.vvvv (r)           ModRM:r/m (r)                   N/A
+
+Description

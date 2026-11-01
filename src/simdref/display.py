@@ -1027,10 +1027,12 @@ _DESCRIPTION_ORDER = [
     "Virtual 8086 Mode Exceptions",
     "Compatibility Mode Exceptions",
     "64-Bit Mode Exceptions",
+    "Opcode & Modes",
+    "Operand Encoding",
 ]
 
 # Sections that are always shown expanded.
-_EXPANDED_SECTIONS: set[str] = set()
+_EXPANDED_SECTIONS: set[str] = {"Opcode & Modes", "Operand Encoding"}
 
 # Syntax language per code section.
 _CODE_SECTION_LANG = {
@@ -1046,9 +1048,9 @@ def print_description_sections(
 ) -> None:
     """Render instruction description sections as Rich panels.
 
-    By default, only Description and Flags Affected are expanded.
-    Other sections show a collapsed summary line.  Pass *full=True*
-    to expand everything.
+    By default, the SDM table sections (Opcode & Modes, Operand Encoding)
+    are expanded. Other sections show a collapsed summary line.  Pass
+    *full=True* to expand everything.
     """
     if not description:
         return
