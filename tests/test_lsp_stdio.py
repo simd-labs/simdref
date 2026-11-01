@@ -12,7 +12,7 @@ from pathlib import Path
 
 from simdref import lsp
 from simdref.lsp import _mnemonic_from_asm_line
-from simdref.storage import SQLITE_PATH
+from simdref.storage import SQLITE_PATH, load_instructions_by_mnemonic_from_db, open_db
 
 # The dev-install data dir has no catalog, so fall back to the user-level one.
 # SIMDREF_CATALOG needs "isa update" output at that path, not a missing file:
@@ -25,6 +25,29 @@ CATALOG = (
     if _catalog_env and Path(_catalog_env).is_file()
     else (_missing if _catalog_env else (SQLITE_PATH if SQLITE_PATH.is_file() else _USER_CATALOG))
 )
+
+
+def _riscv_rows(mnemonic: str) -> bool:
+    with open_db(path=CATALOG) as conn:
+        return any(
+            form.architecture == "riscv"
+            for form in load_instructions_by_mnemonic_from_db(conn, mnemonic)
+        )
+
+
+def _identity_active() -> bool:
+    """Byte identity answers in this run: an llvm-mc tool plus a catalog with
+    the byte-key columns. Read from the environment only, so a mutation of the
+    identity code cannot flip the regime; the other regime is the unchanged
+    old-matcher fallback."""
+    from simdref.asm_identity import _tool_path
+
+    if not _tool_path("SIMDREF_LLVM_MC", "llvm-mc") or not CATALOG.is_file():
+        return False
+    with open_db(path=CATALOG) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(instructions_data)")}
+    return {"enc_mask", "enc_match"}.issubset(columns)
+
 
 ASM_TEXT = """# top comment
 .text
@@ -269,6 +292,27 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("https://www.uops.info/html-instr/VADDPS_YMM_YMM_YMM.html", value)
         self.assertIn("https://www.felixcloutier.com/x86/addps", value)
 
+    def test_movsd_hover_matches_the_sse_form(self):
+        # A bare "movsd" row is the string move, so the exact hit would show
+        # the string form. A two-operand line must get the SSE form instead.
+        # AT&T source order is memory->xmm, and the key lists destination first.
+        self.server.open(ASM_URI, "asm", "movsd 0x10(%rsp), %xmm0\n")
+        result = self.server.hover(ASM_URI, 0, 2)
+        self.assertIsNotNone(result, "hover on movsd with operands returned null")
+        value = result["contents"]["value"]
+        self.assertIn("MOVSD_XMM (XMM, M64)", value)
+        self.assertNotIn("MOVSD_XMM (M64, XMM)", value)
+        self.assertNotIn("Move Data From String to String", value)
+
+    def test_bare_string_movsd_keeps_the_string_form(self):
+        # Zero operands: the exact "movsd" row IS the string move, so hover
+        # keeps it instead of falling through to a matched form.
+        self.server.open(ASM_URI, "asm", "movsd\n")
+        result = self.server.hover(ASM_URI, 0, 2)
+        self.assertIsNotNone(result, "hover on bare movsd returned null")
+        self.assertIn("Move Data From String to String", result["contents"]["value"])
+        self.assertNotIn("MOVSD_XMM (M64, XMM)", result["contents"]["value"])
+
     def test_hover_makes_no_network_call(self):
         # The server is a subprocess, so block sockets there via sitecustomize.
         import tempfile
@@ -401,6 +445,7 @@ class LspEndToEndTests(unittest.TestCase):
     ATT_TEXT = (
         "xorl %eax, %eax\naddq $8, %rax\ncmpq %rsi, %rax\nadd $8, %rax\njmp .L2\n"
         "vpsrlq $1, %xmm0, %xmm1\nmovsb\nshl $1, %rax\nxor %eax, %eax\ncmp %rsi, %rax\n"
+        "shl $2, %rax\n"
     )
 
     def _att_hover_and_hints(self):
@@ -431,13 +476,52 @@ class LspEndToEndTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, hover(line))
 
-    def test_percent_sp_is_the_64_bit_register_form(self):
-        # "%sp" is the 64-bit x86 GPR, not the 16-bit "sp" of the ARM fix at
-        # test_arm_scalar_lines_keep_the_arm_form.
+    def test_shl_immediate_count_picks_the_i8_form(self):
+        # Line 10 shifts by 2, so the fixed-1 form must not win the tie.
+        _, hover = self._att_hover_and_hints()
+        self.assertIn("SHL (R64, I8)", hover(10))
+        self.assertNotIn("SHL (R64, 1)", hover(10))
+        self.assertNotIn("SHL (R64, 0)", hover(10))
+
+    def test_lea_picks_the_64_bit_form(self):
+        # Every lea form has one operand, so the fallback picks. It must name
+        # the width of %rdi, not the first form LEA_B (R16).
+        self.server.open(ASM_URI, "asm", "lea 0x8(%rsp), %rdi\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        key = hover.splitlines()[1]
+        self.assertIn("R64", key)
+        self.assertNotIn("R16", key)
+
+    def test_vpermilps_immediate_picks_the_i8_form(self):
+        # The line names an immediate, so the I8 form must beat the
+        # register form the width pre-pass took by name order.
+        self.server.open(ASM_URI, "asm", "vpermilps $1, %ymm1, %ymm2\n")
+        key = self.server.hover(ASM_URI, 0, 1)["contents"]["value"].splitlines()[1]
+        self.assertIn("I8)", key)
+
+    def test_pinsrw_register_picks_the_r32_form(self):
+        # %eax is R32; the M16 form must not win on key order.
+        self.server.open(ASM_URI, "asm", "pinsrw $1, %eax, %xmm0\n")
+        key = self.server.hover(ASM_URI, 0, 1)["contents"]["value"].splitlines()[1]
+        self.assertIn("R32", key)
+        self.assertNotIn("M16", key)
+
+    def test_percent_sp_is_the_16_bit_register_form(self):
+        # "%sp" is the 16-bit x86 stack pointer: the chosen form must not
+        # name an R64 or M64 form for it.
         self.server.open(ASM_URI, "asm", "mov %rax, %sp\n")
         hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
-        self.assertIn("MOV (M64, R64)", hover)
-        self.assertNotIn("Moffs16", hover)
+        self.assertNotIn("MOV (M64, R64)", hover)
+        self.assertNotIn("R64)", hover)
+
+    def test_intel_bare_sp_is_the_16_bit_register(self):
+        # In an Intel file a bare "sp" is the 16-bit x86 register: the chosen
+        # form must not name an R64 form for it.
+        uri = "file:///tmp/simdref_lsp_test_sp.asm"
+        self.server.open(uri, "nasm", "mov rax, sp\n")
+        hover = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertNotIn("MOV (M64, R64)", hover)
+        self.assertNotIn("R64)", hover)
 
     def test_add_with_64_bit_register_is_not_the_8_bit_form(self):
         hints, hover = self._att_hover_and_hints()
@@ -446,17 +530,39 @@ class LspEndToEndTests(unittest.TestCase):
             self.assertNotIn("ADD (AL", hover(line))
             self.assertNotIn("ADD (R8", hover(line))
 
-    def test_jmp_to_a_label_picks_the_memory_form(self):
-        # In AT&T a bare ".L2" is a symbol: a memory reference, not a rel8 immediate.
+    def test_jmp_to_a_label_follows_the_active_lookup(self):
+        # llvm-mc encodes bare "jmp .L2" as a direct branch (probed encoding:
+        # [0xeb,A], fixup FK_PCRel_1); only "jmp *.L2" is the memory form
+        # (probed [0xff,0x24,0x25,...]). Byte identity shows the direct row.
+        # The keyless fallback keeps the old matcher unchanged: JMP (M64).
         _, hover = self._att_hover_and_hints()
-        self.assertNotIn("Rel8", hover(4))
-        self.assertIn("JMP (M64)", hover(4))
+        if _identity_active():
+            self.assertNotIn("JMP (M64)", hover(4))
+            self.assertIn("JMP (Rel", hover(4))
+        else:
+            self.assertIn("JMP (M64)", hover(4))
 
     def test_mov_of_a_bare_symbol_picks_a_memory_form(self):
-        # "mov symbol, %eax" reads memory: the picked form has an M slot, not rel.
+        # "mov symbol, %eax" reads memory: the destination %eax leads the form
+        # key and the bare symbol is a memory slot, not rel.
         self.server.open(ASM_URI, "asm", "mov symbol, %eax\n")
         hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
-        self.assertIn("MOV (M32, R32)", hover)
+        self.assertIn("MOV (R32, M32)", hover)
+
+    def test_att_operand_order_picks_store_form(self):
+        # AT&T writes the destination last: "sub %rax, (%rbx)" stores, so the
+        # memory operand leads the form key.
+        self.server.open(ASM_URI, "asm", "sub %rax, (%rbx)\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("SUB (M64, R64)", hover)
+        self.assertNotIn("SUB (R64, M64)", hover)
+
+    def test_att_operand_order_picks_load_form(self):
+        # "sub (%rbx), %rax" loads: the register operand leads the form key.
+        self.server.open(ASM_URI, "asm", "sub (%rbx), %rax\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("SUB (R64, M64)", hover)
+        self.assertNotIn("SUB (M64, R64)", hover)
 
     def test_jmp_star_register_picks_the_indirect_form(self):
         # "jmp *%rax" is the indirect jump, not the direct rel8 form.
@@ -482,11 +588,294 @@ class LspEndToEndTests(unittest.TestCase):
             ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
         )
 
+    def test_arm_three_register_add_keeps_the_arm_form(self):
+        # x0/x1/x2 are AArch64 general registers, not x86, so the hover and
+        # hint must not name an x86 form like ADD (R16, M16, I16).
+        self.server.open(ASM_URI, "asm", "add x0, x1, x2\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(hover, "add x0, x1, x2 got no hover")
+        value = hover["contents"]["value"]
+        for x86_token in ("R16", "R64", "M16", "I16"):
+            self.assertNotIn(x86_token, value, f"hover named an x86 form: {x86_token}")
+        self.assertIn("Add operands.", value)
+        hints = self.server.hints(ASM_URI)
+        self.assertEqual([h["label"] for h in hints], ["Add operands."])
+
+    def test_riscv_word_ops_do_not_resolve_to_x86(self):
+        # A catalog with the RISC-V word rows shows the RISC-V form; without
+        # them the line stays silent, except a documented pseudo-op, which byte
+        # identity resolves to the row of its expansion. Never x86 "add".
+        cases = [
+            (op, "a0, a1, a2")
+            for op in (
+                "addw",
+                "subw",
+                "sllw",
+                "srlw",
+                "sraw",
+                "mulw",
+                "divw",
+                "divuw",
+                "remw",
+                "remuw",
+            )
+        ]
+        cases += [(op, "a0, a1, 5") for op in ("addiw", "slliw", "srliw", "sraiw")]
+        cases += [("addw", "a0, a1, %pcrel_hi(sym)")]
+        for op, operands in cases:
+            with self.subTest(op=op, operands=operands):
+                self.server.open(ASM_URI, "asm", f"{op} {operands}\n")
+                hover = self.server.hover(ASM_URI, 0, 1)
+                hints = self.server.hints(ASM_URI)
+                if _riscv_rows(op):
+                    self.assertIsNotNone(hover, f"{op} {operands} got no hover")
+                    self.assertEqual(hover["contents"]["value"].splitlines()[1], op)
+                    self.assertTrue(hints, f"{op} {operands} got no hint")
+                else:
+                    self.assertEqual(hints, [])
+                    self.assertIsNone(hover)
+        # "negw a0, a1" is the pseudo-op subw a0, zero, a1 (probed encoding
+        # [0x3b,0x05,0xb0,0x40]), so byte identity shows the SUBW row; the
+        # keyless fallback keeps the old matcher silent. Never x86 "add".
+        self.server.open(ASM_URI, "asm", "negw a0, a1\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        hints = self.server.hints(ASM_URI)
+        if _identity_active():
+            self.assertIsNotNone(hover, "negw a0, a1 got no hover")
+            self.assertNotIn("ADD", hover["contents"]["value"].splitlines()[1])
+            self.assertTrue(hints, "negw a0, a1 got no hint")
+            self.assertEqual(hints[0]["label"], "Subtract word.")
+        else:
+            self.assertEqual(hints, [])
+            self.assertIsNone(hover)
+
+    def test_att_x86_word_ops_still_resolve(self):
+        # "%ax" is not a RISC-V register, so the guard must not fire and the
+        # w-suffix strip resolves to the x86 form. "mulw sym" moved to
+        # test_undecided_line_keeps_the_exact_key: its line is undecided.
+        self.server.open(ASM_URI, "asm", "addw %ax, %bx\nmulw %ax\n")
+        add = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(add, "addw %ax, %bx got no hover")
+        self.assertIn("ADD (", add["contents"]["value"])
+        mul = self.server.hover(ASM_URI, 1, 1)
+        self.assertIsNotNone(mul, "mulw %ax got no hover")
+        self.assertIn("MUL (R16)", mul["contents"]["value"])
+
+    def test_intel_word_ops_still_resolve(self):
+        # Intel syntax writes registers bare: the guard is AT&T-only, so a bare
+        # "ax" must not read as RISC-V.
+        uri = "file:///tmp/simdref_lsp_test_word.asm"
+        self.server.open(uri, "nasm", "add ax, bx\naddw ax, bx\n")
+        add = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(add, "add ax, bx in nasm got no hover")
+        self.assertIn("ADD (", add["contents"]["value"])
+        addw = self.server.hover(uri, 1, 1)
+        self.assertIsNotNone(addw, "addw ax, bx in nasm got no hover")
+        self.assertIn("ADD (", addw["contents"]["value"])
+
+    def test_undecided_line_keeps_a_name_the_strip_cannot_resolve(self):
+        # "bl target" carries no register vote and "b" names no x86 row, so the
+        # strip falls back to the exact ARM row.
+        self.server.open(ASM_URI, "asm", "bl target\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(hover, "bl target got no hover")
+        self.assertTrue(hover["contents"]["value"].splitlines()[1].startswith("BL "))
+
+    def test_undecided_line_keeps_the_exact_key(self):
+        # probe5: "mulw sym" carries no register vote, so the exact RISC-V key
+        # wins and the suffix strip must not flip it to x86 MUL. With no key
+        # rows the strip resolves to MUL as it always did.
+        self.server.open(ASM_URI, "asm", "addi a0, a1, a2\nmulw sym\n")
+        hover = self.server.hover(ASM_URI, 1, 1)
+        self.assertIsNotNone(hover, "mulw sym got no hover")
+        fence = hover["contents"]["value"].splitlines()[1]
+        if _riscv_rows("mulw"):
+            self.assertEqual(fence, "mulw")
+        else:
+            self.assertIn("MUL (", fence)
+
     def test_movsbl_is_not_the_string_move(self):
-        # movsbl is a sign-extend. The suffix strip must not land on the string op movsb.
+        # movsbl is a sign-extend. It resolves to MOVSX; the suffix strip must
+        # not land on the string op movsb.
         self.server.open(ASM_URI, "asm", "movsbl %al, %eax\n")
-        self.assertEqual(self.server.hints(ASM_URI), [])
-        self.assertIsNone(self.server.hover(ASM_URI, 0, 1))
+        self.assertEqual(len(self.server.hints(ASM_URI)), 1)
+        value = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("MOVSX (R32, R8", value)
+        self.assertNotIn("MOVSB", value)
+
+    def test_vinsertf128_register_line_picks_the_register_form(self):
+        # Intel: xmm2 is a v128 register, not M128. The vector classes must rank
+        # the register form above the memory form.
+        uri = "file:///tmp/simdref_lsp_vinsertf128.asm"
+        self.server.open(uri, "nasm", "vinsertf128 ymm0, ymm1, xmm2, 0\n")
+        hover = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertIn("VINSERTF128 (YMM, YMM, XMM, I8)", hover)
+        self.assertNotIn("VINSERTF128 (YMM, YMM, M128, I8)", hover)
+
+    def test_vpmovzxbw_picks_the_ymm_destination(self):
+        # AT&T: %ymm0 is a v256 destination, so the (YMM, XMM) form outranks the
+        # (XMM, XMM) form by width agreement.
+        self.server.open(ASM_URI, "asm", "vpmovzxbw %xmm1, %ymm0\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("VPMOVZXBW (YMM, XMM)", hover)
+        self.assertNotIn("VPMOVZXBW (XMM, XMM)", hover)
+
+    def test_vpsllq_register_count_picks_the_xmm_count_form(self):
+        # AT&T: three register operands (xmm, ymm, ymm). The vector classes must
+        # pick the (YMM, YMM, XMM) form, not an all-XMM variant.
+        self.server.open(ASM_URI, "asm", "vpsllq %xmm1, %ymm2, %ymm3\n")
+        hover = self.server.hover(ASM_URI, 0, 1)["contents"]["value"]
+        self.assertIn("VPSLLQ (YMM, YMM, XMM)", hover)
+        self.assertNotIn("VPSLLQ (XMM, XMM, XMM)", hover)
+
+    def test_cmpsd_xmm_pair_is_not_the_string_form(self):
+        # AT&T: two xmm operands. The bare string-op CMPSD key must not shadow the
+        # SSE forms on an operand-matched line.
+        self.server.open(ASM_URI, "asm", "cmpsd %xmm1, %xmm0\n")
+        result = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(result, "hover on a cmpsd xmm pair returned null")
+        value = result["contents"]["value"]
+        self.assertIn("CMPSD_XMM", value)
+        self.assertNotIn("String", value)
+
+    def test_arm_vector_add_keeps_the_arm_form(self):
+        # AArch64: the .4s arrangement is an ARM vector signal. The line must rank
+        # the AArch64 vector form, not an x86 ADD form.
+        uri = "file:///tmp/simdref_lsp_arm_vec.s"
+        self.server.open(uri, "asm", "add v0.4s, v1.4s, v2.4s\n")
+        result = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(result, "hover on an arm vector add returned null")
+        value = result["contents"]["value"]
+        self.assertIn("V0.<T_OPTION>", value)
+        self.assertNotIn("ADD (R16", value)
+
+    def test_arm_fp_register_keeps_the_arm_form(self):
+        # AArch64: fp is x29, not the stack pointer. The line must rank an
+        # X-register (or XZR) ADD form, not an x86 ADD form.
+        uri = "file:///tmp/simdref_lsp_arm_fp.s"
+        self.server.open(uri, "asm", "add fp, x1, x2\n")
+        result = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(result, "hover on an arm fp add returned null")
+        value = result["contents"]["value"]
+        self.assertIn("XDORXZR", value)
+        self.assertNotIn("R16", value)
+        self.assertNotIn("R64", value)
+        self.assertNotIn("M16", value)
+
+    def test_arm_x_registers_pick_the_x_form(self):
+        # AArch64: x0-x30 are 64-bit and w0-w30 are 32-bit. The width classes must
+        # separate the X and W forms.
+        uri = "file:///tmp/simdref_lsp_arm_xw.s"
+        self.server.open(uri, "asm", "add x0, x1, x2\nadd w0, w1, w2\n")
+        hover_x = self.server.hover(uri, 0, 1)["contents"]["value"]
+        hover_w = self.server.hover(uri, 1, 1)["contents"]["value"]
+        self.assertIn("XD", hover_x)
+        self.assertNotIn("WD", hover_x)
+        self.assertIn("WD", hover_w)
+        self.assertNotIn("XD", hover_w)
+
+    def test_arm32_addw_does_not_show_x86(self):
+        # ARM32: addw is not in the catalog. The x86-gated suffix strip must not
+        # resolve it to an x86 ADD form on a non-x86 line.
+        uri = "file:///tmp/simdref_lsp_addw.s"
+        self.server.open(uri, "asm", "addw r0, r1, r2\n")
+        self.assertIsNone(self.server.hover(uri, 0, 1), "addw on an ARM32 line has no hover")
+
+    def test_att_bare_register_names_are_symbols(self):
+        # AT&T: a bare sp and a bare x1 (no %) are symbols. "mov sp, %eax"
+        # loads the symbol into %eax, so the Intel-ordered form is
+        # (R32, M32), never Moffs.
+        uri = "file:///tmp/simdref_lsp_bare_sym.s"
+        self.server.open(uri, "asm", "mov sp, %eax\nmov x1, %eax\n")
+        hover_sp = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertIn("MOV (R32, M32)", hover_sp)
+        self.assertNotIn("Moffs", hover_sp)
+        hover_x1 = self.server.hover(uri, 1, 1)["contents"]["value"]
+        self.assertIn("MOV (R32, M32)", hover_x1)
+        self.assertNotIn("Moffs", hover_x1)
+
+    def test_intel_nop_hover_matches_the_hint(self):
+        # In an Intel .asm file "nop" must hover the x86 NOP, not AArch64.
+        # Hover and hint must name the same entry.
+        uri = "file:///tmp/simdref_lsp_nop.asm"
+        self.server.open(uri, "nasm", "nop\n")
+        hover = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(hover, "hover on nop returned null")
+        value = hover["contents"]["value"]
+        self.assertNotIn("A64", value)
+        self.assertIn("No Operation", value)
+        # The inlay hint must agree.
+        hint = self.server.hints(uri, 0, 1)
+        self.assertTrue(hint, "inlay hint for nop is empty")
+        hint_label = hint[0]["label"]
+        self.assertNotIn("A64", hint_label)
+        self.assertIn("No Operation", hint_label)
+
+    def test_att_bare_16_bit_register_names_are_symbols(self):
+        # In AT&T bare si/di/bp are symbols, same rule as bare sp.
+        uri = "file:///tmp/simdref_lsp_bare16.s"
+        self.server.open(uri, "asm", "mov si, %eax\nmov di, %eax\nmov bp, %eax\n")
+        for i in range(3):
+            hover = self.server.hover(uri, i, 1)["contents"]["value"]
+            self.assertIn("MOV (R32, M32)", hover, msg=f"line {i}: {hover}")
+            self.assertNotIn("Moffs", hover, msg=f"line {i}: {hover}")
+
+    def test_riscv_vector_lines_do_not_land_on_x86_or_arm(self):
+        # RISC-V vector: these lines must stay on RISC-V forms, not fall onto x86
+        # or AArch64 ADD/MOV forms.
+        uri = "file:///tmp/simdref_lsp_riscv.s"
+        self.server.open(uri, "asm", "vadd.vv v1, v2, v3\nvle32.v v1, (a0)\n")
+        hover_vadd = self.server.hover(uri, 0, 1)["contents"]["value"]
+        self.assertIn("vadd.vv", hover_vadd)
+        self.assertNotIn("ADD (R16", hover_vadd)
+        self.assertNotIn("ADD (R32", hover_vadd)
+        hover_vle = self.server.hover(uri, 1, 1)["contents"]["value"]
+        self.assertIn("vle32.v", hover_vle)
+        self.assertNotIn("ADD (R16", hover_vle)
+        self.assertNotIn("ADD (R32", hover_vle)
+
+    def test_arm_single_precision_scalar_lines_keep_their_arm_form(self):
+        # s0-s31 are AArch64 scalar FP registers. A bare s-register also reads
+        # as a RISC-V saved register. That is a weak vote, so the mnemonic's
+        # catalog rows arbitrate. An ARM-only mnemonic keeps its ARM form.
+        uri = "file:///tmp/simdref_lsp_arm_s.s"
+        lines = ("ldr s1, [x11], #4", "fneg s0, s1", "fmov s0, w1", "fmadd s0, s1, s2, s3")
+        self.server.open(uri, "asm", "\n".join(lines) + "\n")
+        for i, line in enumerate(lines):
+            with self.subTest(line=line):
+                self.assertIsNotNone(self.server.hover(uri, i, 1), f"{line} got no hover")
+        self.assertEqual(len(self.server.hints(uri)), len(lines))
+
+    def test_arm_double_precision_scalar_picks_the_scalar_form(self):
+        # d0-d31 are AArch64 64-bit scalar FP registers, not vectors. The
+        # numbered catalog placeholders D0 and D1 accept the same class.
+        uri = "file:///tmp/simdref_lsp_arm_d.s"
+        self.server.open(uri, "asm", "fneg d0, d1\n")
+        hover = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(hover, "fneg d0, d1 got no hover")
+        value = hover["contents"]["value"]
+        self.assertIn("FNEG (D0, D1)", value)
+        self.assertNotIn("T_OPTION", value)
+
+    def test_riscv_saved_registers_keep_the_riscv_form(self):
+        # A catalog with the RISC-V scalar rows shows the RISC-V form; without
+        # them these lines stay silent. No line names a foreign form.
+        uri = "file:///tmp/simdref_lsp_riscv_saved.s"
+        text = "addi s0, sp, 16\nsd s1, 8(sp)\n"
+        self.server.open(uri, "asm", text)
+        ops = ("addi", "sd")
+        for line, op in enumerate(ops):
+            with self.subTest(op=op):
+                hover = self.server.hover(uri, line, 1)
+                if _riscv_rows(op):
+                    self.assertIsNotNone(hover, f"{op} got no hover")
+                    self.assertEqual(hover["contents"]["value"].splitlines()[1], op)
+                else:
+                    self.assertIsNone(hover)
+        self.assertEqual(
+            [h["position"]["line"] for h in self.server.hints(uri)],
+            [line for line, op in enumerate(ops) if _riscv_rows(op)],
+        )
 
 
 class MissingCatalogTests(unittest.TestCase):

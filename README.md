@@ -72,7 +72,7 @@ simdref-lsp
 
 Editor clients, one for each editor:
 
-- Zed: [zed-simdref](https://github.com/simd-labs/zed-simdref)
+- Zed: [zed-asm-intrinsics](https://github.com/simd-labs/zed-asm-intrinsics)
 - VS Code: [vscode-simdref](https://github.com/simd-labs/vscode-simdref)
 - JetBrains: [jetbrains-simdref](https://github.com/simd-labs/jetbrains-simdref)
 - Neovim: [nvim-simdref](https://github.com/simd-labs/nvim-simdref)

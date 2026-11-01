@@ -707,11 +707,15 @@ def _select_instruction_variant(catalog, query: str, items):
     return None
 
 
+# shortcut: the name lookup answers only when byte identity has no row
+# (schema-13 catalogs or missing tools); remove it at the schema-14 data
+# release with simdref-llvm-mc on PyPI as a required dependency
 def _find_instructions_fast(query: str):
     ensure_runtime()
     with open_db() as conn:
         exact = load_instruction_from_db(conn, query)
-        if exact is not None:
+        # A bare-mnemonic exact hit falls through to the form candidates.
+        if exact is not None and exact.mnemonic.casefold() != query.strip().casefold():
             return [exact]
         parts = query.split()
         mnemonic = parts[0] if parts else query
@@ -1891,6 +1895,33 @@ def _build_llm_payload(
             **({"result": kept[0]} if kept else {"results": []}),
             **meta,
         }
+    # Byte identity wins over the name lookups below: a full assembly line
+    # resolves to the one row its bytes name.
+    from simdref.lsp import NO_CATALOG_ROW, identity_keys
+
+    keys = identity_keys([query_str], None, conn)
+    if keys[0] == NO_CATALOG_ROW:
+        # Identified form the catalog lacks (issue #49): report the miss by
+        # name, never join the line to a neighbour form's row.
+        mnemonic = query_str.split(None, 1)[0]
+        return {
+            "query": query_str,
+            "mode": "exact",
+            "match_kind": "instruction",
+            "detail": f"{mnemonic}: no measured row",
+            "results": [],
+            **meta,
+        }
+    if keys[0]:
+        item = load_instruction_from_db(conn, keys[0])
+        if item is not None:
+            return {
+                "query": query_str,
+                "mode": "exact",
+                "match_kind": "instruction",
+                "results": finish([_llm_instruction_payload(item)]),
+                **meta,
+            }
     instructions = _find_instructions_fast(query_str)
     if instructions:
         return {

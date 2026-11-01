@@ -8,6 +8,7 @@ production code never needs to know fixtures exist.
 
 from __future__ import annotations
 
+import os
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,9 @@ from simdref.riscv import (
 )
 
 FIXTURES_DIR: Path = Path(__file__).resolve().parent / "fixtures"
+
+# A version-stamp mismatch must not trigger a catalog download during tests.
+os.environ.setdefault("SIMDREF_SKIP_AUTOUPDATE", "1")
 
 
 def _iso_now() -> str:

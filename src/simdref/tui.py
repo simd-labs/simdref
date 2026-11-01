@@ -1803,7 +1803,7 @@ class SimdrefApp(App):
         meta.add_row("isa", display_isa(item.isa))
         meta.add_row("summary", item.summary or "-")
         for key, value in instruction_metadata_rows(item):
-            if key in {"isa"}:
+            if key in {"isa", "summary"}:
                 continue
             meta.add_row(key, value)
         payload.append(

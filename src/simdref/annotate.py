@@ -17,8 +17,9 @@ from enum import Enum
 from typing import Any, Iterable, Iterator
 
 from simdref import perf
+from simdref.lsp import NO_CATALOG_ROW, identity_keys
 from simdref.models import InstructionRecord
-from simdref.storage import load_instructions_by_mnemonic_from_db
+from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
 
 
 class LineKind(str, Enum):
@@ -410,6 +411,9 @@ def _operand_match_score(
     return score
 
 
+# shortcut: the form pick answers only when byte identity has no row
+# (schema-13 catalogs or missing tools); remove it at the schema-14 data
+# release with simdref-llvm-mc on PyPI as a required dependency
 def pick_record(
     records: list[InstructionRecord],
     *,
@@ -456,7 +460,9 @@ class PerfSummary:
 def _per_arch_value(details: dict[str, Any], value_fn) -> float | None:
     for v in value_fn(details):
         try:
-            return float(v)
+            # Latency ranges render as "min-max" strings (simdref#50); the
+            # float view takes the min so aggregates stay numeric.
+            return float(str(v).split("-", 1)[0])
         except (TypeError, ValueError):
             continue
     return None
@@ -679,22 +685,48 @@ def _annotate_instruction(
     conn: sqlite3.Connection,
     lookup_cache: dict[str, list[InstructionRecord]] | None = None,
     stats: dict[str, int] | None = None,
+    identity_key: str | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Return the rendered output line and an optional JSON record."""
-    if lookup_cache is not None:
-        records = lookup_cache.get(parsed.mnemonic)
-        if records is None:
-            # Module-level call (not a captured reference) so tests can
-            # keep monkeypatching ``annotate.lookup`` with a 2-arg fake.
-            records = lookup(parsed.mnemonic, conn)
-            lookup_cache[parsed.mnemonic] = records
-    else:
-        records = lookup(parsed.mnemonic, conn)
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
-        if records:
+    if identity_key == NO_CATALOG_ROW:
+        # Byte identity identified the form and the catalog has no row for
+        # it (issue #49: uops.info carries no AVX reg-reg VMOVAPD/VMOVUPS):
+        # report the miss by name, never guess a neighbour form below.
+        if stats is not None:
+            stats["no_row"] = stats.get("no_row", 0) + 1
+        no_row: dict[str, Any] = {
+            "mnemonic": parsed.mnemonic,
+            "known": False,
+            "no_measured_row": True,
+        }
+        if parsed.address is not None:
+            no_row["address"] = f"0x{parsed.address:x}"
+        if parsed.source_file:
+            no_row["source_file"] = parsed.source_file
+        if parsed.source_line is not None:
+            no_row["source_line"] = parsed.source_line
+        return f"{parsed.raw}   # {parsed.mnemonic}: no measured row", no_row
+    # Byte identity wins over the form pick: the record is what the line
+    # assembles to, and an empty row keeps the old pick unchanged.
+    record = load_instruction_from_db(conn, identity_key) if identity_key else None
+    if record is not None:
+        if stats is not None:
             stats["recognized"] = stats.get("recognized", 0) + 1
-    record = pick_record(records, arch=opts.arch, operands=parsed.operands)
+    else:
+        if lookup_cache is not None:
+            records = lookup_cache.get(parsed.mnemonic)
+            if records is None:
+                # Module-level call (not a captured reference) so tests can
+                # keep monkeypatching ``annotate.lookup`` with a 2-arg fake.
+                records = lookup(parsed.mnemonic, conn)
+                lookup_cache[parsed.mnemonic] = records
+        else:
+            records = lookup(parsed.mnemonic, conn)
+        if stats is not None and records:
+            stats["recognized"] = stats.get("recognized", 0) + 1
+        record = pick_record(records, arch=opts.arch, operands=parsed.operands)
 
     if record is None:
         if opts.unknown == "drop":
@@ -784,8 +816,29 @@ def annotate_stream(
     pending_src_line: int | None = None
     lookup_cache: dict[str, list[InstructionRecord]] = {}
 
-    for line in lines:
-        parsed = parse_asm_line(line, track_positions=opts.track_positions)
+    parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
+    # One llvm-mc run for the whole input: byte identity per instruction
+    # line. An objdump line assembles as its mnemonic and operands only, so
+    # the address and byte columns never reach the assembler.
+    items = [
+        (
+            index,
+            f"{parsed.mnemonic} {parsed.operands}".strip()
+            if parsed.address is not None
+            else parsed.raw,
+        )
+        for index, parsed in enumerate(parsed_lines)
+        if parsed.kind == LineKind.INSTRUCTION
+    ]
+    identity = {
+        index: key
+        for (index, _text), key in zip(
+            items, identity_keys([text for _index, text in items], None, conn)
+        )
+        if key
+    }
+
+    for index, parsed in enumerate(parsed_lines):
         if opts.track_positions:
             if parsed.kind == LineKind.INSTRUCTION:
                 parsed.source_file = pending_src_file
@@ -815,7 +868,9 @@ def annotate_stream(
             if not collecting_json:
                 yield parsed.raw + "\n"
             continue
-        out_line, record = _annotate_instruction(parsed, opts, conn, lookup_cache, stats)
+        out_line, record = _annotate_instruction(
+            parsed, opts, conn, lookup_cache, stats, identity_key=identity.get(index)
+        )
         if collecting_json:
             if record is not None:
                 json_records.append(record)

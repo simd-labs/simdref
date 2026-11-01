@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover
     HAS_TEXTUAL = False
 
 FIXTURE = Path(__file__).parent / "fixtures" / "b1" / "latency_pairs.json"
-EXPECTED_TEXT = "10-<=22 (xmm1->xmm0), <=8 (mem->xmm0), 13 (xmm0->xmm0, same reg 10)"
+EXPECTED_TEXT = "10-22 (xmm1->xmm0), <=8 (mem->xmm0), 13 (xmm0->xmm0, same reg 10)"
 
 
 def _fixture() -> dict:
@@ -60,7 +60,7 @@ class LatencyPairHelperTests(unittest.TestCase):
         self.assertEqual(
             pairs,
             [
-                {"start": "xmm1", "target": "xmm0", "value": "10-<=22"},
+                {"start": "xmm1", "target": "xmm0", "value": "10-22"},
                 {"start": "mem", "target": "xmm0", "value": "<=8"},
                 {"start": "xmm0", "target": "xmm0", "value": "13", "same_reg": "10"},
             ],
@@ -84,7 +84,7 @@ class CliSurfaceTests(unittest.TestCase):
         # Rich folds long pair strings over table rules; unwrap for matching.
         out = " ".join(capture.get().replace("│", " ").split())
         self.assertIn("latency per operand pair", out)
-        self.assertIn("10-<=22 (xmm1->xmm0)", out)
+        self.assertIn("10-22 (xmm1->xmm0)", out)
         self.assertIn("<=8 (mem->xmm0)", out)
         self.assertIn("same reg 10", out)
 
@@ -129,7 +129,7 @@ class TuiSurfaceTests(unittest.TestCase):
     def test_tui_detail_page_shows_pair_panel(self):
         out = self._pair_panel_text(_instruction())
         self.assertIn("latency per operand pair", out)
-        self.assertIn("10-<=22 (xmm1->xmm0)", out)
+        self.assertIn("10-22 (xmm1->xmm0)", out)
         self.assertIn("<=8 (mem->xmm0)", out)
 
     def test_tui_detail_without_pairs_has_no_pair_panel(self):
@@ -160,7 +160,7 @@ class ExportSurfaceTests(unittest.TestCase):
         self.assertEqual(
             rows[0]["latencyPairs"],
             [
-                {"start": "xmm1", "target": "xmm0", "value": "10-<=22"},
+                {"start": "xmm1", "target": "xmm0", "value": "10-22"},
                 {"start": "mem", "target": "xmm0", "value": "<=8"},
                 {"start": "xmm0", "target": "xmm0", "value": "13", "sameReg": "10"},
             ],

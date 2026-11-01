@@ -9,12 +9,14 @@ import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
+from simdref.display import _LEADING_INSTR_TAG_RE, strip_instruction_decorators
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
@@ -31,6 +33,7 @@ from simdref.riscv import parse_riscv_instruction_payload, parse_riscv_intrinsic
 _UOPS_METADATA_KEYS = frozenset(
     {"category", "cpl", "extension", "iclass", "iform", "url", "url-ref"}
 )
+_UOPS_SPLIT_ATTR_KEYS = ("agen", "eosz", "high8", "immzero", "mask", "zeroing")
 _UOPS_OPERAND_KEYS = ("idx", "r", "w", "type", "width", "xtype", "name", "suppressed")
 _ARM_ACLE_INTRINSIC_BASE_URL = (
     "https://developer.arm.com/architectures/instruction-sets/intrinsics/"
@@ -144,12 +147,13 @@ def _arm_instantiate_register_roles(text: str) -> str:
 
 
 @lru_cache(maxsize=128)
-def _normalize_operand_xtype(value: str) -> str:
+def _normalize_operand_xtype(value: str, width: str = "") -> str:
     xtype = value.strip()
     if not xtype:
         return xtype
     if xtype == "int":
-        return "i32"
+        # uops.info marks every scalar integer operand xtype=int; the width holds the size
+        return f"i{width}" if width in {"8", "16", "32", "64"} else "i32"
     match = re.fullmatch(r"\d+([iu]\d+)", xtype)
     if match:
         return match.group(1)
@@ -1049,19 +1053,46 @@ def parse_arm_sve_instruction_map(
     return records
 
 
-def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
-    records: list[InstructionRecord] = []
+def _normalize_uops_form(form: str) -> str:
+    """Strip uops.info display tags and opcode-map suffixes from a form.
+
+    ``ADD_01 (R16, R16)`` and ``MOVSD_XMM_0F10 (XMM, XMM)`` name one
+    opcode-map variant of the plain assembly form. The ``_EVEX`` marker
+    stays: it keeps EVEX and APX variants on rows of their own, so a hidden
+    APX-first variant never shadows the ordinary row.
+    """
+    head, sep, tail = form.partition(" ")
+    head = _LEADING_INSTR_TAG_RE.sub("", head)
+    head = re.sub(r"_[0-9A-F]{2,4}$", "", head)
+    return f"{head}{sep}{tail}".strip()
+
+
+def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], dict[int, str]]:
+    """Parse the uops.info XML into rows.
+
+    Returns the rows plus a map from each raw ``instruction`` element's
+    ordinal (among the mnemonic-bearing elements, in document order) to the
+    db_key of the row the parser assigned it to. The validator uses that map
+    so it never re-derives the record-to-row mapping.
+    """
+    groups: dict[str, list[tuple[InstructionRecord, str, int]]] = {}
+    raw_index = 0
     for node in _iter_xml_elements(source, "instruction"):
-        mnemonic = _intern_small((node.attrib.get("asm") or node.attrib.get("name") or "").strip())
+        mnemonic = _intern_small(
+            strip_instruction_decorators(
+                node.attrib.get("asm") or node.attrib.get("name") or ""
+            ).strip()
+        )
         if not mnemonic:
             continue
-        form = (
+        raw_form = (
             node.attrib.get("string")
             or node.attrib.get("form")
             or node.attrib.get("cpl")
             or node.attrib.get("category")
             or ""
         ).strip()
+        form = _normalize_uops_form(raw_form)
         raw_summary = node.attrib.get("summary", "").strip()
         isa = _normalize_isa(
             node.attrib.get("isa-set", "")
@@ -1078,12 +1109,22 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
             for key, value in node.attrib.items()
             if key in _UOPS_METADATA_KEYS
         }
+        # Variant-split attributes of the uops.info row (spec K1): the byte
+        # lookup narrows an iform pool with these, so they must ride on the
+        # row instead of the raw XML.
+        split_attrs = {
+            key: node.attrib[key].strip() for key in _UOPS_SPLIT_ATTR_KEYS if key in node.attrib
+        }
+        if split_attrs:
+            metadata["split_attrs"] = json.dumps(split_attrs, sort_keys=True)
         if raw_summary:
             metadata["uops_summary"] = raw_summary
         arch_details: dict[str, dict[str, Any]] = {}
         for child in node:
             if child.tag == "operand":
-                xtype = _normalize_operand_xtype(child.attrib.get("xtype", "").strip())
+                xtype = _normalize_operand_xtype(
+                    child.attrib.get("xtype", "").strip(), child.attrib.get("width", "").strip()
+                )
                 operand_payload = {
                     key: (
                         _intern_small(value.strip())
@@ -1122,21 +1163,75 @@ def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
                     elif grandchild.tag == "IACA":
                         arch_entry["iaca"].append(dict(grandchild.attrib))
                 arch_details[arch] = arch_entry
-        records.append(
-            InstructionRecord(
-                mnemonic=mnemonic,
-                form=form,
-                summary=_instruction_summary(
-                    mnemonic, raw_summary, operand_details, architecture="x86"
-                ),
-                architecture="x86",
-                isa=isa,
-                operand_details=operand_details,
-                metadata=metadata,
-                arch_details=arch_details,
-            )
+        record = InstructionRecord(
+            mnemonic=mnemonic,
+            form=form,
+            summary=_instruction_summary(
+                mnemonic, raw_summary, operand_details, architecture="x86"
+            ),
+            architecture="x86",
+            isa=isa,
+            operand_details=operand_details,
+            metadata=metadata,
+            arch_details=arch_details,
         )
-    return records
+        groups.setdefault(record.db_key, []).append((record, raw_form, raw_index))
+        raw_index += 1
+    records: list[InstructionRecord] = []
+    assignments: dict[int, str] = {}
+    used_keys = set(groups)
+    for rows in groups.values():
+        if len(rows) == 1:
+            record, _, node_index = rows[0]
+            records.append(record)
+            assignments[node_index] = record.db_key
+            continue
+        # Two raw records share a row only when iform, measurements and
+        # arch_details are identical. Variants whose data differs stay as
+        # rows of their own, named by the raw uops string the way the
+        # pre-normalization parser named them (VMOVAPD_28 (YMM, YMM) next
+        # to VMOVAPD (YMM, YMM)); measurement dicts are never merged.
+        seen: dict[tuple[str, str, str], int] = {}
+        partitions: list[tuple[InstructionRecord, str, list[int]]] = []
+        for record, node_raw_form, node_index in rows:
+            identity = (
+                record.metadata.get("iform", ""),
+                json.dumps(record.arch_details, sort_keys=True),
+                record.metadata.get("split_attrs", ""),
+            )
+            position = seen.get(identity)
+            if position is not None:
+                partitions[position][2].append(node_index)
+                continue
+            seen[identity] = len(partitions)
+            partitions.append((record, node_raw_form, [node_index]))
+        records.append(partitions[0][0])
+        for node_index in partitions[0][2]:
+            assignments[node_index] = partitions[0][0].db_key
+        for record, node_raw_form, node_indices in partitions[1:]:
+            head, sep, tail = node_raw_form.partition(" ")
+            candidate = f"{_LEADING_INSTR_TAG_RE.sub('', head)}{sep}{tail}".strip()
+            if not candidate or _uops_form_db_key(record, candidate) in used_keys:
+                candidate = f"{record.form} [{record.metadata.get('iform', '')}]"
+            while _uops_form_db_key(record, candidate) in used_keys:
+                candidate += "~"
+            candidate_key = _uops_form_db_key(record, candidate)
+            used_keys.add(candidate_key)
+            records.append(replace(record, form=candidate))
+            for node_index in node_indices:
+                assignments[node_index] = candidate_key
+    return records, assignments
+
+
+def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
+    return _parse_uops_xml_keyed(source)[0]
+
+
+def _uops_form_db_key(record: InstructionRecord, form: str) -> str:
+    key = form.strip() or record.mnemonic
+    if not key.casefold().startswith(record.mnemonic.casefold()):
+        key = f"{record.mnemonic} {key}".strip()
+    return f"{record.architecture}:{key.casefold()}"
 
 
 def _instruction_indexes(

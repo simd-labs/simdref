@@ -285,6 +285,45 @@ def _instruction_form(item: dict[str, Any], mnemonic: str) -> str:
     return mnemonic
 
 
+_RV_ENC_KEYED_RE = re.compile(
+    r"^[ ]{0,2}(RV32|RV64|RV32E|RV64E):[ \t]*\n((?:^[ ]{3,}.*\n?)*)", re.MULTILINE
+)
+_RV_ENC_MATCH_RE = re.compile(r"^[ \t]*match:[ \t]*\"?([01xX-]+)\"?", re.MULTILINE)
+
+
+def _rv_bits_to_ints(bits: str) -> tuple[int, int, int]:
+    mask = match = 0
+    for char in bits:
+        mask <<= 1
+        match <<= 1
+        if char == "1":
+            mask |= 1
+            match |= 1
+        elif char == "0":
+            mask |= 1
+    return len(bits), mask, match
+
+
+def _rv_encoding_patterns(block: str) -> list[list]:
+    """Parse a kept YAML encoding block into [base, bits, mask, match] rows.
+
+    A flat ``match:`` applies to every base; a per-base block (RV32/RV64/...)
+    yields one pattern per base named in the block.
+    """
+    patterns: list[list] = []
+    for keyed in _RV_ENC_KEYED_RE.finditer(block):
+        matched = _RV_ENC_MATCH_RE.search(keyed.group(2))
+        if matched:
+            bits, mask, match = _rv_bits_to_ints(matched.group(1).strip())
+            patterns.append([keyed.group(1), bits, mask, match])
+    if not patterns:
+        matched = _RV_ENC_MATCH_RE.search(block)
+        if matched:
+            bits, mask, match = _rv_bits_to_ints(matched.group(1).strip())
+            patterns.append(["", bits, mask, match])
+    return patterns
+
+
 def parse_riscv_instruction_payload(text: str) -> list[InstructionRecord]:
     payload = json.loads(text)
     docs_pages = _docs_page_map(payload)
@@ -331,40 +370,45 @@ def parse_riscv_instruction_payload(text: str) -> list[InstructionRecord]:
         if item.get("extension"):
             metadata.setdefault("extension", _string(item.get("extension")))
         description = _instruction_semantics(item, url, docs_pages)
-        records.append(
-            InstructionRecord(
-                mnemonic=mnemonic,
-                form=_instruction_form(item, mnemonic),
-                summary=_string(
-                    item.get("summary")
-                    or item.get("brief")
-                    or item.get("description_text")
-                    or f"{mnemonic} instruction."
-                ).rstrip(".")
-                + ".",
-                architecture="riscv",
-                isa=_normalize_isa(
-                    item.get("isa")
-                    or item.get("extensions")
-                    or item.get("extension")
-                    or metadata.get("extensions")
-                    or ["V"]
-                ),
-                operand_details=[
-                    {
-                        key: str(value).strip()
-                        for key, value in operand.items()
-                        if str(value).strip()
-                    }
-                    for operand in (item.get("operand_details") or [])
-                    if isinstance(operand, dict)
-                ],
-                metadata=metadata,
-                aliases=_string_list(item.get("aliases")),
-                description=description,
-                source="riscv-unified-db",
-            )
+        record = InstructionRecord(
+            mnemonic=mnemonic,
+            form=_instruction_form(item, mnemonic),
+            summary=_string(
+                item.get("summary")
+                or item.get("brief")
+                or item.get("description_text")
+                or f"{mnemonic} instruction."
+            ).rstrip(".")
+            + ".",
+            architecture="riscv",
+            isa=_normalize_isa(
+                item.get("isa")
+                or item.get("extensions")
+                or item.get("extension")
+                or metadata.get("extensions")
+                or ["V"]
+            ),
+            operand_details=[
+                {key: str(value).strip() for key, value in operand.items() if str(value).strip()}
+                for operand in (item.get("operand_details") or [])
+                if isinstance(operand, dict)
+            ],
+            metadata=metadata,
+            aliases=_string_list(item.get("aliases")),
+            description=description,
+            source="riscv-unified-db",
         )
+        # RVV masked/unmasked variants share one encoding (spec K3): the key
+        # lives on the base-instruction row only.
+        encoding_block = _string(item.get("encoding"))
+        if encoding_block and record.form == record.mnemonic:
+            patterns = _rv_encoding_patterns(encoding_block)
+            if patterns:
+                record.enc_bits = patterns[0][1]
+                record.enc_mask = patterns[0][2]
+                record.enc_match = patterns[0][3]
+                record.enc_extra = patterns
+        records.append(record)
     return records
 
 

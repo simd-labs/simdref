@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import random
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,30 @@ def test_schema_version_is_int(tmp_path: Path):
     export_site_data(_tiny_catalog(), tmp_path)
     stamp = json.loads((tmp_path / "build_stamp.json").read_text())
     assert isinstance(stamp["schema_version"], int)
+
+
+def test_gzip_output_is_reproducible(tmp_path: Path, monkeypatch):
+    # gzip headers carry the write time by default; mtime=0 keeps two exports
+    # of the same payloads byte-identical. The stamp time is frozen because
+    # built_at would differ legitimately between the two runs.
+    import simdref.export as export_module
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 1, 1, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(export_module, "datetime", _FrozenDateTime)
+    first, second = tmp_path / "first", tmp_path / "second"
+    export_site_data(_tiny_catalog(), first)
+    export_site_data(_tiny_catalog(), second)
+    gz_files = sorted(item.relative_to(first) for item in first.rglob("*.gz"))
+    assert gz_files  # positive control: an empty tree would pass vacuously
+    for relative in gz_files:
+        assert (first / relative).read_bytes() == (second / relative).read_bytes(), relative
+        # The header mtime field must read 0. Without it two exports in the
+        # same second would pass the byte compare even without the fix.
+        assert (first / relative).read_bytes()[4:8] == b"\x00\x00\x00\x00", relative
 
 
 @pytest.fixture(scope="module")
@@ -214,3 +239,79 @@ def test_columnar_intrinsics_roundtrip():
     entries = _search_intrinsics(catalog, instr_perf)
     assert entries  # positive control: an empty fixture would pass vacuously
     assert _decode_intrinsics(_columnar_intrinsics(entries)) == entries
+
+
+# ---------------------------------------------------------------------------
+# search-index-encodings.json: the byte-identity shard the web repo uses to
+# re-implement asm_identity from export output (schema 14 catalogs only).
+# ---------------------------------------------------------------------------
+
+_ENC_ALLOWED_KEYS = {
+    "key",
+    "arch",
+    "enc_bits",
+    "enc_mask",
+    "enc_match",
+    "enc_extra",
+    "iform",
+    "split_attrs",
+}
+
+
+def test_encodings_shard_matches_records(tmp_path: Path):
+    catalog = build_fixture_catalog()
+    # The fixture pipeline sets x86 iform metadata but no bit patterns; give
+    # one arm row a pattern and one riscv row enc_extra so the schema-14 gate
+    # opens, and tag one x86 row with split_attrs.
+    arm = next(item for item in catalog.instructions if item.architecture == "arm")
+    arm.enc_bits, arm.enc_mask, arm.enc_match = 32, 0xFFFF0000, 0x14000000
+    riscv = next(item for item in catalog.instructions if item.architecture == "riscv")
+    riscv.enc_bits, riscv.enc_mask, riscv.enc_match = 16, 0xE003, 0x9002
+    riscv.enc_extra = [["", 16, 0xE003, 0x9002]]
+    x86 = next(item for item in catalog.instructions if item.metadata.get("iform"))
+    x86.metadata["split_attrs"] = '{"immzero": "1"}'
+    export_site_data(catalog, tmp_path)
+    enc_path = tmp_path / "search-index-encodings.json"
+    assert enc_path.exists()
+    entries = json.loads(enc_path.read_text())
+    assert entries  # positive control: the injected rows must appear
+    keys = [entry["key"] for entry in entries]
+    assert keys == sorted(keys)
+    assert len(keys) == len(set(keys))
+    for entry in entries:
+        assert set(entry) <= _ENC_ALLOWED_KEYS, entry
+        assert entry["arch"] and entry["key"].split(":", 1)[0] in ("x86", "arm", "riscv")
+    # Every entry resolves in the instruction shard (0 misses).
+    shard = json.loads((tmp_path / "search-index-instructions.json").read_text())
+    resolved = {row["key"] for row in _decode_instructions(shard)}
+    missing = [key for key in keys if key not in resolved]
+    assert not missing, f"{len(missing)} encodings keys missing from the instruction shard"
+    # The fixture pipeline tags x86 rows with an iform and no bit pattern.
+    iform_rows = {entry["key"]: entry["iform"] for entry in entries if "iform" in entry}
+    assert iform_rows["x86:addps (xmm, xmm)"] == "ADDPS_XMMps_XMMps"
+    by_key = {entry["key"]: entry for entry in entries}
+    assert by_key[arm.db_key] == {
+        "key": arm.db_key,
+        "arch": "aarch64",
+        "enc_bits": 32,
+        "enc_mask": 0xFFFF0000,
+        "enc_match": 0x14000000,
+    }
+    # enc_extra keeps its parsed [base, bits, mask, match] shape.
+    assert by_key[riscv.db_key]["enc_extra"] == [["", 16, 0xE003, 0x9002]]
+    # split_attrs is a parsed object, not the raw metadata string.
+    assert by_key[x86.db_key]["split_attrs"] == {"immzero": "1"}
+
+
+def test_encodings_shard_absent_without_encoding_data(tmp_path: Path):
+    # No bit patterns anywhere, as on a schema-13 catalog: no file, no error.
+    catalog = build_fixture_catalog()
+    for item in catalog.instructions:
+        item.enc_bits = item.enc_mask = item.enc_match = 0
+        item.enc_extra = []
+    enc_path = tmp_path / "search-index-encodings.json"
+    enc_path.write_bytes(b"[]")  # stale shard a re-export must remove
+    export_site_data(catalog, tmp_path)
+    assert not enc_path.exists()
+    assert not Path(f"{enc_path}.gz").exists()
+    assert (tmp_path / "search-index-instructions.json").exists()

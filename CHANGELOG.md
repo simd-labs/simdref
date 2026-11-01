@@ -20,6 +20,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `amd_ops_per_cycle` value, and Intel guide round/SAE note text lands on
   the intrinsics that reference it.
 
+## [0.0.15], 2026-10-31
+
+### Fixed
+
+- `isa annotate` and the perf tables show the latency of rows whose source
+  gives a min/max range, for example `VDIVSD` on MTL-P and ADL-P. These
+  rows showed `lat=-` before.
+- Byte identity can identify an instruction whose form has no catalog row,
+  for example register-register `vmovapd`. `isa annotate`, LSP hover and
+  inlay hints, and `simdref llm query` then report no measured row by name.
+  They no longer join the line to a neighbour form. The operand matcher
+  still answers where byte identity could not run.
+
+## [0.0.14], 2026-10-31
+
+### Added
+
+- LSP hover and inlay hints resolve each assembly line to one catalog row by
+  its encoded bytes: llvm-mc encodes the line, and XED decodes x86 bytes.
+  Both tools come from the pinned `simdref-llvm-mc` dependency where its
+  wheels ship. `SIMDREF_LLVM_MC` and `SIMDREF_XED` override the bundled
+  tools. Platforms without wheels keep the operand matcher.
+- Catalog schema 14 stores the encoding keys this lookup reads. These
+  appear in the next release and then after `isa update`.
+
+### Fixed
+
+- `simdref export` writes gzip files with mtime 0. Two exports of the same
+  catalog now give identical bytes.
+- The catalog loaders skip record fields they do not know, such as
+  `enc_id`. Before, a newer catalog raised a `TypeError` on load.
+- LSP hover shows the instruction page as editors render Markdown. `Operation`
+  and `Intrinsic Equivalents` are code blocks, and description lines keep their
+  line breaks. The perf table shows `*` in port strings as text, not as
+  emphasis. The `isa` row shows once, also in the terminal view. The footer
+  keeps only the full-page link, because the rows above already give the
+  source URLs.
+- CI builds the catalog from a pinned `riscv-unified-db` commit. Upstream
+  added `Zvdot4a8i` with no Operation text, and the RISC-V operation coverage
+  gate fell from 0.606 to 0.598. The coverage audit still follows upstream
+  HEAD.
+- RISC-V vector instructions from extensions with no docs.riscv.org page
+  (`Zvabd`, `Zvdot4a8i`, `Zvzip`, `Zvfofp4min`, `Zvfofp8min`, `Zvfbdota32f`)
+  link to their `riscv-unified-db` YAML file. Before, they linked to the V
+  spec page, which does not describe them.
+- Hover and inlay hints now resolve AT&T zero extend and sign extend names such as `movzbl` and `movslq` to Intel MOVZX and MOVSX rows. `movzbl (%rax), %edx` picks the 8 to 32 bit zero extend form.
+- AArch64 shift and extend suffixes now count as part of the last register operand. `add x0, x1, x2, lsl #2` picks the shifted register form instead of an SVE four operand row.
+- AArch64 index mode and immediate forms now match correctly. `ldr s1, [x11], #4` picks the post index row and `mov w0, #0x10` hovers the MOVZ alias.
+- Intel memory operands now read size keywords. `mov byte ptr [rax], 1` picks the 8 bit form.
+- Shared register names no longer match the wrong architecture. A line such as `add s0, s1, s2` shows nothing when no architecture has an accepting form.
+- AArch64 `#` immediates now survive the comment strip. `ldr s1, [x11], #4` keeps the `#4` and picks the post index form.
+- The catalog now fills x86 MOVSD_XMM (XMM, XMM) and ADD (R16, R16) gaps and includes RISC-V scalar instructions. It also maps AArch64 FPFAR rules to scalar FP registers. These appear in the next release and then after `isa update`.
+
+### Known limits
+
+- Three SVE predicate lines pick a wrong row: `ptest p0, p1.b` picks x86 PTEST, `ptrue p0.b` picks predicate-counter PTRUE, and `rev p0.b, p0.b` picks GPR REV.
+
+## [0.0.13], 2026-10-27
+
 ### Fixed
 
 - A failed catalog auto-update (for example when offline) no longer stamps the
@@ -28,7 +87,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hover and inlay hints now resolve AT&T size-suffixed mnemonics such as
   `xorl`, `addq` and `cmpq` to the base instruction. They use the suffix and
   the line operands to pick the form, so `add $8, %rax` no longer shows the
-  8-bit form and `jmp .L2` no longer shows the memory form.
+  8-bit form.
+- LSP hover and inlay hints decide the architecture of each line once and rank
+  the operand forms with one key. The architectures are x86 AT&T, x86 Intel,
+  AArch64, ARM32 and RISC-V. This fixes the 16-bit `sp`, `bp`, `si` and `di`
+  forms (#40), the operand order of loads and stores (#41), the `I8` shift
+  form instead of the fixed `1` form (#42) and x86 entries on RISC-V word
+  instructions (#43). It also fixes the forms for `movsd`, `cmpsd`, `lea`,
+  `vpermilps`, `pinsrw`, `vinsertf128`, `vpmovzxbw` and `vpsllq`, and for
+  AArch64 vector and `fp` lines.
+- Generated x86 summaries name the real integer width (16, 32 or 64 bits).
+  Before, they always said 32-bit. The change shows after the next catalog
+  update (`isa update`).
 
 ## [0.0.12], 2026-10-07
 

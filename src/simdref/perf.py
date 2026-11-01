@@ -94,8 +94,11 @@ def latency_cycle_values(latencies: list[dict[str, Any]]) -> list[str]:
     """Collect unique cycle-count strings from a list of latency dicts.
 
     Each *latency* dict may contain keys like ``cycles``, ``cycles_mem``,
-    ``cycles_addr``, or ``cycles_addr_index``.  Values are collected in
-    order, skipping duplicates.
+    ``cycles_addr``, or ``cycles_addr_index``. uops.info divide/sqrt
+    measurements carry a ``min_cycles`` / ``max_cycles`` pair instead (and
+    ``_mem`` / ``_addr`` / ``_addr_index`` variants); a pair renders as one
+    range string (``"13"`` when equal, ``"13-15"`` otherwise). Values are
+    collected in order, skipping duplicates.
 
     Returns:
         De-duplicated list of cycle-count strings (may be empty).
@@ -111,6 +114,23 @@ def latency_cycle_values(latencies: list[dict[str, Any]]) -> list[str]:
                 # uops.info convention: cycles_mem=0 with the upper-bound flag
                 # is a "not measured" marker, not a real zero-cycle latency.
                 continue
+            if value not in values:
+                values.append(value)
+        for suffix in ("", "_mem", "_addr", "_addr_index"):
+            low = latency.get("min_cycles" + suffix, "")
+            high = latency.get("max_cycles" + suffix, "")
+            if not low and not high:
+                continue
+            low_only = low or high
+            if (
+                suffix == "_mem"
+                and latency.get("min_cycles_mem_is_upper_bound") == "1"
+                and _is_numeric(low_only)
+                and float(low_only) == 0
+            ):
+                # Same not-measured convention as cycles_mem=0 above.
+                continue
+            value = f"{low}-{high}" if low and high and low != high else low_only
             if value not in values:
                 values.append(value)
     return values
@@ -308,28 +328,34 @@ _GPR_LABELS = {"32": "r32"}
 def _pair_value(latency: dict[str, Any]) -> str | None:
     """One bounded cycle string for a latency entry (``"3"``, ``"3-5"``, ``"<=7"``).
 
-    Range rows (``min_cycles``/``max_cycles``) join the bounds with ``-``.
-    A bound flagged ``*_is_upper_bound`` gets the ``<=`` mark uops.info
-    shows. Returns ``None`` when the entry has no cycle data.
+    Range rows (``min_cycles``/``max_cycles``) use the same reading as
+    ``latency_cycle_values``: ``"13"`` when the bounds match, ``"13-15"``
+    otherwise, one bound alone when only one is present. A plain key
+    flagged ``*_is_upper_bound`` gets the ``<=`` mark uops.info shows.
+    Returns ``None`` when the entry has no cycle data.
     """
     mem_is_upper = latency.get("cycles_mem_is_upper_bound") == "1"
     for key in _LATENCY_VALUE_KEYS:
         value = latency.get(key)
-        if value:
-            if key == "cycles_mem" and mem_is_upper and _is_numeric(value) and float(value) == 0:
-                # Same "not measured" zero convention as latency_cycle_values.
-                continue
+        if value and not (
+            key == "cycles_mem" and mem_is_upper and _is_numeric(value) and float(value) == 0
+        ):
             if latency.get(f"{key}_is_upper_bound") == "1":
                 return f"<={value}"
             return value
         lo = latency.get(f"min_{key}")
         hi = latency.get(f"max_{key}")
         if lo or hi:
-            lo_t = f"<={lo}" if lo and latency.get(f"min_{key}_is_upper_bound") == "1" else lo
-            hi_t = f"<={hi}" if hi and latency.get(f"max_{key}_is_upper_bound") == "1" else hi
-            if lo and hi:
-                return f"{lo_t}-{hi_t}"
-            return f"{lo_t}-" if lo else f"-{hi_t}"
+            low_only = lo or hi
+            if (
+                key == "cycles_mem"
+                and latency.get("min_cycles_mem_is_upper_bound") == "1"
+                and _is_numeric(low_only)
+                and float(low_only) == 0
+            ):
+                # Same not-measured zero convention as latency_cycle_values.
+                continue
+            return f"{lo}-{hi}" if lo and hi and lo != hi else low_only
     return None
 
 

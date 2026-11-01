@@ -8,7 +8,7 @@ holding thousands of records.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 from simdref.pdfrefs import apply_legacy_pdf_metadata, normalize_pdf_refs
@@ -107,6 +107,14 @@ class InstructionRecord:
     description: dict[str, str] = field(default_factory=dict)
     pdf_refs: list[dict[str, str]] = field(default_factory=list)
     source: str = "uops.info"
+    # Byte-identity encoding key (spec K2/K3): fixed bits of the upstream
+    # encoding pattern. enc_extra holds alternate patterns for other bases,
+    # e.g. a RISC-V instruction whose RV32 and RV64 match strings differ:
+    # [[base, bits, mask, match], ...].
+    enc_bits: int = 0
+    enc_mask: int = 0
+    enc_match: int = 0
+    enc_extra: list[list[Any]] = field(default_factory=list)
     _search_blob: str = field(default="", repr=False)
     _key: str = field(default="", init=False, repr=False)
     _db_key: str = field(default="", init=False, repr=False)
@@ -187,19 +195,25 @@ class InstructionRecord:
             "description": self.description,
             "pdf_refs": self.pdf_refs,
             "source": self.source,
+            "enc_bits": self.enc_bits,
+            "enc_mask": self.enc_mask,
+            "enc_match": self.enc_match,
+            "enc_extra": self.enc_extra,
         }
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "InstructionRecord":
         data = dict(payload)
-        data.pop("metrics", None)
-        data.pop("operands", None)
         data.setdefault("architecture", "x86")
         data.setdefault("description", {})
         metadata = dict(data.get("metadata") or {})
         data["metadata"] = metadata
         data["pdf_refs"] = normalize_pdf_refs(data.get("pdf_refs"), metadata)
-        return cls(**data)
+        # Keep only known fields. A catalog a newer simdref built can carry
+        # fields this version does not know (enc_id); so did legacy payloads
+        # (metrics, operands). Otherwise the load dies with a TypeError.
+        known = {item.name for item in fields(cls)}
+        return cls(**{key: value for key, value in data.items() if key in known})
 
 
 @dataclass(slots=True)

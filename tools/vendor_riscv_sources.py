@@ -25,6 +25,21 @@ INTRINSIC_SIGNATURE_RE = re.compile(
     re.DOTALL,
 )
 POLICY_SUFFIXES = ("_tumu", "_tum", "_mu", "_tu")
+# Whole mnemonics only: a letter prefix also caught sh1add, sha256*, sctrclr, vsetvli and vslide*.
+LOAD_STORE_RE = re.compile(
+    r"(?:lb|lh|lw|ld|lbu|lhu|lwu|sb|sh|sw|sd"
+    r"|(?:lr|sc)\.[wdq]"
+    r"|amo[a-z0-9]+\.[bhwdq]"
+    r"|(?:flh|flw|fld|flq|fsh|fsw|fsd|fsq)"
+    r"|(?:vl|vs)(?:m|[1248]r|[1248]re\d+|e\d+(?:ff)?|se\d+|(?:ux|ox)ei\d+"
+    r"|sseg\d+e\d+|seg\d+e\d+(?:ff)?|(?:ux|ox)seg\d+ei\d+)\.v"
+    r"|c\.(?:flwsp|fswsp|fldsp|fsdsp|flw|fsw|fld|fsd"
+    r"|lbu|lhu|lwsp|ldsp|swsp|sdsp|lh|lw|ld|sb|sh|sw|sd)"
+    r"|hlvx\.(?:hu|wu)|hlv\.(?:b|bu|h|hu|w|wu|d)|hsv\.(?:b|h|w|d)"
+    r"|cbo\.(?:clean|flush|inval|zero)"
+    r"|prefetch\.[irw]"
+    r")(?:\.(?:aq|rl|aqrl))?$"
+)
 
 
 def git_rev(repo: Path) -> str:
@@ -69,7 +84,7 @@ def instruction_category(mnemonic: str, isa: list[str]) -> str:
         return "Vector Crypto"
     if any(token.startswith("zvfbf") for token in isa_tokens):
         return "BFloat16"
-    if lowered.startswith(("vl", "vs")):
+    if LOAD_STORE_RE.fullmatch(lowered):
         return "Loads and Stores"
     if lowered.startswith("vm") and ".m" in lowered:
         return "Mask Operations"
@@ -84,22 +99,29 @@ def instruction_category(mnemonic: str, isa: list[str]) -> str:
     return "Arithmetic"
 
 
-def instruction_doc_url(isa: list[str]) -> str:
+def instruction_doc_url(isa: list[str], source_url: str) -> str:
     lowered = {token.casefold() for token in isa}
     if any(token.startswith("zvfbf") for token in lowered):
         return BFLOAT16_DOC_URL
     if any(token.startswith("zvk") or token in {"zvbb", "zvbc"} for token in lowered):
         return VECTOR_CRYPTO_DOC_URL
-    return V_DOC_URL
+    if "v" in lowered:
+        return V_DOC_URL
+    # Newer vector extensions (Zvabd, Zvdot4a8i, ...) have no docs.riscv.org page.
+    return source_url
 
 
-def parse_instruction_file(path: Path) -> dict[str, object]:
+def parse_instruction_file(path: Path, source_url: str) -> dict[str, object]:
     text = path.read_text()
     mnemonic = extract_yaml_scalar(text, "name").casefold()
     if not mnemonic:
         return {}
     description = extract_yaml_block(text, "description")
     operation = extract_yaml_block(text, "operation()")
+    # Keep the encoding block (per-base match strings): the byte-identity
+    # lookup keys rows on it (spec K3).
+    match = re.search(r"^encoding:\s*\n(?P<body>(?:^[ ]+.*\n?)*)", text, re.MULTILINE)
+    encoding = match.group("body").strip("\n") if match else ""
     long_name = extract_yaml_scalar(text, "long_name")
     extension_match = re.search(r"definedBy:\n(?:^[ ]+.*\n)*?^\s+name:\s*(.+)$", text, re.MULTILINE)
     extension = normalize_extension(
@@ -113,19 +135,15 @@ def parse_instruction_file(path: Path) -> dict[str, object]:
         "operation": operation.strip(),
         "isa": isa,
         "category": instruction_category(mnemonic, isa),
-        "url": instruction_doc_url(isa),
+        "url": instruction_doc_url(isa, source_url),
         "extension": extension,
+        "encoding": encoding,
     }
 
 
-def iter_vector_instruction_files(udb_root: Path) -> list[Path]:
+def iter_instruction_files(udb_root: Path) -> list[Path]:
     inst_root = udb_root / "spec" / "std" / "isa" / "inst"
-    files: list[Path] = []
-    for path in inst_root.rglob("*.yaml"):
-        extension_dir = path.parent.name
-        if extension_dir.startswith(("V", "Zv", "Zve")):
-            files.append(path)
-    return sorted(files)
+    return sorted(inst_root.rglob("*.yaml"))
 
 
 def infer_intrinsic_policy(name: str) -> tuple[str, str]:
@@ -277,6 +295,7 @@ def synthesize_instruction_records(
                     "metadata": metadata,
                     "policy": policy,
                     "masking": masking,
+                    "encoding": str(base.get("encoding") or ""),
                 }
             )
     return records
@@ -359,8 +378,9 @@ def build_intrinsics_bundle(
 
 def collect_base_instructions(udb_root: Path) -> dict[str, dict[str, object]]:
     instructions: dict[str, dict[str, object]] = {}
-    for path in iter_vector_instruction_files(udb_root):
-        parsed = parse_instruction_file(path)
+    blob = f"{UDB_PROJECT_URL}/blob/{git_rev(udb_root)}"
+    for path in iter_instruction_files(udb_root):
+        parsed = parse_instruction_file(path, f"{blob}/{path.relative_to(udb_root).as_posix()}")
         if not parsed:
             continue
         mnemonic = str(parsed["mnemonic"])

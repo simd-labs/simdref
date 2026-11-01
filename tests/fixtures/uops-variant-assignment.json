@@ -1,0 +1,1436 @@
+{
+ "ADC (R16, R16)": [
+  "ADC_GPRv_GPRv_11",
+  [
+   18846
+  ]
+ ],
+ "ADC (R32, R32)": [
+  "ADC_GPRv_GPRv_11",
+  [
+   18847
+  ]
+ ],
+ "ADC (R64, R64)": [
+  "ADC_GPRv_GPRv_11",
+  [
+   18848
+  ]
+ ],
+ "ADC (R8h, R8h)": [
+  "ADC_GPR8_GPR8_10",
+  [
+   18842
+  ]
+ ],
+ "ADC (R8h, R8l)": [
+  "ADC_GPR8_GPR8_10",
+  [
+   18843
+  ]
+ ],
+ "ADC (R8l, R8h)": [
+  "ADC_GPR8_GPR8_10",
+  [
+   18844
+  ]
+ ],
+ "ADC (R8l, R8l)": [
+  "ADC_GPR8_GPR8_10",
+  [
+   18845
+  ]
+ ],
+ "ADC_12 (R8h, R8h)": [
+  "ADC_GPR8_GPR8_12",
+  [
+   18849
+  ]
+ ],
+ "ADC_12 (R8h, R8l)": [
+  "ADC_GPR8_GPR8_12",
+  [
+   18850
+  ]
+ ],
+ "ADC_12 (R8l, R8h)": [
+  "ADC_GPR8_GPR8_12",
+  [
+   18851
+  ]
+ ],
+ "ADC_12 (R8l, R8l)": [
+  "ADC_GPR8_GPR8_12",
+  [
+   18852
+  ]
+ ],
+ "ADC_13 (R16, R16)": [
+  "ADC_GPRv_GPRv_13",
+  [
+   18853
+  ]
+ ],
+ "ADC_13 (R32, R32)": [
+  "ADC_GPRv_GPRv_13",
+  [
+   18854
+  ]
+ ],
+ "ADC_13 (R64, R64)": [
+  "ADC_GPRv_GPRv_13",
+  [
+   18855
+  ]
+ ],
+ "ADD (R16, R16)": [
+  "ADD_GPRv_GPRv_01",
+  [
+   18917
+  ]
+ ],
+ "ADD (R32, R32)": [
+  "ADD_GPRv_GPRv_01",
+  [
+   18918
+  ]
+ ],
+ "ADD (R64, R64)": [
+  "ADD_GPRv_GPRv_01",
+  [
+   18919
+  ]
+ ],
+ "ADD (R8h, R8h)": [
+  "ADD_GPR8_GPR8_00",
+  [
+   18913
+  ]
+ ],
+ "ADD (R8h, R8l)": [
+  "ADD_GPR8_GPR8_00",
+  [
+   18914
+  ]
+ ],
+ "ADD (R8l, R8h)": [
+  "ADD_GPR8_GPR8_00",
+  [
+   18915
+  ]
+ ],
+ "ADD (R8l, R8l)": [
+  "ADD_GPR8_GPR8_00",
+  [
+   18916
+  ]
+ ],
+ "ADD_02 (R8h, R8h)": [
+  "ADD_GPR8_GPR8_02",
+  [
+   18920
+  ]
+ ],
+ "ADD_02 (R8h, R8l)": [
+  "ADD_GPR8_GPR8_02",
+  [
+   18921
+  ]
+ ],
+ "ADD_02 (R8l, R8h)": [
+  "ADD_GPR8_GPR8_02",
+  [
+   18922
+  ]
+ ],
+ "ADD_02 (R8l, R8l)": [
+  "ADD_GPR8_GPR8_02",
+  [
+   18923
+  ]
+ ],
+ "ADD_03 (R16, R16)": [
+  "ADD_GPRv_GPRv_03",
+  [
+   18924
+  ]
+ ],
+ "ADD_03 (R32, R32)": [
+  "ADD_GPRv_GPRv_03",
+  [
+   18925
+  ]
+ ],
+ "ADD_03 (R64, R64)": [
+  "ADD_GPRv_GPRv_03",
+  [
+   18926
+  ]
+ ],
+ "AND (R16, R16)": [
+  "AND_GPRv_GPRv_21",
+  [
+   18988
+  ]
+ ],
+ "AND (R32, R32)": [
+  "AND_GPRv_GPRv_21",
+  [
+   18989
+  ]
+ ],
+ "AND (R64, R64)": [
+  "AND_GPRv_GPRv_21",
+  [
+   18990
+  ]
+ ],
+ "AND (R8h, R8h)": [
+  "AND_GPR8_GPR8_20",
+  [
+   18984
+  ]
+ ],
+ "AND (R8h, R8l)": [
+  "AND_GPR8_GPR8_20",
+  [
+   18985
+  ]
+ ],
+ "AND (R8l, R8h)": [
+  "AND_GPR8_GPR8_20",
+  [
+   18986
+  ]
+ ],
+ "AND (R8l, R8l)": [
+  "AND_GPR8_GPR8_20",
+  [
+   18987
+  ]
+ ],
+ "AND_22 (R8h, R8h)": [
+  "AND_GPR8_GPR8_22",
+  [
+   18991
+  ]
+ ],
+ "AND_22 (R8h, R8l)": [
+  "AND_GPR8_GPR8_22",
+  [
+   18992
+  ]
+ ],
+ "AND_22 (R8l, R8h)": [
+  "AND_GPR8_GPR8_22",
+  [
+   18993
+  ]
+ ],
+ "AND_22 (R8l, R8l)": [
+  "AND_GPR8_GPR8_22",
+  [
+   18994
+  ]
+ ],
+ "AND_23 (R16, R16)": [
+  "AND_GPRv_GPRv_23",
+  [
+   18995
+  ]
+ ],
+ "AND_23 (R32, R32)": [
+  "AND_GPRv_GPRv_23",
+  [
+   18996
+  ]
+ ],
+ "AND_23 (R64, R64)": [
+  "AND_GPRv_GPRv_23",
+  [
+   18997
+  ]
+ ],
+ "BNDCL_B (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21120
+  ]
+ ],
+ "BNDCL_B_D32 (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21121
+  ]
+ ],
+ "BNDCL_B_D8 (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21122
+  ]
+ ],
+ "BNDCL_B_I (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21123
+  ]
+ ],
+ "BNDCL_B_IS (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21124
+  ]
+ ],
+ "BNDCL_B_IS_D32 (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21125
+  ]
+ ],
+ "BNDCL_B_IS_D8 (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21126
+  ]
+ ],
+ "BNDCL_B_I_D32 (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21127
+  ]
+ ],
+ "BNDCL_B_I_D8 (BND)": [
+  "BNDCL_BND_AGEN",
+  [
+   21128
+  ]
+ ],
+ "BNDCN_B (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21134
+  ]
+ ],
+ "BNDCN_B_D32 (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21135
+  ]
+ ],
+ "BNDCN_B_D8 (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21136
+  ]
+ ],
+ "BNDCN_B_I (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21137
+  ]
+ ],
+ "BNDCN_B_IS (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21138
+  ]
+ ],
+ "BNDCN_B_IS_D32 (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21139
+  ]
+ ],
+ "BNDCN_B_IS_D8 (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21140
+  ]
+ ],
+ "BNDCN_B_I_D32 (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21141
+  ]
+ ],
+ "BNDCN_B_I_D8 (BND)": [
+  "BNDCN_BND_AGEN",
+  [
+   21142
+  ]
+ ],
+ "BNDCU_B (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21148
+  ]
+ ],
+ "BNDCU_B_D32 (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21149
+  ]
+ ],
+ "BNDCU_B_D8 (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21150
+  ]
+ ],
+ "BNDCU_B_I (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21151
+  ]
+ ],
+ "BNDCU_B_IS (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21152
+  ]
+ ],
+ "BNDCU_B_IS_D32 (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21153
+  ]
+ ],
+ "BNDCU_B_IS_D8 (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21154
+  ]
+ ],
+ "BNDCU_B_I_D32 (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21155
+  ]
+ ],
+ "BNDCU_B_I_D8 (BND)": [
+  "BNDCU_BND_AGEN",
+  [
+   21156
+  ]
+ ],
+ "BNDMK_B (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21162
+  ]
+ ],
+ "BNDMK_B_D32 (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21163
+  ]
+ ],
+ "BNDMK_B_D8 (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21164
+  ]
+ ],
+ "BNDMK_B_I (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21165
+  ]
+ ],
+ "BNDMK_B_IS (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21166
+  ]
+ ],
+ "BNDMK_B_IS_D32 (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21167
+  ]
+ ],
+ "BNDMK_B_IS_D8 (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21168
+  ]
+ ],
+ "BNDMK_B_I_D32 (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21169
+  ]
+ ],
+ "BNDMK_B_I_D8 (BND)": [
+  "BNDMK_BND_AGEN",
+  [
+   21170
+  ]
+ ],
+ "CMP (R16, R16)": [
+  "CMP_GPRv_GPRv_39",
+  [
+   19309
+  ]
+ ],
+ "CMP (R32, R32)": [
+  "CMP_GPRv_GPRv_39",
+  [
+   19310
+  ]
+ ],
+ "CMP (R64, R64)": [
+  "CMP_GPRv_GPRv_39",
+  [
+   19311
+  ]
+ ],
+ "CMP (R8h, R8h)": [
+  "CMP_GPR8_GPR8_38",
+  [
+   19305
+  ]
+ ],
+ "CMP (R8h, R8l)": [
+  "CMP_GPR8_GPR8_38",
+  [
+   19306
+  ]
+ ],
+ "CMP (R8l, R8h)": [
+  "CMP_GPR8_GPR8_38",
+  [
+   19307
+  ]
+ ],
+ "CMP (R8l, R8l)": [
+  "CMP_GPR8_GPR8_38",
+  [
+   19308
+  ]
+ ],
+ "CMP_3A (R8h, R8h)": [
+  "CMP_GPR8_GPR8_3A",
+  [
+   19312
+  ]
+ ],
+ "CMP_3A (R8h, R8l)": [
+  "CMP_GPR8_GPR8_3A",
+  [
+   19313
+  ]
+ ],
+ "CMP_3A (R8l, R8h)": [
+  "CMP_GPR8_GPR8_3A",
+  [
+   19314
+  ]
+ ],
+ "CMP_3A (R8l, R8l)": [
+  "CMP_GPR8_GPR8_3A",
+  [
+   19315
+  ]
+ ],
+ "CMP_3B (R16, R16)": [
+  "CMP_GPRv_GPRv_3B",
+  [
+   19316
+  ]
+ ],
+ "CMP_3B (R32, R32)": [
+  "CMP_GPRv_GPRv_3B",
+  [
+   19317
+  ]
+ ],
+ "CMP_3B (R64, R64)": [
+  "CMP_GPRv_GPRv_3B",
+  [
+   19318
+  ]
+ ],
+ "LEA_B (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19482
+  ]
+ ],
+ "LEA_B (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19483
+  ]
+ ],
+ "LEA_B (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19484
+  ]
+ ],
+ "LEA_B_D32 (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19485
+  ]
+ ],
+ "LEA_B_D32 (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19486
+  ]
+ ],
+ "LEA_B_D32 (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19487
+  ]
+ ],
+ "LEA_B_D8 (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19488
+  ]
+ ],
+ "LEA_B_D8 (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19489
+  ]
+ ],
+ "LEA_B_D8 (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19490
+  ]
+ ],
+ "LEA_B_I (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19491
+  ]
+ ],
+ "LEA_B_I (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19492
+  ]
+ ],
+ "LEA_B_I (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19493
+  ]
+ ],
+ "LEA_B_IS (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19494
+  ]
+ ],
+ "LEA_B_IS (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19495
+  ]
+ ],
+ "LEA_B_IS (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19496
+  ]
+ ],
+ "LEA_B_IS_D32 (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19497
+  ]
+ ],
+ "LEA_B_IS_D32 (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19498
+  ]
+ ],
+ "LEA_B_IS_D32 (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19499
+  ]
+ ],
+ "LEA_B_IS_D8 (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19500
+  ]
+ ],
+ "LEA_B_IS_D8 (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19501
+  ]
+ ],
+ "LEA_B_IS_D8 (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19502
+  ]
+ ],
+ "LEA_B_I_D32 (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19503
+  ]
+ ],
+ "LEA_B_I_D32 (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19504
+  ]
+ ],
+ "LEA_B_I_D32 (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19505
+  ]
+ ],
+ "LEA_B_I_D8 (R16)": [
+  "LEA_GPRv_AGEN",
+  [
+   19506
+  ]
+ ],
+ "LEA_B_I_D8 (R32)": [
+  "LEA_GPRv_AGEN",
+  [
+   19507
+  ]
+ ],
+ "LEA_B_I_D8 (R64)": [
+  "LEA_GPRv_AGEN",
+  [
+   19508
+  ]
+ ],
+ "MOV (R16, R16)": [
+  "MOV_GPRv_GPRv_89",
+  [
+   19630
+  ]
+ ],
+ "MOV (R32, R32)": [
+  "MOV_GPRv_GPRv_89",
+  [
+   19631
+  ]
+ ],
+ "MOV (R64, R64)": [
+  "MOV_GPRv_GPRv_89",
+  [
+   19632
+  ]
+ ],
+ "MOV (R8h, R8h)": [
+  "MOV_GPR8_GPR8_88",
+  [
+   19626
+  ]
+ ],
+ "MOV (R8h, R8l)": [
+  "MOV_GPR8_GPR8_88",
+  [
+   19627
+  ]
+ ],
+ "MOV (R8l, R8h)": [
+  "MOV_GPR8_GPR8_88",
+  [
+   19628
+  ]
+ ],
+ "MOV (R8l, R8l)": [
+  "MOV_GPR8_GPR8_88",
+  [
+   19629
+  ]
+ ],
+ "MOVAPD (XMM, XMM)": [
+  "MOVAPD_XMMpd_XMMpd_0F28",
+  [
+   21445
+  ]
+ ],
+ "MOVAPD_0F29 (XMM, XMM)": [
+  "MOVAPD_XMMpd_XMMpd_0F29",
+  [
+   21446
+  ]
+ ],
+ "MOVAPS (XMM, XMM)": [
+  "MOVAPS_XMMps_XMMps_0F28",
+  [
+   21317
+  ]
+ ],
+ "MOVAPS_0F29 (XMM, XMM)": [
+  "MOVAPS_XMMps_XMMps_0F29",
+  [
+   21318
+  ]
+ ],
+ "MOVDQA (XMM, XMM)": [
+  "MOVDQA_XMMdq_XMMdq_0F6F",
+  [
+   21454
+  ]
+ ],
+ "MOVDQA_0F7F (XMM, XMM)": [
+  "MOVDQA_XMMdq_XMMdq_0F7F",
+  [
+   21455
+  ]
+ ],
+ "MOVDQU (XMM, XMM)": [
+  "MOVDQU_XMMdq_XMMdq_0F6F",
+  [
+   21458
+  ]
+ ],
+ "MOVDQU_0F7F (XMM, XMM)": [
+  "MOVDQU_XMMdq_XMMdq_0F7F",
+  [
+   21459
+  ]
+ ],
+ "MOVQ (MM, MM)": [
+  "MOVQ_MMXq_MMXq_0F6F",
+  [
+   20981
+  ]
+ ],
+ "MOVQ (XMM, XMM)": [
+  "MOVQ_XMMdq_XMMq_0F7E",
+  [
+   21474
+  ]
+ ],
+ "MOVQ_0F7F (MM, MM)": [
+  "MOVQ_MMXq_MMXq_0F7F",
+  [
+   20982
+  ]
+ ],
+ "MOVQ_0FD6 (XMM, XMM)": [
+  "MOVQ_XMMdq_XMMq_0FD6",
+  [
+   21475
+  ]
+ ],
+ "MOVSD_XMM (XMM, XMM)": [
+  "MOVSD_XMM_XMMsd_XMMsd_0F10",
+  [
+   21478
+  ]
+ ],
+ "MOVSD_XMM_0F11 (XMM, XMM)": [
+  "MOVSD_XMM_XMMsd_XMMsd_0F11",
+  [
+   21479
+  ]
+ ],
+ "MOVSS (XMM, XMM)": [
+  "MOVSS_XMMss_XMMss_0F10",
+  [
+   21329
+  ]
+ ],
+ "MOVSS_0F11 (XMM, XMM)": [
+  "MOVSS_XMMss_XMMss_0F11",
+  [
+   21330
+  ]
+ ],
+ "MOVUPD (XMM, XMM)": [
+  "MOVUPD_XMMpd_XMMpd_0F10",
+  [
+   21482
+  ]
+ ],
+ "MOVUPD_0F11 (XMM, XMM)": [
+  "MOVUPD_XMMpd_XMMpd_0F11",
+  [
+   21483
+  ]
+ ],
+ "MOVUPS (XMM, XMM)": [
+  "MOVUPS_XMMps_XMMps_0F10",
+  [
+   21333
+  ]
+ ],
+ "MOVUPS_0F11 (XMM, XMM)": [
+  "MOVUPS_XMMps_XMMps_0F11",
+  [
+   21334
+  ]
+ ],
+ "MOV_8A (R8h, R8h)": [
+  "MOV_GPR8_GPR8_8A",
+  [
+   19633
+  ]
+ ],
+ "MOV_8A (R8h, R8l)": [
+  "MOV_GPR8_GPR8_8A",
+  [
+   19634
+  ]
+ ],
+ "MOV_8A (R8l, R8h)": [
+  "MOV_GPR8_GPR8_8A",
+  [
+   19635
+  ]
+ ],
+ "MOV_8A (R8l, R8l)": [
+  "MOV_GPR8_GPR8_8A",
+  [
+   19636
+  ]
+ ],
+ "MOV_8B (R16, R16)": [
+  "MOV_GPRv_GPRv_8B",
+  [
+   19637
+  ]
+ ],
+ "MOV_8B (R32, R32)": [
+  "MOV_GPRv_GPRv_8B",
+  [
+   19638
+  ]
+ ],
+ "MOV_8B (R64, R64)": [
+  "MOV_GPRv_GPRv_8B",
+  [
+   19639
+  ]
+ ],
+ "OR (R16, R16)": [
+  "OR_GPRv_GPRv_09",
+  [
+   19727
+  ]
+ ],
+ "OR (R32, R32)": [
+  "OR_GPRv_GPRv_09",
+  [
+   19728
+  ]
+ ],
+ "OR (R64, R64)": [
+  "OR_GPRv_GPRv_09",
+  [
+   19729
+  ]
+ ],
+ "OR (R8h, R8h)": [
+  "OR_GPR8_GPR8_08",
+  [
+   19723
+  ]
+ ],
+ "OR (R8h, R8l)": [
+  "OR_GPR8_GPR8_08",
+  [
+   19724
+  ]
+ ],
+ "OR (R8l, R8h)": [
+  "OR_GPR8_GPR8_08",
+  [
+   19725
+  ]
+ ],
+ "OR (R8l, R8l)": [
+  "OR_GPR8_GPR8_08",
+  [
+   19726
+  ]
+ ],
+ "OR_0A (R8h, R8h)": [
+  "OR_GPR8_GPR8_0A",
+  [
+   19730
+  ]
+ ],
+ "OR_0A (R8h, R8l)": [
+  "OR_GPR8_GPR8_0A",
+  [
+   19731
+  ]
+ ],
+ "OR_0A (R8l, R8h)": [
+  "OR_GPR8_GPR8_0A",
+  [
+   19732
+  ]
+ ],
+ "OR_0A (R8l, R8l)": [
+  "OR_GPR8_GPR8_0A",
+  [
+   19733
+  ]
+ ],
+ "OR_0B (R16, R16)": [
+  "OR_GPRv_GPRv_0B",
+  [
+   19734
+  ]
+ ],
+ "OR_0B (R32, R32)": [
+  "OR_GPRv_GPRv_0B",
+  [
+   19735
+  ]
+ ],
+ "OR_0B (R64, R64)": [
+  "OR_GPRv_GPRv_0B",
+  [
+   19736
+  ]
+ ],
+ "SBB (R16, R16)": [
+  "SBB_GPRv_GPRv_19",
+  [
+   20050
+  ]
+ ],
+ "SBB (R32, R32)": [
+  "SBB_GPRv_GPRv_19",
+  [
+   20051
+  ]
+ ],
+ "SBB (R64, R64)": [
+  "SBB_GPRv_GPRv_19",
+  [
+   20052
+  ]
+ ],
+ "SBB (R8h, R8h)": [
+  "SBB_GPR8_GPR8_18",
+  [
+   20046
+  ]
+ ],
+ "SBB (R8h, R8l)": [
+  "SBB_GPR8_GPR8_18",
+  [
+   20047
+  ]
+ ],
+ "SBB (R8l, R8h)": [
+  "SBB_GPR8_GPR8_18",
+  [
+   20048
+  ]
+ ],
+ "SBB (R8l, R8l)": [
+  "SBB_GPR8_GPR8_18",
+  [
+   20049
+  ]
+ ],
+ "SBB_1A (R8h, R8h)": [
+  "SBB_GPR8_GPR8_1A",
+  [
+   20053
+  ]
+ ],
+ "SBB_1A (R8h, R8l)": [
+  "SBB_GPR8_GPR8_1A",
+  [
+   20054
+  ]
+ ],
+ "SBB_1A (R8l, R8h)": [
+  "SBB_GPR8_GPR8_1A",
+  [
+   20055
+  ]
+ ],
+ "SBB_1A (R8l, R8l)": [
+  "SBB_GPR8_GPR8_1A",
+  [
+   20056
+  ]
+ ],
+ "SBB_1B (R16, R16)": [
+  "SBB_GPRv_GPRv_1B",
+  [
+   20057
+  ]
+ ],
+ "SBB_1B (R32, R32)": [
+  "SBB_GPRv_GPRv_1B",
+  [
+   20058
+  ]
+ ],
+ "SBB_1B (R64, R64)": [
+  "SBB_GPRv_GPRv_1B",
+  [
+   20059
+  ]
+ ],
+ "SUB (R16, R16)": [
+  "SUB_GPRv_GPRv_29",
+  [
+   20318
+  ]
+ ],
+ "SUB (R32, R32)": [
+  "SUB_GPRv_GPRv_29",
+  [
+   20319
+  ]
+ ],
+ "SUB (R64, R64)": [
+  "SUB_GPRv_GPRv_29",
+  [
+   20320
+  ]
+ ],
+ "SUB (R8h, R8h)": [
+  "SUB_GPR8_GPR8_28",
+  [
+   20314
+  ]
+ ],
+ "SUB (R8h, R8l)": [
+  "SUB_GPR8_GPR8_28",
+  [
+   20315
+  ]
+ ],
+ "SUB (R8l, R8h)": [
+  "SUB_GPR8_GPR8_28",
+  [
+   20316
+  ]
+ ],
+ "SUB (R8l, R8l)": [
+  "SUB_GPR8_GPR8_28",
+  [
+   20317
+  ]
+ ],
+ "SUB_2A (R8h, R8h)": [
+  "SUB_GPR8_GPR8_2A",
+  [
+   20321
+  ]
+ ],
+ "SUB_2A (R8h, R8l)": [
+  "SUB_GPR8_GPR8_2A",
+  [
+   20322
+  ]
+ ],
+ "SUB_2A (R8l, R8h)": [
+  "SUB_GPR8_GPR8_2A",
+  [
+   20323
+  ]
+ ],
+ "SUB_2A (R8l, R8l)": [
+  "SUB_GPR8_GPR8_2A",
+  [
+   20324
+  ]
+ ],
+ "SUB_2B (R16, R16)": [
+  "SUB_GPRv_GPRv_2B",
+  [
+   20325
+  ]
+ ],
+ "SUB_2B (R32, R32)": [
+  "SUB_GPRv_GPRv_2B",
+  [
+   20326
+  ]
+ ],
+ "SUB_2B (R64, R64)": [
+  "SUB_GPRv_GPRv_2B",
+  [
+   20327
+  ]
+ ],
+ "VMOVAPD (XMM, XMM)": [
+  "VMOVAPD_XMMdq_XMMdq_28",
+  [
+   3335
+  ]
+ ],
+ "VMOVAPD (YMM, YMM)": [
+  "VMOVAPD_YMMqq_YMMqq_28",
+  [
+   3336
+  ]
+ ],
+ "VMOVAPD_29 (XMM, XMM)": [
+  "VMOVAPD_XMMdq_XMMdq_29",
+  [
+   3337
+  ]
+ ],
+ "VMOVAPD_29 (YMM, YMM)": [
+  "VMOVAPD_YMMqq_YMMqq_29",
+  [
+   3338
+  ]
+ ],
+ "VMOVAPS (XMM, XMM)": [
+  "VMOVAPS_XMMdq_XMMdq_28",
+  [
+   3343
+  ]
+ ],
+ "VMOVAPS (YMM, YMM)": [
+  "VMOVAPS_YMMqq_YMMqq_28",
+  [
+   3344
+  ]
+ ],
+ "VMOVAPS_29 (XMM, XMM)": [
+  "VMOVAPS_XMMdq_XMMdq_29",
+  [
+   3345
+  ]
+ ],
+ "VMOVAPS_29 (YMM, YMM)": [
+  "VMOVAPS_YMMqq_YMMqq_29",
+  [
+   3346
+  ]
+ ],
+ "VMOVDQA (XMM, XMM)": [
+  "VMOVDQA_XMMdq_XMMdq_6F",
+  [
+   3359
+  ]
+ ],
+ "VMOVDQA (YMM, YMM)": [
+  "VMOVDQA_YMMqq_YMMqq_6F",
+  [
+   3360
+  ]
+ ],
+ "VMOVDQA_7F (XMM, XMM)": [
+  "VMOVDQA_XMMdq_XMMdq_7F",
+  [
+   3361
+  ]
+ ],
+ "VMOVDQA_7F (YMM, YMM)": [
+  "VMOVDQA_YMMqq_YMMqq_7F",
+  [
+   3362
+  ]
+ ],
+ "VMOVDQU (XMM, XMM)": [
+  "VMOVDQU_XMMdq_XMMdq_6F",
+  [
+   3367
+  ]
+ ],
+ "VMOVDQU (YMM, YMM)": [
+  "VMOVDQU_YMMqq_YMMqq_6F",
+  [
+   3368
+  ]
+ ],
+ "VMOVDQU_7F (XMM, XMM)": [
+  "VMOVDQU_XMMdq_XMMdq_7F",
+  [
+   3369
+  ]
+ ],
+ "VMOVDQU_7F (YMM, YMM)": [
+  "VMOVDQU_YMMqq_YMMqq_7F",
+  [
+   3370
+  ]
+ ],
+ "VMOVQ (XMM, XMM)": [
+  "VMOVQ_XMMdq_XMMq_7E",
+  [
+   3396
+  ]
+ ],
+ "VMOVQ_D6 (XMM, XMM)": [
+  "VMOVQ_XMMdq_XMMq_D6",
+  [
+   3397
+  ]
+ ],
+ "VMOVSD (XMM, XMM, XMM)": [
+  "VMOVSD_XMMdq_XMMdq_XMMq_10",
+  [
+   3400
+  ]
+ ],
+ "VMOVSD_11 (XMM, XMM, XMM)": [
+  "VMOVSD_XMMdq_XMMdq_XMMq_11",
+  [
+   3401
+  ]
+ ],
+ "VMOVSS (XMM, XMM, XMM)": [
+  "VMOVSS_XMMdq_XMMdq_XMMd_10",
+  [
+   3412
+  ]
+ ],
+ "VMOVSS_11 (XMM, XMM, XMM)": [
+  "VMOVSS_XMMdq_XMMdq_XMMd_11",
+  [
+   3413
+  ]
+ ],
+ "VMOVUPD (XMM, XMM)": [
+  "VMOVUPD_XMMdq_XMMdq_10",
+  [
+   3418
+  ]
+ ],
+ "VMOVUPD (YMM, YMM)": [
+  "VMOVUPD_YMMqq_YMMqq_10",
+  [
+   3419
+  ]
+ ],
+ "VMOVUPD_11 (XMM, XMM)": [
+  "VMOVUPD_XMMdq_XMMdq_11",
+  [
+   3420
+  ]
+ ],
+ "VMOVUPD_11 (YMM, YMM)": [
+  "VMOVUPD_YMMqq_YMMqq_11",
+  [
+   3421
+  ]
+ ],
+ "VMOVUPS (XMM, XMM)": [
+  "VMOVUPS_XMMdq_XMMdq_10",
+  [
+   3426
+  ]
+ ],
+ "VMOVUPS (YMM, YMM)": [
+  "VMOVUPS_YMMqq_YMMqq_10",
+  [
+   3427
+  ]
+ ],
+ "VMOVUPS_11 (XMM, XMM)": [
+  "VMOVUPS_XMMdq_XMMdq_11",
+  [
+   3428
+  ]
+ ],
+ "VMOVUPS_11 (YMM, YMM)": [
+  "VMOVUPS_YMMqq_YMMqq_11",
+  [
+   3429
+  ]
+ ],
+ "XOR (R16, R16)": [
+  "XOR_GPRv_GPRv_31",
+  [
+   20462
+  ]
+ ],
+ "XOR (R32, R32)": [
+  "XOR_GPRv_GPRv_31",
+  [
+   20463
+  ]
+ ],
+ "XOR (R64, R64)": [
+  "XOR_GPRv_GPRv_31",
+  [
+   20464
+  ]
+ ],
+ "XOR (R8h, R8h)": [
+  "XOR_GPR8_GPR8_30",
+  [
+   20458
+  ]
+ ],
+ "XOR (R8h, R8l)": [
+  "XOR_GPR8_GPR8_30",
+  [
+   20459
+  ]
+ ],
+ "XOR (R8l, R8h)": [
+  "XOR_GPR8_GPR8_30",
+  [
+   20460
+  ]
+ ],
+ "XOR (R8l, R8l)": [
+  "XOR_GPR8_GPR8_30",
+  [
+   20461
+  ]
+ ],
+ "XOR_32 (R8h, R8h)": [
+  "XOR_GPR8_GPR8_32",
+  [
+   20465
+  ]
+ ],
+ "XOR_32 (R8h, R8l)": [
+  "XOR_GPR8_GPR8_32",
+  [
+   20466
+  ]
+ ],
+ "XOR_32 (R8l, R8h)": [
+  "XOR_GPR8_GPR8_32",
+  [
+   20467
+  ]
+ ],
+ "XOR_32 (R8l, R8l)": [
+  "XOR_GPR8_GPR8_32",
+  [
+   20468
+  ]
+ ],
+ "XOR_33 (R16, R16)": [
+  "XOR_GPRv_GPRv_33",
+  [
+   20469
+  ]
+ ],
+ "XOR_33 (R32, R32)": [
+  "XOR_GPRv_GPRv_33",
+  [
+   20470
+  ]
+ ],
+ "XOR_33 (R64, R64)": [
+  "XOR_GPRv_GPRv_33",
+  [
+   20471
+  ]
+ ]
+}

@@ -321,5 +321,71 @@ class PerfPanelTests(unittest.TestCase):
         self.assertNotIn("perf (measured)", output)
 
 
+class InstructionMarkdownTests(unittest.TestCase):
+    """Parse the hover Markdown with CommonMark + tables, as editors render it."""
+
+    def setUp(self):
+        from markdown_it import MarkdownIt
+
+        from simdref.display import instruction_markdown
+
+        item = InstructionRecord(
+            mnemonic="VADDPS",
+            form="VADDPS (YMM, YMM, YMM)",
+            summary="Add packed single *precision* values",
+            architecture="x86",
+            isa=["AVX"],
+            metadata={"extension": "AVX", "url": "https://example.com/vaddps"},
+            description={
+                "Description": "First line.\nSecond line with a_b and [x].",
+                "Operation": "IF k1[j] OR *no writemask*\n    THEN DEST := 0",
+                "Intrinsic Equivalents": "VADDPS __m256 _mm256_add_ps (__m256 a, __m256 b);",
+                "Protected Mode Exceptions": "#UD If the LOCK prefix is used.",
+            },
+            arch_details={
+                "SKL": {
+                    "measurement": {"TP_loop": "0.5", "ports": "1*p01+1*p23"},
+                    "latencies": [{"cycles": "4"}],
+                }
+            },
+        )
+        self.text = instruction_markdown(item)
+        self.tokens = MarkdownIt("commonmark").enable("table").parse(self.text)
+
+    def inline_text(self, kind):
+        return [t.content for t in self.tokens if t.type == "inline" and kind in t.content]
+
+    def test_code_sections_are_fenced(self):
+        fences = {t.info: t.content for t in self.tokens if t.type == "fence"}
+        self.assertIn("*no writemask*", fences["asm"])
+        self.assertIn("_mm256_add_ps", fences["c"])
+
+    def test_description_lines_keep_line_breaks(self):
+        para = next(t for t in self.tokens if t.type == "inline" and "First line" in t.content)
+        self.assertIn("hardbreak", [c.type for c in para.children])
+        self.assertIn("a_b and [x].", "".join(c.content for c in para.children))
+
+    def test_text_is_not_emphasis_or_heading(self):
+        types = {c.type for t in self.tokens if t.type == "inline" for c in t.children}
+        self.assertNotIn("em_open", types)
+        headings = [
+            self.tokens[i + 1].content
+            for i, t in enumerate(self.tokens)
+            if t.type == "heading_open"
+        ]
+        self.assertNotIn("UD If the LOCK prefix is used.", headings)
+
+    def test_perf_ports_cell_is_literal(self):
+        cells = [
+            "".join(c.content for c in t.children)
+            for t in self.tokens
+            if t.type == "inline" and "p01" in t.content
+        ]
+        self.assertEqual(cells, ["1*p01+1*p23"])
+
+    def test_isa_row_shown_once(self):
+        self.assertEqual(self.text.count("**isa.**"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
