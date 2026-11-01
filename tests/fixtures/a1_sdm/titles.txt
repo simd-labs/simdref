@@ -1,0 +1,5 @@
+MOVDQU,VMOVDQU8/16/32/64—Move Unaligned Packed Integer Values
+CMOVcc—Conditional Move
+Jcc—Jump if Condition Is Met
+SETcc—Set Byte on Condition
+PREFETCHh—Prefetch Data Into Caches
