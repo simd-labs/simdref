@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import html
 import json
 import re
+from collections import Counter
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from simdref.models import InstructionRecord
@@ -28,10 +32,118 @@ def _canonical_instruction_key(name: str, form: str) -> str:
     return f"{instruction_name} ({instruction_form.upper()})"
 
 
+# Arm ARM titles for mnemonics the AARCHMRS payload and the ACLE intrinsics
+# data do not name (the payload ships no titles and no operation briefs; the
+# ACLE data is intrinsic-driven and skips scalar instructions).
+_AARCHMRS_TITLES: dict[str, str] = {
+    "MOVI": "Move Immediate",
+    "FMLA": "Floating-point fused Multiply-Add",
+    "LD4": "Load Multiple Structures",
+    "LDP": "Load Pair of Registers",
+}
+
+# The ACLE intrinsics file pairs every intrinsic with the A64 instruction it
+# lowers to and describes the intrinsic. Single-instruction entries give a
+# real summary sentence keyed by mnemonic.
+_ARM_INTRINSICS_JSON_PATHS: tuple[Path, ...] = (
+    Path(__file__).resolve().parents[2] / "vendor" / "arm" / "intrinsics.json",
+)
+
+_ACLE_SUMMARY_CAP = 160
+
+
+def _acle_first_sentence(description: str) -> str:
+    clean = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html.unescape(description))).strip()
+    sentence = clean.split(". ")[0].rstrip(".")
+    if len(sentence) > _ACLE_SUMMARY_CAP:
+        sentence = sentence[:_ACLE_SUMMARY_CAP].rsplit(" ", 1)[0]
+    return sentence
+
+
+def _acle_summaries_from_text(text: str) -> dict[str, str]:
+    """First-sentence summaries keyed by A64 mnemonic from ACLE intrinsics.
+
+    An entry counts only when it lowers to exactly one mnemonic; entries that
+    lower to several instructions describe the intrinsic, so their text would
+    mislabel the target (vtbx1_s8 lowers to TBL plus MOVI).
+    """
+    try:
+        entries = json.loads(text)
+    except ValueError:
+        return {}
+    if not isinstance(entries, list):
+        return {}
+    buckets: dict[str, Counter[str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if "A64" not in (entry.get("Architectures") or []):
+            continue
+        mnemonics: set[str] = set()
+        for group in entry.get("instructions") or []:
+            if not isinstance(group, dict):
+                continue
+            for instruction in group.get("list") or []:
+                if not isinstance(instruction, dict):
+                    continue
+                base = str(instruction.get("base_instruction") or "").strip().upper()
+                if base:
+                    mnemonics.add(base)
+        if len(mnemonics) != 1:
+            continue
+        sentence = _acle_first_sentence(str(entry.get("description") or ""))
+        if sentence:
+            buckets.setdefault(mnemonics.pop(), Counter())[sentence] += 1
+    return {mnemonic: counts.most_common(1)[0][0] for mnemonic, counts in buckets.items()}
+
+
+@lru_cache(maxsize=1)
+def _acle_instruction_summaries() -> dict[str, str]:
+    for path in _ARM_INTRINSICS_JSON_PATHS:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        summaries = _acle_summaries_from_text(text)
+        if summaries:
+            return summaries
+    return {}
+
+
+# A64 condition-code spellings for B.cond, including the hs/lo forms
+# llvm-objdump prints (Arm ARM lists cs/cc for the same field values).
+_CONDITION_CODES: tuple[str, ...] = (
+    "eq",
+    "ne",
+    "hs",
+    "cs",
+    "lo",
+    "cc",
+    "mi",
+    "pl",
+    "vs",
+    "vc",
+    "hi",
+    "ls",
+    "ge",
+    "lt",
+    "gt",
+    "le",
+    "al",
+    "nv",
+)
+
+
 def _generated_summary(mnemonic: str) -> str:
     core = mnemonic.strip().upper()
     if not core:
         return "Arm instruction."
+    acle = _acle_instruction_summaries().get(core)
+    if acle:
+        return f"{acle}."
+    title = _AARCHMRS_TITLES.get(core)
+    if title:
+        return f"{title}."
     if core.startswith("ADD"):
         return "Add operands."
     if core.startswith("SUB"):
@@ -42,7 +154,7 @@ def _generated_summary(mnemonic: str) -> str:
         return "Load data."
     if core.startswith("ST"):
         return "Store data."
-    return f"{core.title()} instruction."
+    return f"{core.title()} is an Arm instruction."
 
 
 def _strip_text(value: Any) -> str:
@@ -493,6 +605,21 @@ def _infer_aarchmrs_isa(group_path: list[str]) -> list[str]:
     return isa or ["A64"]
 
 
+def _aarchmrs_title(node: dict[str, Any], operations: dict[str, Any]) -> str:
+    """AARCHMRS title text for one instruction node, when the data carries it.
+
+    The node title wins; the operation entry named by ``operation_id`` is the
+    only other place a title can live.
+    """
+    title = _strip_text(node.get("title")).rstrip(".")
+    if title:
+        return title
+    operation = operations.get(str(node.get("operation_id") or "").strip())
+    if isinstance(operation, dict):
+        return _strip_text(operation.get("title") or operation.get("brief")).rstrip(".")
+    return ""
+
+
 def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
     if not isinstance(payload, dict):
         return []
@@ -508,6 +635,8 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
 
     records: list[InstructionRecord] = []
     seen_keys: dict[tuple[str, str], tuple[int, int]] = {}
+    raw_operations = payload.get("operations")
+    operations: dict[str, Any] = raw_operations if isinstance(raw_operations, dict) else {}
 
     def walk(node: dict[str, Any], group_path: list[str]) -> None:
         node_type = str(node.get("_type", ""))
@@ -533,6 +662,37 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             mnemonic = mnemonic_match.group(0)
             operand_form = tail.strip()
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
+            metadata = {
+                "operation_id": str(node.get("operation_id") or "").strip(),
+                "instruction_set": group_path[0] if group_path else "A64",
+                "group": group_path[-1] if group_path else "",
+            }
+            metadata = {k: v for k, v in metadata.items() if v}
+            if str(node.get("operation_id") or "") == "B_cond":
+                # B.cond assembles under one encoding with the condition in a
+                # free field; assemblers spell it B.EQ, B.NE, ... and the
+                # mnemonic matcher keys on that dotted form (issue #57a).
+                for code in _CONDITION_CODES:
+                    cond_mnemonic = f"B.{code.upper()}"
+                    records.append(
+                        InstructionRecord(
+                            mnemonic=cond_mnemonic,
+                            form=(
+                                _canonical_instruction_key(cond_mnemonic, operand_form)
+                                if operand_form
+                                else cond_mnemonic
+                            ),
+                            summary="Branch conditionally.",
+                            architecture="arm",
+                            isa=_infer_aarchmrs_isa(group_path),
+                            metadata=dict(metadata),
+                            source="arm-a64",
+                            enc_bits=enc_bits,
+                            enc_mask=enc_mask,
+                            enc_match=enc_match,
+                        )
+                    )
+                return
             key = (mnemonic, form.casefold())
             seen_enc = seen_keys.get(key)
             if seen_enc is not None:
@@ -543,15 +703,9 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 form = f"{form} [{str(node.get('name') or '').strip()}]"
                 key = (mnemonic, form.casefold())
             seen_keys[key] = (enc_mask, enc_match)
-            summary = _generated_summary(mnemonic)
+            summary = _aarchmrs_title(node, operations) or _generated_summary(mnemonic)
             if not summary.endswith("."):
                 summary += "."
-            metadata = {
-                "operation_id": str(node.get("operation_id") or "").strip(),
-                "instruction_set": group_path[0] if group_path else "A64",
-                "group": group_path[-1] if group_path else "",
-            }
-            metadata = {k: v for k, v in metadata.items() if v}
             records.append(
                 InstructionRecord(
                     mnemonic=mnemonic,

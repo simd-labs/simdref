@@ -1,0 +1,73 @@
+[
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vfmaq_f32",
+    "Architectures": ["A64"],
+    "description": "Floating-point fused Multiply-Add to accumulator (vector). This instruction multiplies corresponding floating-point values in the two source vectors, adds the product to the destination element, and writes the result.",
+    "instructions": [
+      {
+        "preamble": "This intrinsic compiles to the following instructions:",
+        "list": [
+          {"base_instruction": "FMLA", "url": "", "operands": "Vd.4S, Vn.4S, Vm.4S"}
+        ]
+      }
+    ]
+  },
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vfmaq_f64",
+    "Architectures": ["A64"],
+    "description": "Floating-point fused Multiply-Add to accumulator (vector). This instruction multiplies corresponding floating-point values.",
+    "instructions": [
+      {
+        "preamble": "",
+        "list": [
+          {"base_instruction": "FMLA", "url": "", "operands": "Vd.2D, Vn.2D, Vm.2D"}
+        ]
+      }
+    ]
+  },
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vld4q_s8",
+    "Architectures": ["A64"],
+    "description": "Load multiple 4-element structures to four registers. This instruction loads multiple 4-element structures from memory, with de-interleaving.",
+    "instructions": [
+      {
+        "preamble": "",
+        "list": [
+          {"base_instruction": "LD4", "url": "", "operands": "{Vt.16B-Vt3.16B}, [Xn]"}
+        ]
+      }
+    ]
+  },
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vfmaq_f32_ignore_me",
+    "Architectures": ["v7"],
+    "description": "Wrong architecture text.",
+    "instructions": [
+      {
+        "preamble": "",
+        "list": [
+          {"base_instruction": "FMLA", "url": "", "operands": "Vd.4S, Vn.4S, Vm.4S"}
+        ]
+      }
+    ]
+  },
+  {
+    "SIMD_ISA": ["Neon"],
+    "name": "vtbx1_s8",
+    "Architectures": ["A64"],
+    "description": "Table vector lookup extension. This instruction reads permutation indices and selects bytes.",
+    "instructions": [
+      {
+        "preamble": "",
+        "list": [
+          {"base_instruction": "TBL", "url": "", "operands": "Vd.8B, {Vn.16B}, Vm.8B"},
+          {"base_instruction": "MOVI", "url": "", "operands": "Vd.16B, #0"}
+        ]
+      }
+    ]
+  }
+]
