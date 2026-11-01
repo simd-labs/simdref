@@ -429,7 +429,10 @@ def _infer_aarchmrs_isa(group_path: list[str]) -> list[str]:
         isa.append("SVE2")
     elif "sve" in joined:
         isa.append("SVE")
-    if (
+    # NEON covers Advanced SIMD and the scalar FP groups under simd_dp.
+    # SVE and SME group paths carry "fp_" fragments of their own
+    # (sve_fp_*, mortlach_*_fp_*), so those never take the NEON label.
+    if not isa and (
         "advsimd" in joined
         or "asimd" in joined
         or "neon" in joined
