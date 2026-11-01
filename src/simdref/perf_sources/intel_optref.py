@@ -469,7 +469,10 @@ def refresh(rawdir: Path) -> None:
         "rows": [asdict(row) for row in rows],
     }
     target = _VENDOR_DIR / "rows.json"
-    target.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     print(f"pdf: {', '.join(pdf.name for pdf in pdfs)}")
     print(f"wrote: {target} ({target.stat().st_size} bytes)")
     print(f"rows: {stats.rows}")

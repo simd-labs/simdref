@@ -227,7 +227,7 @@ def refresh(rawdir: Path, outdir: Path | None = None) -> dict[str, object]:
     for core, rows in sorted(by_core.items()):
         payload = [dataclasses.asdict(row) for row in rows]
         (outdir / f"{core}.json").write_text(
-            json.dumps(payload, indent=1, ensure_ascii=False) + "\n",
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
     return {"per_core": {core: len(rows) for core, rows in sorted(by_core.items())}, **totals}

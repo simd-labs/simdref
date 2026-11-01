@@ -312,7 +312,10 @@ def write_vendored(
     }
     outdir.mkdir(parents=True, exist_ok=True)
     target = outdir / spec.output
-    target.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     return len(rows)
 
 

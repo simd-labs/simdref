@@ -361,7 +361,9 @@ def write_vendored(groups: list[dict], cpu: str, vendor_dir: Path | None = None)
         "groups": store,
     }
     path = vendor_dir / f"{cpu}.json"
-    path.write_text(json.dumps(payload, indent=1) + "\n")
+    path.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+    )
     return path
 
 

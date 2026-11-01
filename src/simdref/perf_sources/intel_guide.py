@@ -201,9 +201,13 @@ def refresh(rawdir: str | Path, outdir: str | Path | None = None) -> IntelGuideP
             "core": core,
             "rows": sorted(entries, key=lambda e: e["form"]),
         }
-        (outdir / f"{core}.json").write_text(json.dumps(payload, indent=1) + "\n")
+        (outdir / f"{core}.json").write_text(
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+        )
     notes = parse_notes_json((rawdir / "notes.json").read_text())
-    (outdir / "notes.json").write_text(json.dumps(notes, indent=1) + "\n")
+    (outdir / "notes.json").write_text(
+        json.dumps(notes, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+    )
     return result
 
 
