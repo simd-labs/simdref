@@ -257,20 +257,37 @@ def _split_operands(operands: str) -> list[str]:
     return parts
 
 
+def _imm_kind(value: int) -> str:
+    """Immediate slot kind sized like the narrowest encoding that holds *value*."""
+    if value == 0:
+        return "I0"
+    for bits in (8, 16, 32, 64):
+        if -(1 << (bits - 1)) <= value < (1 << bits):
+            return f"I{bits}"
+    return "I64"
+
+
 def _classify_operand(op: str) -> tuple[str, str | None]:
     """Return ``(kind, reg_name_lower)`` for one operand.
 
     ``kind`` is one of ``R8``/``R16``/``R32``/``R64``/``XMM``/``YMM``/
-    ``ZMM``/``K``/``M``/``I``/``REL``/``?``.
+    ``ZMM``/``K``/``M``/``I0``/``I8``/``I16``/``I32``/``I64``/``I``/
+    ``REL``/``?``. Immediate kinds carry the width the value needs.
     ``reg_name_lower`` is the lowercase register name when ``kind`` is a
     register class (for alias detection), else ``None``.
     """
     s = op.strip()
     if not s:
         return "?", None
+    # objdump branch target: an address followed by a <symbol> annotation.
+    if re.fullmatch(r"-?(?:0x[0-9a-fA-F]+|\d+)\s+<[^>]*>", s):
+        return "REL", None
     # AT&T immediate: $... ; Intel immediate: bare number / 0x... / '$'-less literal
     if s.startswith("$") or re.fullmatch(r"-?0x[0-9a-fA-F]+|-?\d+", s):
-        return "I", None
+        try:
+            return _imm_kind(int(s.lstrip("$"), 0)), None
+        except ValueError:
+            return "I", None
     # AT&T memory: ``(%reg)``, ``disp(%reg,%idx,scale)``, or plain symbol
     # with a ``(...)`` section; Intel memory: ``[...]`` or explicit size ptr.
     if "(" in s or "[" in s or _SIZE_SPECIFIER_RE.search(s):
@@ -322,6 +339,9 @@ def _form_operand_tokens(form_or_key: str) -> list[str]:
     return [t.strip().upper() for t in inner.split(",") if t.strip()]
 
 
+_BROADCAST_TOK_RE = re.compile(r"_1TO\d+$")
+
+
 def _token_matches_slot(form_tok: str, slot_kind: str) -> bool:
     """True when a catalog operand token matches a parsed input slot kind."""
     ft = form_tok.upper()
@@ -340,13 +360,47 @@ def _token_matches_slot(form_tok: str, slot_kind: str) -> bool:
     # R8h/R8l both map to R8.
     if ft in ("R8H", "R8L") and sk == "R8":
         return True
+    # A plain R row takes a general register of any width.
+    if ft == "R" and sk in ("R8", "R16", "R32", "R64"):
+        return True
     # Mn forms: M32 matches a memory slot regardless of inferred width.
     if ft.startswith("M") and sk == "M":
         return True
-    # Immediate forms: In or the literal "0" both match an immediate slot.
-    if (ft.startswith("I") or ft == "0") and sk == "I":
+    # Relative branch targets match the Rel8/Rel32 rows.
+    if sk == "REL" and ft.startswith("REL"):
         return True
+    # Immediate rows: a literal-0 row takes only a zero immediate, and an
+    # In row takes an immediate whose value fits the encoding width.
+    if sk == "I0":
+        return ft == "0" or (ft.startswith("I") and ft[1:].isdigit())
+    if sk.startswith("I"):
+        if not (ft.startswith("I") and ft[1:].isdigit()):
+            return False
+        return sk == "I" or int(ft[1:]) >= int(sk[1:])
     return False
+
+
+def _slot_token_score(form_tok: str, slot_kind: str) -> int:
+    """Match strength for one form token against one input slot kind."""
+    ft = form_tok.upper()
+    sk = slot_kind.upper()
+    if not _token_matches_slot(ft, sk):
+        # Weak near-misses: a broadcast row wants a {1toN} annotation, and a
+        # register can ride a memory row (mov r,r against MOV (M32, R32)).
+        if sk == "M" and _BROADCAST_TOK_RE.search(ft):
+            return 2
+        if sk.startswith("R") and ("M" + sk[1:]) == ft:
+            return 2
+        return 0
+    score = 10
+    if sk == "I0" and ft == "0":
+        score += 2
+    elif sk not in ("I", "I0") and ft.startswith("I") and int(ft[1:]) == int(sk[1:]):
+        score += 2
+    elif sk == "REL" and ft == "REL32":
+        # The text carries no encoding width; the near jump is the common row.
+        score += 2
+    return score
 
 
 def _operand_match_score(
@@ -373,18 +427,11 @@ def _operand_match_score(
 
     score = 0
     matched_slots = 0
-    for i, (kind, _) in enumerate(slots):
-        if i < len(form_tokens) and _token_matches_slot(form_tokens[i], kind):
-            score += 10
+    for (kind, _), form_tok in zip(slots, form_tokens):
+        pair = _slot_token_score(form_tok, kind)
+        score += pair
+        if pair >= 10:
             matched_slots += 1
-        elif (
-            kind.startswith("R")
-            and i < len(form_tokens)
-            and ("M" + kind[1:]) == form_tokens[i].upper()
-        ):
-            # Register-vs-memory near-miss (e.g. mov r,r against MOV (M32, R32))
-            # still counts a little — better than an unrelated form.
-            score += 2
 
     # Penalise operand-count mismatch — heavily for extra slots in the form.
     len_delta = len(form_tokens) - len(slots)
@@ -429,16 +476,22 @@ def pick_record(
             candidates = pinned
 
     slots, aliased = _operand_shape(operands)
+    if "%" in operands or "$" in operands:
+        # AT&T lists sources first; catalog form tokens are in Intel order.
+        slots = list(reversed(slots))
 
-    def score(rec: InstructionRecord) -> tuple[int, int, int]:
+    def score(rec: InstructionRecord) -> tuple[int, int, int, int]:
         measured = sum(
             1
             for d in (rec.arch_details or {}).values()
             if (d.get("source_kind") or "measured") == "measured"
         )
         op_score = _operand_match_score(rec, slots, aliased=aliased)
-        # Operand match dominates; measurement coverage tiebreaks.
-        return (op_score, measured, len(rec.arch_details or {}))
+        # Operand match dominates; a plain row beats encoding-variant rows
+        # (ADD_NF, MOV_8B, ...) on ties, then measurement coverage.
+        head = str(getattr(rec, "key", "") or "").split("(", 1)[0]
+        variant = 1 if "_" in head else 0
+        return (op_score, -variant, measured, len(rec.arch_details or {}))
 
     return max(candidates, key=score)
 
