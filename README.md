@@ -140,6 +140,11 @@ Dev commands
 | Arm AARCHMRS (A64)      | Base instruction forms and operand tables               | live-only²         |
 | riscv-rvv-intrinsic-doc | RVV intrinsics with deterministic instruction refs      | 74,289 intrinsics  |
 | RISC-V unified-db       | RVV instruction forms, ISA tags, description, operation | 672 instructions   |
+| Intel Guide perf tables | Per-core latency and throughput                         | 9,134 rows         |
+| Intel Optimization Ref. | Latency and throughput tables (volume 2)                | 3,155 rows         |
+| InstLatX64              | Measured latency and throughput dumps                   | 16,235 rows        |
+| AMD Software Opt. Guide | Latency workbooks, Zen 1 to Zen 5                       | 8,386 rows         |
+| Arm Neoverse SWOPT      | Instruction tables for 8 CPUs                           | 10,213 rows        |
 
 ¹ Counts from the vendored snapshot. See
 [`docs/coverage/summary.json`](docs/coverage/summary.json) for parity
@@ -156,7 +161,7 @@ Each perf row carries a `(measured, <core>)` or `(modeled, <core>)` tag.
 
 ### Scope
 
-- Performance data is x86-only.
+- Performance data covers x86, AArch64 and RISC-V: measured rows from uops.info and InstLatX64, vendor-guide rows from Intel, AMD and Arm, and modeled rows from the LLVM scheduling models.
 - RISC-V coverage is RVV only, not scalar or privileged ISA.
 
 ## Development

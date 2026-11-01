@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Five perf sources now feed the catalog: Intel Intrinsics Guide perf
+  tables, Intel Optimization Reference Manual volume 2, InstLatX64 dumps,
+  AMD Software Optimization Guide latency workbooks and Arm Neoverse
+  Software Optimization Guides. `perf_sources/merge.py` picks one value
+  per core by source priority.
+- New core ids: Silvermont (SLM), Ice Lake server (ICX), Neoverse E1 and
+  Neoverse V3AE. The Intel guide "Icelake Xeon" rows now go to ICX.
+- AMD rows carry CPI = 1 / ops-per-cycle next to the raw
+  `amd_ops_per_cycle` value, and Intel guide round/SAE note text lands on
+  the intrinsics that reference it.
+
 ### Fixed
 
 - A failed catalog auto-update (for example when offline) no longer stamps the

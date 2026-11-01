@@ -33,7 +33,10 @@ ingest_sources.py     fetch + source versioning
         |
         v
 ingest_catalog.py     parse + link + assemble
-        |
+        |\
+        | \ perf_sources/*.py  vendored perf JSON + llvm-mca pipeline
+        |  \                  -> merge_perf_rows (source priority)
+        v   v
 optional ingest_pdf.py  cache + dispatch to pdfparse registry
         |
         v
@@ -47,6 +50,14 @@ msgpack     (SQLite + FTS5)
   v           v
 export.py   cli.py / lsp.py
 ```
+
+## Perf merge priority
+
+`perf_sources/merge.py` keeps one perf value per `arch_details[core]` slot. An incoming row replaces the existing entry only when its source ranks higher in `SOURCE_PRIORITY`:
+
+`uops.info > instlatx64 > intel-guide > intel-optref > amd-swopt > arm-swopt > llvm-mca > llvm_scheduling`
+
+`_ingest_perf_sources` in `ingest_catalog.py` merges the llvm-mca rows first, then each vendored source through its module's `load_vendored()`. Entries with no `source` key are uops.info rows and take the top rank.
 
 ## PDF enrichment
 
