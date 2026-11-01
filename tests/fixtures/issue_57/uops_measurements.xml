@@ -5,6 +5,8 @@
      plus the verbatim ICL architecture block for the same row.
      VPCOMPRESSB (M512, K, ZMM): lines 611490-611493, 611524-611529.
      RET_NEAR: lines 1249116-1249119, 1249148-1249154.
+     RET_NEAR SNB: the verbatim SNB architecture block of the same row.
+     CPUID ZEN4 and VZEROUPPER ZEN2: the verbatim architecture blocks.
      Every row carries the real attribute set: uops.info gives uops_MS on
      Intel rows only, never on AMD rows, so the ZEN4 rows have no uops_MS.
      The microcoded flag of an AMD row comes from its macro-op count. -->
@@ -41,6 +43,12 @@
       <operand idx="1" name="REG0" r="1" suppressed="1" type="reg" w="1" width="64">RSP</operand>
       <operand idx="2" name="REG1" suppressed="1" type="reg" w="1" width="64">RIP</operand>
       <operand base="RSP" idx="3" memory-prefix="qword ptr" name="MEM0" r="1" seg="SS" suppressed="1" type="mem" width="64" xtype="int"/>
+      <architecture name="SNB">
+        <IACA version="2.1" TP="1.00" latency="1" TP_no_interiteration="1.00" uops="1" ports="1*p5" TP_ports="1.00"/>
+        <IACA version="2.2" TP="1.00" TP_no_interiteration="1.00" uops="1" ports="1*p5" TP_ports="1.00"/>
+        <IACA version="2.3" TP="1.00" uops="1" ports="1*p5" TP_ports="1.00"/>
+        <measurement TP_loop="31.08" TP_ports="6.00" TP_unrolled="33.80" ports="6*p015+1*p1+4*p23+3*p4+6*p5" uops="3" uops_MITE="3" uops_MS="10" uops_retire_slots="2"/>
+      </architecture>
       <architecture name="HSW">
         <IACA version="2.1" TP="1.00" latency="1" TP_no_interiteration="1.00" uops="1" ports="1*p5" TP_ports="1.00"/>
         <IACA version="2.2" TP="7.00" fusion_occurred="1" TP_no_interiteration="1.00" uops="3" ports="1*p0156+1*p06+1*p23" TP_ports="0.50"/>
@@ -64,6 +72,18 @@
           <latency start_op="2" target_op="1" cycles="3"/>
           <latency start_op="3" target_op="1" cycles="3"/>
         </measurement>
+      </architecture>
+    </instruction>
+    <instruction asm="CPUID" category="MISC" cpl="3" extension="BASE" iclass="CPUID" iform="CPUID" isa-set="I486REAL" opcode="0FA2" string="CPUID" url="uops.info/html-instr/CPUID.html" summary="CPU Identification" url-ref="felixcloutier.com/x86/cpuid">
+      <architecture name="ZEN4">
+        <measurement TP_unrolled="145.58" TP_loop="146.72" uops="88"/>
+        <doc uops="ucode"/>
+      </architecture>
+    </instruction>
+    <instruction asm="VZEROUPPER" category="AVX" cpl="3" extension="AVX" iclass="VZEROUPPER" iform="VZEROUPPER" isa-set="AVX" opcode="77" string="VZEROUPPER" vex="1" url="uops.info/html-instr/VZEROUPPER.html" summary="Zero Upper Bits of YMM and ZMM Registers" url-ref="felixcloutier.com/x86/vzeroupper">
+      <architecture name="ZEN2">
+        <measurement TP_unrolled="5.00" TP_loop="5.00" uops="12"/>
+        <doc uops="1" TP="0.25"/>
       </architecture>
     </instruction>
 </root>

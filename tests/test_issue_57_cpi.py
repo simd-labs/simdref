@@ -114,4 +114,35 @@ def test_ret_harness_row_drops_cpi_and_ports(monkeypatch):
     row = _annotate(monkeypatch, rec, "ret", "HSW")
     assert row["cpi"] is None
     assert row["ports"] is None
+    assert "uops" not in row
+    assert "microcoded" not in row
     assert "cpi=-" in row["annotation"]
+
+
+def test_ret_snb_harness_row_drops_cpi_uops_and_microcoded(monkeypatch):
+    # Review finding 2 repro: the SNB harness row reports uops=3 and the
+    # loop figures. Every call/ret loop harness row drops CPI, uops,
+    # microcoded and ports, whatever the uop count.
+    rec = _records()["RET_NEAR"]
+    row = _annotate(monkeypatch, rec, "ret", "SNB")
+    assert row["cpi"] is None
+    assert row["ports"] is None
+    assert "uops" not in row
+    assert "microcoded" not in row
+
+
+def test_cpuid_zen4_keeps_measured_cpi_and_uops(monkeypatch):
+    # Review finding 4 repro: CPUID measures TP 145.58 with 88 uops on ZEN4.
+    # The figure is real, so the row keeps it.
+    rec = _records()["CPUID"]
+    row = _annotate(monkeypatch, rec, "cpuid", "ZEN4")
+    assert row["cpi"] == 145.58
+    assert row["uops"] == 88
+
+
+def test_vzeroupper_zen2_keeps_measured_cpi_and_uops(monkeypatch):
+    # The same class: VZEROUPPER measures TP 5.00 with 12 uops on ZEN2.
+    rec = _records()["VZEROUPPER"]
+    row = _annotate(monkeypatch, rec, "vzeroupper", "ZEN2")
+    assert row["cpi"] == 5.0
+    assert row["uops"] == 12

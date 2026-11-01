@@ -119,24 +119,31 @@ def best_numeric(values: list[str]) -> str:
     return values[0]
 
 
-# Upstream uops.info records control-flow instructions (RET, some CALL/JMP
-# forms) inside a call/ret loop harness.  There ``uops`` and the
-# ``TP_unrolled``/``TP_loop`` figures describe the whole harness rather than
-# the single measured instruction: RET_NEAR on HSW reports ``uops=20``,
-# ``TP_unrolled=33.35``.  Microcoded forms report many uops too, but their
-# figure is real: VPCOMPRESSD (M512, K, ZMM) on ZEN4 runs 144 uops at a
-# measured 72.50 cycles.  uops.info attaches <latency> children when the
-# measurement covers the instruction's own operands, and the harness rows
-# carry none.  So a big uops count keeps its CPI only with latency data;
-# without it, drop the measured CPI fields so callers fall back to
-# modeled/IACA sources (or display ``-``).
-# shortcut: a harness row with latency children would pass, upgrade when
-# uops.info tags harness rows explicitly.
+# Upstream uops.info measures CALL/JMP/RET forms inside a call/ret loop
+# harness.  There ``uops`` and the ``TP_unrolled``/``TP_loop`` figures
+# describe the whole harness rather than the single measured instruction:
+# RET_NEAR on SNB reports ``uops=3``, ``TP_unrolled=33.80`` and the loop
+# port string.  The vendor XML names those rows in the ``iclass`` attribute
+# (CALL_NEAR, CALL_FAR, JMP, JMP_FAR, JMPABS, RET_NEAR, RET_FAR) and the
+# catalog record keeps iclass in ``metadata``, so the drop keys on it and
+# every other measured row keeps its figures: VPCOMPRESSD (M512, K, ZMM) on
+# ZEN4 keeps its real 144 uops at a measured 72.50 cycles.
+_HARNESS_ICLASS_PREFIXES = ("CALL", "JMP", "RET")
 _HARNESS_UOPS_THRESHOLD = 8
 
 
-def _measurement_is_harness_contaminated(details: dict[str, Any]) -> bool:
+def _measurement_is_harness_contaminated(
+    details: dict[str, Any], iclass: str | None = None
+) -> bool:
     """True when *details* holds a harness-wide figure, not one instruction."""
+    if iclass:
+        return str(iclass).upper().startswith(_HARNESS_ICLASS_PREFIXES)
+    # A caller that passes only an arch_details dict cannot name the row.
+    # Keep the uops heuristic for it: a big uops count with no latency
+    # children reads as harness data (uops.info attaches <latency> children
+    # when the measurement covers the instruction's own operands).
+    # shortcut: a harness row with latency children would pass, upgrade when
+    # uops.info tags harness rows explicitly.
     measurement = details.get("measurement") or {}
     try:
         uops = int(float(measurement.get("uops", 0) or 0))
@@ -147,8 +154,8 @@ def _measurement_is_harness_contaminated(details: dict[str, Any]) -> bool:
     return not (details.get("latencies") or [])
 
 
-def _cpi_values(details: dict[str, Any]) -> list[str]:
-    if _measurement_is_harness_contaminated(details):
+def _cpi_values(details: dict[str, Any], iclass: str | None = None) -> list[str]:
+    if _measurement_is_harness_contaminated(details, iclass):
         return []
     measurement = details.get("measurement") or {}
     out: list[str] = []
