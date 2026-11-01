@@ -289,9 +289,10 @@ class PerfPanelTests(unittest.TestCase):
         # Two separate panels, one per source kind.
         self.assertIn("perf (measured)", output)
         self.assertIn("perf (modeled)", output)
-        # No ``src`` column inside the tables — the panel title carries
-        # the provenance label now.
-        self.assertNotIn(" src ", output)
+        # The FIXUI per-row source label: rows carry a ``src`` column with
+        # the source id (uops.info rows default to the id, never empty).
+        self.assertIn("src", output)
+        self.assertIn("uops.info", output)
 
     def test_render_instruction_modeled_only_has_no_measured_panel(self):
         instruction = InstructionRecord(

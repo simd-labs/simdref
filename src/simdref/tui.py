@@ -132,7 +132,6 @@ from simdref.display import (
     instruction_metadata_rows,
     latency_pair_rows,
     normalize_isa_token,
-    strip_instruction_decorators,
     measurement_rows,
     uarch_sort_key,
 )
@@ -414,7 +413,7 @@ def _fts_search(
             result = SearchResult(
                 kind="instruction",
                 key=row["db_key"],
-                title=strip_instruction_decorators(row["key"]),
+                title=display_instruction_form(row["key"]),
                 subtitle=row["summary"] or "",
                 score=90,
             )
@@ -1860,6 +1859,7 @@ class SimdrefApp(App):
             return
         label_map = {
             "uarch": "microarch",
+            "source_tool": "src",
             "latency": "LAT",
             "TP_loop": "CPI",
             "TP_unrolled": "CPI unroll",
@@ -1949,15 +1949,17 @@ class SimdrefApp(App):
                 lines.append(record.description)
             if record.instructions:
                 lines.append("")
-                lines.append(f"Instructions: {', '.join(record.instructions)}")
+                lines.append(
+                    f"Instructions: {', '.join(display_instruction_form(key) for key in record.instructions)}"
+                )
         elif isinstance(record, InstructionRecord):
-            lines.append(record.key)
+            lines.append(display_instruction_form(record.key))
             if record.summary:
                 lines.append(record.summary)
             if record.isa:
                 lines.append(f"ISA: {', '.join(record.isa)}")
             if record.form:
-                lines.append(f"Form: {record.form}")
+                lines.append(f"Form: {display_instruction_form(record.form)}")
         text = "\n".join(lines)
         self._copy_to_clipboard(text)
 

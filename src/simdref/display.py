@@ -500,7 +500,7 @@ def instruction_markdown(item, conn=None) -> str:
     terminal: metadata, every description section, the intrinsic mapping
     and the per-microarchitecture performance table, plus reference URLs.
     """
-    lines = [f"```asm\n{item.key}\n```"]
+    lines = [f"```asm\n{display_instruction_form(item.key)}\n```"]
     lines.append(f"**isa.** {display_isa(item.isa)}")
     for key, value in instruction_metadata_rows(item):
         if key != "isa":
@@ -614,8 +614,16 @@ def instruction_query_text(item) -> str:
     return " ".join([name, *tokens]).strip()
 
 
+def drop_template_tokens(text: str) -> str:
+    # A form whose operand text holds an unexpandable <RULE> token shows
+    # only the mnemonic on displays. Keys keep the token.
+    if "<" not in text:
+        return text
+    return text.split(" (", 1)[0].strip()
+
+
 def display_instruction_form(form: str) -> str:
-    return strip_instruction_decorators(form or "") or "-"
+    return drop_template_tokens(strip_instruction_decorators(form or "")) or "-"
 
 
 def display_instruction_title(item) -> str:
@@ -686,10 +694,12 @@ def measurement_rows(item) -> list[dict]:
                 # Fall back to TP so the CPI column shows it.
                 row["TP_loop"] = cpi
             row["source"] = details.get("source_kind") or "measured"
-            # Provenance keys ride along for the footnote; the exclude set
-            # keeps them out of the table columns.
+            # Per-row source label. Entries without a stored source are
+            # uops.info rows, the same default merge._entry_rank uses.
+            row["source_tool"] = details.get("source") or "uops.info"
+            # The version and citation keys ride along for the footnote;
+            # the exclude set keeps them out of the table columns.
             for stored, key in (
-                ("source", "source_tool"),
                 ("source_version", "source_version"),
                 ("citation_url", "citation_url"),
             ):
@@ -731,6 +741,7 @@ def latency_rows(item) -> list[dict]:
 
 _GENERIC_TABLE_LABEL_MAP = {
     "uarch": "microarch",
+    "source_tool": "src",
     "latency": "LAT",
     "TP_loop": "CPI",
     "TP_unrolled": "CPI unroll",
@@ -945,7 +956,7 @@ def print_instruction_mapping(catalog, intrinsic, conn=None) -> None:
     table.add_column("isa", width=12)
     for instr in linked:
         table.add_row(
-            instr.key,
+            display_instruction_form(instr.key),
             display_architecture(instr.architecture),
             instr.summary or "-",
             ", ".join(instr.isa) or "-",
@@ -986,6 +997,7 @@ def print_intrinsic_mapping(catalog, item, conn=None, find_intrinsic_fn=None) ->
 
 _MEASUREMENT_PREFERRED_ORDER = [
     "uarch",
+    "source_tool",
     "latency",
     "TP_loop",
     "TP_ports",
@@ -999,7 +1011,6 @@ _MEASUREMENT_EXCLUDE_KEYS = {
     "uops_MS",
     "macro_fusible",
     "source",
-    "source_tool",
     "source_version",
     "citation_url",
 }

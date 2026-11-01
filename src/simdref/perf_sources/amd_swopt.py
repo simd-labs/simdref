@@ -199,6 +199,81 @@ def _clean(text: str) -> str:
     return "" if text.casefold() == "na" else text
 
 
+# AMD workbook operand codes name classes, not catalog forms. ``*`` marks a
+# wildcard class: it matches the record class with its digits stripped
+# (``gpr*`` takes gpr8 through gpr64 and the unknown width, ``mem*`` every
+# memory form). See merge._form_class_match.
+def _vendor_alt_classes(alt: str) -> frozenset[str]:
+    # One ``/`` alternative of one workbook operand ("mem128{k0}", "reg32").
+    a = alt.strip().casefold().split(" ", 1)[0]
+    a = re.sub(r"\{.*$", "", a).strip("<>_`")
+    if re.fullmatch(r"xmm\d*|x|s", a):
+        return frozenset({"xmm"})
+    if re.fullmatch(r"ymm\d*|y", a):
+        return frozenset({"ymm"})
+    if re.fullmatch(r"zmm\d*|z", a):
+        return frozenset({"zmm"})
+    if a == "xy":
+        return frozenset({"xmm", "ymm"})
+    if a == "xyz":
+        return frozenset({"xmm", "ymm", "zmm"})
+    if a == "yz":
+        return frozenset({"ymm", "zmm"})
+    if re.fullmatch(r"mmx\d*", a):
+        return frozenset({"mmx"})
+    if re.fullmatch(r"k\d*", a):
+        return frozenset({"k"})
+    if a == "sti":
+        return frozenset({"x87"})
+    if a == "xi":
+        return frozenset({"xmm", "imm*"})
+    if a == "cl":
+        return frozenset({"gpr8"})
+    regs = re.fullmatch(r"(?:\[)?r(?:eg)?((?:\d+(?:/(?:r(?:eg)?)?\d+)*)?)(?:\])?", a)
+    if a in ("reg", "r", "g", "gx"):
+        return frozenset({"gpr*"})
+    if regs and regs.group(1):
+        return frozenset(f"gpr{w}" for w in re.findall(r"\d+", regs.group(1)))
+    if a in ("i", "imm"):
+        return frozenset({"imm*"})
+    if a in ("m", "mi", "mem", "vm32x"):
+        return frozenset({"mem*"})
+    widths = re.fullmatch(r"(?:mem)?(?:em)?(\d+)(?:bcst)?(?:/(\d+))?", a)
+    if a.startswith(("mem", "memem")) and widths:
+        found = [w for w in widths.groups() if w]
+        return frozenset(f"mem{w}" for w in found)
+    imms = re.fullmatch(r"imm(\d+(?:/\d+)*)", a)
+    if imms:
+        return frozenset(
+            re.findall(r"imm\d+", "imm" + imms.group(1).replace("/", "/imm"))
+        ) | frozenset({"imm0"})
+    return frozenset({"other"})
+
+
+def form_classes(form: str) -> tuple[frozenset[str], ...]:
+    # Workbook "Instruction Operands" text ("xmm1,xmm2/mem128") as one
+    # allowed-class set per operand position.
+    out: list[frozenset[str]] = []
+    for operand in form.split(","):
+        operand = operand.strip()
+        if not operand:
+            continue
+        # Trailing width alternatives take the family of the first token:
+        # "reg8/16/32" reads as "reg8/reg16/reg32".
+        widen = re.fullmatch(r"([a-z\[\]_]*[a-z_\]])(\d+)((?:/\d+)+)", operand)
+        if widen:
+            alts = [
+                f"{widen.group(1)}{w}" for w in [widen.group(2), *widen.group(3)[1:].split("/")]
+            ]
+        else:
+            alts = operand.split("/")
+        allowed: set[str] = set()
+        for alt in alts:
+            allowed |= _vendor_alt_classes(alt)
+        out.append(frozenset(allowed))
+    return tuple(out)
+
+
 def _cpi(throughput: str) -> str:
     """Invert the ops-per-cycle value to cycles per instruction.
 
@@ -280,6 +355,7 @@ def parse_workbook(
                 cpi=_cpi(throughput),
                 citation_url=citation_url,
                 extra_measurement=measurement,
+                form_classes=form_classes(form),
             )
         )
         stats.kept += 1
@@ -346,6 +422,7 @@ def load_vendored(path: Path | str | None = None) -> list[PerfRow]:
                     cpi=_cpi(raw.get(THROUGHPUT_KEY, "")),
                     citation_url=data["citation_url"],
                     extra_measurement=measurement,
+                    form_classes=form_classes(raw.get("form", "")),
                 )
             )
     return rows

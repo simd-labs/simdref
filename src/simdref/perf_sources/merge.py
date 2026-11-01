@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
+import re
 from typing import Any, Iterable
 
 from simdref.models import InstructionRecord
@@ -59,6 +61,9 @@ class PerfRow:
     applies_to: str = "mnemonic"
     citation_url: str = ""
     extra_measurement: dict[str, str] = field(default_factory=dict)
+    # Operand classes per key position (e.g. frozenset({"xmm"}) for an AMD
+    # workbook ``xmm1``). Empty means the row matches by the form string.
+    form_classes: tuple[frozenset[str], ...] = ()
 
     def as_arch_details_entry(self) -> dict[str, Any]:
         entry: dict[str, Any] = {
@@ -90,6 +95,74 @@ def _record_key(record: InstructionRecord) -> tuple[str, str, str]:
         record.mnemonic.casefold(),
         record.form.strip().casefold(),
     )
+
+
+_KEY_GPR_WIDTHS = {
+    "al": "gpr8",
+    "cl": "gpr8",
+    "r8l": "gpr8",
+    "r8h": "gpr8",
+    "ax": "gpr16",
+    "dx": "gpr16",
+    "r16": "gpr16",
+    "eax": "gpr32",
+    "ecx": "gpr32",
+    "edx": "gpr32",
+    "r32": "gpr32",
+    "rax": "gpr64",
+    "rcx": "gpr64",
+    "rdx": "gpr64",
+    "r64": "gpr64",
+    "r": "gpr0",
+}
+
+
+def _key_operand_class(token: str) -> str:
+    # Map one catalog key operand ("XMM", "M128", "I8", "Rel32") to the
+    # class an AMD workbook row names for it. ``0`` marks unknown width.
+    c = token.strip().casefold()
+    if c.startswith("vsib") or c.startswith("moffs") or c == "agen":
+        return "mem0"
+    mem = re.fullmatch(r"m(\d+).*", c)
+    if mem:
+        return f"mem{int(mem.group(1))}"
+    if c == "m":
+        return "mem0"
+    if c in ("xmm", "ymm", "zmm", "mm", "k"):
+        return "mmx" if c == "mm" else c
+    if c.startswith("st"):
+        return "x87"
+    if c in ("i8", "i16", "i32", "i64"):
+        return "imm" + c[1:]
+    if c in ("rel8", "rel16", "rel32", "abs64"):
+        return "imm" + c[3:]
+    if c.isdigit():
+        return "imm0"
+    if c in _KEY_GPR_WIDTHS:
+        return _KEY_GPR_WIDTHS[c]
+    return "other"
+
+
+@lru_cache(maxsize=65536)
+def _record_form_classes(form: str) -> tuple[str, ...]:
+    # Operand classes of one catalog form, read from the key text so every
+    # source (uops.info, SDM, vendored) maps the same way.
+    match = re.match(r"^[^(]+\((.*)\)", form)
+    if not match:
+        return ()
+    return tuple(_key_operand_class(part) for part in match.group(1).split(","))
+
+
+def _form_class_match(
+    row_classes: tuple[frozenset[str], ...], record_classes: tuple[str, ...]
+) -> bool:
+    if len(row_classes) != len(record_classes):
+        return False
+    for allowed, actual in zip(row_classes, record_classes):
+        base = re.match(r"[a-z]+", actual).group(0) + "*"
+        if actual not in allowed and base not in allowed:
+            return False
+    return True
 
 
 def merge_perf_rows(
@@ -130,8 +203,17 @@ def merge_perf_rows(
         if not targets:
             continue
         form_key = row.form.strip().casefold()
-        matched = [r for r in targets if not form_key or r.form.strip().casefold() == form_key]
-        if not matched and form_key:
+        if row.form_classes:
+            # Class rows (AMD workbook operand codes) land on the catalog
+            # forms whose operands match the classes position by position.
+            matched = [
+                r
+                for r in targets
+                if _form_class_match(row.form_classes, _record_form_classes(r.form))
+            ]
+        else:
+            matched = [r for r in targets if not form_key or r.form.strip().casefold() == form_key]
+        if not matched and (form_key or row.form_classes):
             matched = targets  # graceful fallback: attach to every variant
         entry = row.as_arch_details_entry()
         new_rank = _SOURCE_RANK.get(row.source)

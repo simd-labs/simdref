@@ -182,12 +182,14 @@ class WebExportTests(unittest.TestCase):
         self.assertEqual(row["sourceVersion"], "22.1.8")
         self.assertEqual(row["citationUrl"], CITATION_URL)
 
-    def test_measurement_rows_omit_provenance_when_absent(self):
+    def test_measurement_rows_label_uops_source_when_absent(self):
         from simdref.export import _web_measurements
 
+        # FIXUI: every row carries a source label; a row without a stored
+        # source is a uops.info row, the same default the merge rank uses.
         rows = _web_measurements(_instruction(_fixture()["measured_details"]))
         self.assertEqual(len(rows), 1)
-        self.assertNotIn("source", rows[0])
+        self.assertEqual(rows[0]["source"], "uops.info")
         self.assertNotIn("sourceVersion", rows[0])
         self.assertNotIn("citationUrl", rows[0])
 

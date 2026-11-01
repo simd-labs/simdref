@@ -24,6 +24,7 @@ from simdref.ingest_catalog import link_records
 from simdref.models import InstructionRecord, IntrinsicRecord
 
 AARCHMRS = Path(__file__).parent / "fixtures" / "b5" / "arm_fadd_aarchmrs.json"
+AARCHMRS_LOWER = Path(__file__).parent / "fixtures" / "b5" / "arm_fadd_lowercase_aarchmrs.json"
 
 
 class ArmLinkPickTests(unittest.TestCase):
@@ -89,6 +90,45 @@ class PlaceholderTests(unittest.TestCase):
         sme = [record for record in records if record.isa == ["SME"]]
         self.assertEqual(len(sme), 1)
         self.assertEqual(sme[0].form, "FADD (ZA0.4S[<ZM1_MORTLACH>])")
+
+
+class RealShapePickTests(unittest.TestCase):
+    """The vendored AARCHMRS tree uses lowercase rule ids (T_option__4,
+    T_fmul_HSD). They must expand like the fixture's uppercase ids."""
+
+    def _records(self):
+        from simdref.arm_instructions import parse_arm_instruction_payload
+
+        return parse_arm_instruction_payload(AARCHMRS_LOWER.read_text())
+
+    def test_lowercase_rule_tokens_expand_to_the_concrete_instance(self):
+        forms = {record.form for record in self._records()}
+        self.assertIn("FADD (V0.4S, V1.4S, V2.4S)", forms)
+        self.assertIn("FADD (Z0.4S, Z1.4S, Z2.4S)", forms)
+        self.assertNotIn("<", " ".join(forms))
+
+    def test_neon_intrinsic_resolves_the_vector_form_by_key(self):
+        intrinsic = IntrinsicRecord(
+            name="vaddq_f32",
+            signature="float32x4_t vaddq_f32(float32x4_t a, float32x4_t b)",
+            description="Floating-point add.",
+            header="arm_neon.h",
+            architecture="arm",
+            isa=["NEON"],
+            instruction_refs=[
+                {
+                    "name": "FADD",
+                    "form": "Vd.4S,Vn.4S,Vm.4S",
+                    "architecture": "arm",
+                }
+            ],
+        )
+
+        link_records([intrinsic], self._records())
+
+        keys = [ref.get("key", "") for ref in intrinsic.instruction_refs]
+        self.assertEqual(keys, ["arm:fadd (v0.4s, v1.4s, v2.4s)"])
+        self.assertEqual(intrinsic.instruction_refs[0]["resolution"], "key")
 
 
 if __name__ == "__main__":

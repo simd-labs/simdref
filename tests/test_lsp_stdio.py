@@ -742,13 +742,15 @@ class LspEndToEndTests(unittest.TestCase):
 
     def test_arm_vector_add_keeps_the_arm_form(self):
         # AArch64: the .4s arrangement is an ARM vector signal. The line must rank
-        # the AArch64 vector form, not an x86 ADD form.
+        # the AArch64 vector form, not an x86 ADD form. The hover body shows only
+        # the mnemonic; the picked row's key stays in the deep link.
         uri = "file:///tmp/simdref_lsp_arm_vec.s"
         self.server.open(uri, "asm", "add v0.4s, v1.4s, v2.4s\n")
         result = self.server.hover(uri, 0, 1)
         self.assertIsNotNone(result, "hover on an arm vector add returned null")
         value = result["contents"]["value"]
-        self.assertIn("V0.<T_OPTION>", value)
+        self.assertIn("V0.%3CT_OPTION%3E", value)
+        self.assertNotIn("V0.<T_OPTION>", value)
         self.assertNotIn("ADD (R16", value)
 
     def test_arm_fp_register_keeps_the_arm_form(self):

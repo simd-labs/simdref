@@ -437,6 +437,13 @@ _LITERAL_KEEP = {
     "EXCLAM": "!",
 }
 
+# The vendored AARCHMRS revisions mix case in rule ids (T_OPTION__4 in one,
+# T_option__4 in FAT-2025-09, T_FMUL_HSD vs T_fmul_HSD), so the placeholder
+# lookup folds case.
+_RULE_PLACEHOLDER_BY_FOLD = {
+    name.casefold(): instance for name, instance in _RULE_PLACEHOLDER.items()
+}
+
 
 def _render_assembly(assembly: dict[str, Any]) -> str:
     """Render an AARCHMRS ``assembly.symbols`` list to a concrete asm string.
@@ -462,10 +469,10 @@ def _render_assembly(assembly: dict[str, Any]) -> str:
                 parts.append(_LITERAL_KEEP[rule])
                 continue
             base = re.sub(r"__\d+$", "", rule)
-            if rule in _RULE_PLACEHOLDER:
-                parts.append(_RULE_PLACEHOLDER[rule])
-            elif base in _RULE_PLACEHOLDER:
-                parts.append(_RULE_PLACEHOLDER[base])
+            if rule.casefold() in _RULE_PLACEHOLDER_BY_FOLD:
+                parts.append(_RULE_PLACEHOLDER_BY_FOLD[rule.casefold()])
+            elif base.casefold() in _RULE_PLACEHOLDER_BY_FOLD:
+                parts.append(_RULE_PLACEHOLDER_BY_FOLD[base.casefold()])
             elif re.search(r"imm|offset|off|lsb|width|shift|amount|rot", rule, re.IGNORECASE):
                 parts.append("#0")
             elif re.search(r"label|addr", rule, re.IGNORECASE):

@@ -77,12 +77,14 @@ def _web_measurements(item) -> list[dict]:
             "tpPorts": measurement.get("TP_ports", "-"),
             "uops": measurement.get("uops", "-"),
             "sourceKind": details.get("source_kind") or "measured",
+            # Per-row source label. Entries without a stored source are
+            # uops.info rows, the same default merge._entry_rank uses.
+            "source": details.get("source") or "uops.info",
         }
         family = perf_family_label(uarch)
         if family:
             row["family"] = family
         for stored, exported in (
-            ("source", "source"),
             ("source_version", "sourceVersion"),
             ("citation_url", "citationUrl"),
         ):

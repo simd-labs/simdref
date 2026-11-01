@@ -16,9 +16,20 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.parse import quote
 
 from simdref.lsp import _hover_markdown, _hint_label, _mnemonic_from_asm_line
 from simdref.storage import SQLITE_PATH, open_db
+
+
+def _form_evidence(fragment: str) -> str:
+    # The hover body hides unexpandable <RULE> tokens under the mnemonic;
+    # the picked row's key stays in the deep link, URL-encoded, and is the
+    # pick evidence. The site link keeps only parentheses literal.
+    if "<" not in fragment:
+        return fragment
+    return quote(fragment, safe="()")
+
 
 _USER_CATALOG = Path.home() / ".local" / "share" / "simdref" / "catalog.db"
 _catalog_env = os.environ.get("SIMDREF_CATALOG", "")
@@ -177,7 +188,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
 
     def test_shift_and_extend_fold_into_the_register(self):
@@ -185,21 +196,21 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
 
     def test_register_offset_row_carries_no_immediate(self):
         hover, hint = self._hover_and_hint("ldr w0, [x9, x10]")
         self.assertIsNotNone(hover)
         self.assertNotIn("<HASH>", hover)
-        self.assertIn("LDR (<WTORWZR__4>, [<XNSP_OPTION>, <WORX_CHOICE>", hover)
+        self.assertIn(_form_evidence("LDR (<WTORWZR__4>, [<XNSP_OPTION>, <WORX_CHOICE>"), hover)
 
     def test_extend_suffix_picks_the_extended_row(self):
         for line, fragment in EXTEND_ROWS:
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
 
     def test_alias_lines_agree_on_hover_and_hint(self):
@@ -207,7 +218,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
 
     def test_sp_moves_are_add_immediate(self):
@@ -215,7 +226,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
 
     def test_weak_gate_judges_the_aliased_form(self):
@@ -223,7 +234,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
 
     def test_arm32_lines_get_no_aarch64_alias(self):
@@ -238,7 +249,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
                 self.assertNotIn("<ZAT", hover)
 
@@ -247,7 +258,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 self.assertIsNotNone(hint)
                 self.assertNotIn("<ZAT", hover)
 
@@ -256,7 +267,7 @@ class LeftoverArmFormPickTests(unittest.TestCase):
             with self.subTest(line=line):
                 hover, hint = self._hover_and_hint(line)
                 self.assertIsNotNone(hover)
-                self.assertIn(fragment, hover)
+                self.assertIn(_form_evidence(fragment), hover)
                 if fragment.startswith("MOVA"):
                     self.assertNotIn("ORR (", hover)
                 self.assertIsNotNone(hint)

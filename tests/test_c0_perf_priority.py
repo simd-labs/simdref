@@ -9,6 +9,7 @@ uops.info > instlatx64 > intel-guide > intel-optref/amd-swopt/arm-swopt
 import unittest
 
 from simdref.models import InstructionRecord
+from simdref.perf_sources.amd_swopt import form_classes
 from simdref.perf_sources.cores import canonical_core_id, core_architecture
 from simdref.perf_sources.merge import PerfRow, merge_perf_rows
 
@@ -123,6 +124,83 @@ class TestNewCoreIds(unittest.TestCase):
                 canonical = canonical_core_id(name)
                 self.assertEqual(canonical, f"neoverse-{name.lower()}")
                 self.assertEqual(core_architecture(canonical), "aarch64")
+
+
+class TestAmdFormClassMatch(unittest.TestCase):
+    """FIXUI defect 5: AMD workbook rows name operand classes (xmm1,xmm2;
+    reg,reg/mem), not catalog forms. A class row lands on the catalog
+    forms whose operands match the classes, not on every variant."""
+
+    def _records(self):
+        reg = InstructionRecord(
+            mnemonic="ADDPD",
+            form="ADDPD (XMM, XMM)",
+            summary="Add packed double-precision floating-point values.",
+            architecture="x86",
+            isa=["SSE2"],
+        )
+        mem = InstructionRecord(
+            mnemonic="ADDPD",
+            form="ADDPD (XMM, M128)",
+            summary="Add packed double-precision floating-point values.",
+            architecture="x86",
+            isa=["SSE2"],
+        )
+        return reg, mem
+
+    def _amd_row(self, form: str, mnemonic: str = "ADDPD") -> PerfRow:
+        return PerfRow(
+            mnemonic=mnemonic,
+            core="ZEN4",
+            source="amd-swopt",
+            source_kind="modeled",
+            source_version="test",
+            architecture="x86",
+            form=form,
+            latency="3",
+            form_classes=form_classes(form),
+        )
+
+    def test_register_row_hits_only_the_register_form(self):
+        reg, mem = self._records()
+        rows = [self._amd_row("xmm1,xmm2")]
+        merge_perf_rows([reg, mem], rows)
+        self.assertIn("ZEN4", reg.arch_details)
+        self.assertNotIn("ZEN4", mem.arch_details)
+
+    def test_reg_or_mem_row_hits_both_forms(self):
+        reg, mem = self._records()
+        rows = [self._amd_row("xmm1,xmm2/mem128")]
+        merge_perf_rows([reg, mem], rows)
+        self.assertIn("ZEN4", reg.arch_details)
+        self.assertIn("ZEN4", mem.arch_details)
+
+    def test_width_specific_row_skips_other_widths(self):
+        r32 = InstructionRecord(
+            mnemonic="ADCX",
+            form="ADCX (R32, R32)",
+            summary="Unsigned integer addition with carry.",
+            architecture="x86",
+            isa=["ADX"],
+        )
+        r64 = InstructionRecord(
+            mnemonic="ADCX",
+            form="ADCX (R64, R64)",
+            summary="Unsigned integer addition with carry.",
+            architecture="x86",
+            isa=["ADX"],
+        )
+        rows = [self._amd_row("reg32,reg32", mnemonic="ADCX")]
+        merge_perf_rows([r32, r64], rows)
+        self.assertIn("ZEN4", r32.arch_details)
+        self.assertNotIn("ZEN4", r64.arch_details)
+
+    def test_unmatched_form_still_falls_back_to_all_variants(self):
+        reg, mem = self._records()
+        rows = [self._amd_row("xmm1,xmm2,imm8,imm16")]
+        merge_perf_rows([reg, mem], rows)
+        self.assertIn("ZEN4", reg.arch_details)
+        self.assertIn("ZEN4", mem.arch_details)
 
 
 if __name__ == "__main__":
