@@ -119,28 +119,38 @@ def best_numeric(values: list[str]) -> str:
     return values[0]
 
 
-# Upstream uops.info measurements of control-flow instructions (RET, some
-# CALL/JMP forms) are recorded inside a call/ret loop harness, so the raw
-# ``uops`` count and ``TP_unrolled``/``TP_loop`` figures describe the
-# entire harness rather than the single measured instruction — RET_NEAR on
-# HSW reports ``uops=20``, ``TP_unrolled=33.35``. When the measurement
-# clearly can't be a single-instruction figure, drop the measured CPI
-# fields so callers fall back to modeled/IACA sources (or display ``-``).
+# Upstream uops.info records control-flow instructions (RET, some CALL/JMP
+# forms) inside a call/ret loop harness.  There ``uops`` and the
+# ``TP_unrolled``/``TP_loop`` figures describe the whole harness rather than
+# the single measured instruction: RET_NEAR on HSW reports ``uops=20``,
+# ``TP_unrolled=33.35``.  Microcoded forms report many uops too, but their
+# figure is real: VPCOMPRESSD (M512, K, ZMM) on ZEN4 runs 144 uops at a
+# measured 72.50 cycles.  uops.info attaches <latency> children when the
+# measurement covers the instruction's own operands, and the harness rows
+# carry none.  So a big uops count keeps its CPI only with latency data;
+# without it, drop the measured CPI fields so callers fall back to
+# modeled/IACA sources (or display ``-``).
+# shortcut: a harness row with latency children would pass, upgrade when
+# uops.info tags harness rows explicitly.
 _HARNESS_UOPS_THRESHOLD = 8
 
 
-def _measurement_is_harness_contaminated(measurement: dict[str, Any]) -> bool:
+def _measurement_is_harness_contaminated(details: dict[str, Any]) -> bool:
+    """True when *details* holds a harness-wide figure, not one instruction."""
+    measurement = details.get("measurement") or {}
     try:
         uops = int(float(measurement.get("uops", 0) or 0))
     except (TypeError, ValueError):
         return False
-    return uops >= _HARNESS_UOPS_THRESHOLD
+    if uops < _HARNESS_UOPS_THRESHOLD:
+        return False
+    return not (details.get("latencies") or [])
 
 
 def _cpi_values(details: dict[str, Any]) -> list[str]:
-    measurement = details.get("measurement") or {}
-    if _measurement_is_harness_contaminated(measurement):
+    if _measurement_is_harness_contaminated(details):
         return []
+    measurement = details.get("measurement") or {}
     out: list[str] = []
     for key in ("TP_unrolled", "TP_loop", "TP_ports", "TP"):
         value = measurement.get(key)
