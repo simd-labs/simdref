@@ -584,6 +584,29 @@ def _ports_for(details: dict[str, Any]) -> str | None:
     return str(ports)
 
 
+def _uops_for(details: dict[str, Any]) -> tuple[int | None, bool | None]:
+    """Return ``(uops, microcoded)`` for one core's measurement.
+
+    uops.info counts microcode-sequencer uops in ``uops_MS``; a positive
+    value marks the form microcoded. Rows without the key omit the flag so
+    the output never guesses ``False``. A harness-contaminated row loses
+    both, the same as its ports.
+    """
+    if perf._measurement_is_harness_contaminated(details):
+        return None, None
+
+    def _int(value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    measurement = details.get("measurement") or {}
+    uops = _int(measurement.get("uops"))
+    ms = _int(measurement.get("uops_MS"))
+    return uops, (None if ms is None else ms > 0)
+
+
 def collect_ports(
     record: InstructionRecord,
     *,
@@ -647,9 +670,15 @@ def format_annotation(
     if docs and record.summary and _summary_matches_form(record.summary, record):
         parts.append(record.summary.strip())
     if performance:
+        uops_frag = ""
         if arch is not None:
             lat, cpi, kind = arch_perf(record, arch)
             tag = arch_perf_tag(arch, lat, cpi, kind)
+            uops_val, microcoded_val = _uops_for((record.arch_details or {}).get(arch) or {})
+            if uops_val is not None:
+                uops_frag = f" uops={uops_val}"
+                if microcoded_val:
+                    uops_frag += " microcoded"
         else:
             summary = aggregate_perf(record, mode=agg, include_modeled=include_modeled)
             lat, cpi = summary.latency, summary.cpi
@@ -659,7 +688,7 @@ def format_annotation(
                 tag = f"[avg of {summary.n_archs} archs, {summary.source_kind}]"
             else:
                 tag = f"[{agg} of {summary.n_archs} archs, {summary.source_kind}]"
-        perf_frag = f"lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)} {tag}"
+        perf_frag = f"lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)}{uops_frag} {tag}"
         parts.append(perf_frag)
     return " | ".join(parts)
 
@@ -783,6 +812,14 @@ def _annotate_instruction(
         "cpi": cpi_val,
         "ports": ports_val,
     }
+    if opts.arch is not None:
+        # A single core is pinned, so its uop count is well defined. In the
+        # aggregate case the count differs per core and both fields stay out.
+        uops_val, microcoded_val = _uops_for((record.arch_details or {}).get(opts.arch) or {})
+        if uops_val is not None:
+            json_record["uops"] = uops_val
+        if microcoded_val is not None:
+            json_record["microcoded"] = microcoded_val
     if parsed.address is not None:
         json_record["address"] = f"0x{parsed.address:x}"
     if parsed.source_file:

@@ -65,6 +65,27 @@ def test_zen4_microcoded_form_keeps_cpi_when_tp_figures_differ(monkeypatch):
     assert row["cpi"] == 167.5
 
 
+def test_zen4_vpcompressd_reports_uops_and_microcoded(monkeypatch):
+    # Issue #57 "Expected": keep the uop count of the ZEN4 row and mark the
+    # form microcoded. The fixture row carries uops=144 and uops_MS=144.
+    rec = _records()["VPCOMPRESSD (M512, K, ZMM)"]
+    row = _annotate(monkeypatch, rec, "vpcompressd ZMMWORD PTR [rsi+rcx*4]{k1},zmm0", "ZEN4")
+    assert row["uops"] == 144
+    assert row["microcoded"] is True
+    assert "uops=144" in row["annotation"]
+    assert "microcoded" in row["annotation"]
+
+
+def test_skx_vaddps_reports_uops_and_not_microcoded(monkeypatch):
+    # A plain 1-uop form: uops_MS is 0, so microcoded is False, not omitted.
+    rec = _records()["VADDPS (ZMM, ZMM, ZMM)"]
+    row = _annotate(monkeypatch, rec, "vaddps %zmm1, %zmm0, %zmm2", "SKX")
+    assert row["uops"] == 1
+    assert row["microcoded"] is False
+    assert "uops=1" in row["annotation"]
+    assert "microcoded" not in row["annotation"]
+
+
 def test_ret_harness_row_drops_cpi_and_ports(monkeypatch):
     # The RET call/ret loop harness reports uops=20 and TP 33.35 for the
     # whole loop. The row must drop both the CPI and the harness ports.
