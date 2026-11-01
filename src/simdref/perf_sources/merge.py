@@ -7,6 +7,36 @@ from typing import Any, Iterable
 
 from simdref.models import InstructionRecord
 
+# Perf-source ids, best first. When several sources give perf for one
+# instruction form on one core, the catalog keeps exactly one value: the
+# one from the highest-priority source.
+SOURCE_UOPS_INFO = "uops.info"
+SOURCE_INSTLATX64 = "instlatx64"
+SOURCE_INTEL_GUIDE = "intel-guide"
+SOURCE_INTEL_OPTREF = "intel-optref"
+SOURCE_AMD_SWOPT = "amd-swopt"
+SOURCE_ARM_SWOPT = "arm-swopt"
+SOURCE_LLVM_MCA = "llvm-mca"
+SOURCE_LLVM_SCHEDULING = "llvm_scheduling"
+
+SOURCE_PRIORITY: tuple[str, ...] = (
+    SOURCE_UOPS_INFO,
+    SOURCE_INSTLATX64,
+    SOURCE_INTEL_GUIDE,
+    SOURCE_INTEL_OPTREF,
+    SOURCE_AMD_SWOPT,
+    SOURCE_ARM_SWOPT,
+    SOURCE_LLVM_MCA,
+    SOURCE_LLVM_SCHEDULING,
+)
+_SOURCE_RANK = {source: rank for rank, source in enumerate(SOURCE_PRIORITY)}
+
+
+def _entry_rank(entry: dict[str, Any]) -> int | None:
+    # Entries written by parse_uops_xml carry no ``source`` key; they are
+    # uops.info rows and take the top rank.
+    return _SOURCE_RANK.get(entry.get("source") or SOURCE_UOPS_INFO)
+
 
 @dataclass(frozen=True)
 class PerfRow:
@@ -75,9 +105,11 @@ def merge_perf_rows(
     matching form are updated (case-insensitive). Otherwise the row applies
     to every variant of the mnemonic (``applies_to="mnemonic"``).
 
-    ``overwrite=False`` (default) preserves existing ``arch_details[core]``
-    entries so measured data produced by earlier passes is never clobbered
-    by modeled data from a later pass.
+    ``overwrite=False`` (default) keeps one value per ``arch_details[core]``
+    slot: an incoming row replaces the existing entry only when its source
+    ranks higher in :data:`SOURCE_PRIORITY`. Slots whose source is unknown
+    to the priority table are never displaced, so passes that predate the
+    table keep their data.
 
     Returns the number of ``arch_details[core]`` entries newly written.
     """
@@ -102,9 +134,13 @@ def merge_perf_rows(
         if not matched and form_key:
             matched = targets  # graceful fallback: attach to every variant
         entry = row.as_arch_details_entry()
+        new_rank = _SOURCE_RANK.get(row.source)
         for record in matched:
-            if not overwrite and row.core in record.arch_details:
-                continue
+            existing = record.arch_details.get(row.core)
+            if existing is not None and not overwrite:
+                old_rank = _entry_rank(existing)
+                if new_rank is None or old_rank is None or new_rank >= old_rank:
+                    continue
             record.arch_details[row.core] = entry
             written += 1
     return written

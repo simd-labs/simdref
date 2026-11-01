@@ -89,6 +89,20 @@ AARCH64_CORES: tuple[CoreSpec, ...] = (
         frozenset({"neoverse-v2", "V2", "Neoverse-V2"}),
     ),
     CoreSpec(
+        "neoverse-n3",
+        "aarch64",
+        "aarch64-unknown-linux-gnu",
+        "neoverse-n3",
+        frozenset({"neoverse-n3", "N3", "Neoverse-N3"}),
+    ),
+    CoreSpec(
+        "neoverse-v3",
+        "aarch64",
+        "aarch64-unknown-linux-gnu",
+        "neoverse-v3",
+        frozenset({"neoverse-v3", "V3", "Neoverse-V3"}),
+    ),
+    CoreSpec(
         "a64fx", "aarch64", "aarch64-unknown-linux-gnu", "a64fx", frozenset({"a64fx", "A64FX"})
     ),
     # Apple cores reuse the Linux AArch64 triple so llvm-exegesis can
@@ -258,6 +272,44 @@ X86_CORES: tuple[CoreSpec, ...] = (
         "skymont",
         frozenset({"ARL-E", "skymont", "arrowlake-e", "arl-e"}),
     ),
+    # Raptor Lake, Lunar Lake, Granite Rapids and Sierra Forest have no
+    # uops.info rows in the vendored instructions.xml, so they carry no
+    # uops.info aliases.
+    CoreSpec(
+        "RPL",
+        "x86",
+        "x86_64-unknown-linux-gnu",
+        "raptorlake",
+        frozenset({"RPL", "raptorlake", "raptor-lake", "rpl"}),
+    ),
+    CoreSpec(
+        "LNL-P",
+        "x86",
+        "x86_64-unknown-linux-gnu",
+        "lioncove",
+        frozenset({"LNL-P", "lunarlake", "lunarlake-p", "lnl-p"}),
+    ),
+    CoreSpec(
+        "LNL-E",
+        "x86",
+        "x86_64-unknown-linux-gnu",
+        "skymont",
+        frozenset({"LNL-E", "lunarlake-e", "lnl-e"}),
+    ),
+    CoreSpec(
+        "GNR",
+        "x86",
+        "x86_64-unknown-linux-gnu",
+        "graniterapids",
+        frozenset({"GNR", "graniterapids", "granite-rapids", "gnr"}),
+    ),
+    CoreSpec(
+        "SRF",
+        "x86",
+        "x86_64-unknown-linux-gnu",
+        "sierraforest",
+        frozenset({"SRF", "sierraforest", "sierra-forest", "srf"}),
+    ),
     CoreSpec(
         "CNL",
         "x86",
@@ -348,6 +400,9 @@ X86_CORES: tuple[CoreSpec, ...] = (
     ),
     CoreSpec(
         "ZEN2", "x86", "x86_64-unknown-linux-gnu", "znver2", frozenset({"ZEN2", "zen2", "znver2"})
+    ),
+    CoreSpec(
+        "ZEN1", "x86", "x86_64-unknown-linux-gnu", "znver1", frozenset({"ZEN1", "zen1", "zen"})
     ),
     CoreSpec(
         "ZEN+",
