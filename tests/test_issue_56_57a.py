@@ -13,17 +13,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from simdref import arm_instructions
 from simdref.annotate import AnnotateOptions, annotate_stream
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.models import Catalog
 from simdref.storage import build_sqlite, load_instructions_by_mnemonic_from_db, open_db
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "issue_56" / "arm_a64_instructions.json"
+ACLE_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "issue_56" / "arm_acle_intrinsics_sample.json"
+)
 
 EXPECTED_SUMMARIES = {
+    # MOVI: operation title inside the AARCHMRS fixture.
     "MOVI": "Move Immediate.",
-    "FMLA": "Floating-point fused Multiply-Add.",
-    "LD4": "Load Multiple Structures.",
+    # FMLA and LD4: first sentence of the Arm ACLE intrinsics description.
+    "FMLA": "Floating-point fused Multiply-Add to accumulator (vector).",
+    "LD4": "Load multiple 4-element structures to four registers.",
+    # LDP: not in the ACLE data, so the title table wins.
     "LDP": "Load Pair of Registers.",
 }
 
@@ -51,7 +58,20 @@ ALL_CONDITION_CODES = {
 
 
 def _records() -> list:
-    return parse_arm_instruction_payload(FIXTURE.read_text())
+    # Point the ACLE summary loader at the sample fixture for this parse, so
+    # tests do not depend on the large vendored intrinsics.json.
+    module = arm_instructions
+    had_paths = hasattr(module, "_ARM_INTRINSICS_JSON_PATHS")
+    old_paths = getattr(module, "_ARM_INTRINSICS_JSON_PATHS", None)
+    if had_paths:
+        module._ARM_INTRINSICS_JSON_PATHS = (ACLE_FIXTURE,)
+        module._acle_instruction_summaries.cache_clear()
+    try:
+        return parse_arm_instruction_payload(FIXTURE.read_text())
+    finally:
+        if had_paths:
+            module._ARM_INTRINSICS_JSON_PATHS = old_paths
+            module._acle_instruction_summaries.cache_clear()
 
 
 _TMPDIRS: list = []
@@ -80,6 +100,26 @@ def _memory_db(records) -> sqlite3.Connection:
     return mem
 
 
+class AcleSummaryMapTest(unittest.TestCase):
+    """Issue #56: the ACLE intrinsics data keys summaries by A64 mnemonic."""
+
+    def test_map_keeps_single_instruction_a64_entries_only(self):
+        summaries = arm_instructions._acle_summaries_from_text(ACLE_FIXTURE.read_text())
+        self.assertEqual(
+            summaries,
+            {
+                "FMLA": "Floating-point fused Multiply-Add to accumulator (vector)",
+                "LD4": "Load multiple 4-element structures to four registers",
+            },
+        )
+
+    def test_multi_instruction_intrinsics_do_not_reach_the_map(self):
+        # vtbx1_s8 lowers to TBL plus MOVI; its text describes the table
+        # lookup, so it must not become the MOVI summary.
+        summaries = arm_instructions._acle_summaries_from_text(ACLE_FIXTURE.read_text())
+        self.assertNotIn("MOVI", summaries)
+
+
 class A64SummaryTest(unittest.TestCase):
     """Issue #56: rows take the Arm ARM title, not a placeholder."""
 
@@ -100,6 +140,18 @@ class A64SummaryTest(unittest.TestCase):
         # the data title when the payload carries one.
         movi = next(record for record in self.records if record.mnemonic == "MOVI")
         self.assertEqual(movi.summary, "Move Immediate.")
+
+    def test_acle_sentence_beats_the_mnemonic_table(self) -> None:
+        # FMLA and LD4 are in the ACLE sample; its first sentence wins over
+        # the title-table text (issue #56 follow-up).
+        seen = {record.mnemonic: record.summary for record in self.records}
+        self.assertEqual(seen["FMLA"], "Floating-point fused Multiply-Add to accumulator (vector).")
+        self.assertEqual(seen["LD4"], "Load multiple 4-element structures to four registers.")
+
+    def test_title_table_survives_where_acle_is_silent(self) -> None:
+        # LDP has no single-instruction ACLE entry, so the table text stays.
+        ldp = next(record for record in self.records if record.mnemonic == "LDP")
+        self.assertEqual(ldp.summary, "Load Pair of Registers.")
 
     def test_fallback_is_a_real_sentence(self) -> None:
         # A mnemonic without a data title or a table entry keeps a generated

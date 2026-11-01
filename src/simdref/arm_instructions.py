@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import html
 import json
 import re
+from collections import Counter
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from simdref.models import InstructionRecord
@@ -28,13 +32,83 @@ def _canonical_instruction_key(name: str, form: str) -> str:
     return f"{instruction_name} ({instruction_form.upper()})"
 
 
-# Arm ARM titles for mnemonics whose summary the AARCHMRS payload does not
-# carry (this release ships no node titles and no operation briefs).
+# Arm ARM titles for mnemonics the AARCHMRS payload and the ACLE intrinsics
+# data do not name (the payload ships no titles and no operation briefs; the
+# ACLE data is intrinsic-driven and skips scalar instructions).
 _AARCHMRS_TITLES: dict[str, str] = {
+    "MOVI": "Move Immediate",
     "FMLA": "Floating-point fused Multiply-Add",
     "LD4": "Load Multiple Structures",
     "LDP": "Load Pair of Registers",
 }
+
+# The ACLE intrinsics file pairs every intrinsic with the A64 instruction it
+# lowers to and describes the intrinsic. Single-instruction entries give a
+# real summary sentence keyed by mnemonic.
+_ARM_INTRINSICS_JSON_PATHS: tuple[Path, ...] = (
+    Path(__file__).resolve().parents[2] / "vendor" / "arm" / "intrinsics.json",
+)
+
+_ACLE_SUMMARY_CAP = 160
+
+
+def _acle_first_sentence(description: str) -> str:
+    clean = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html.unescape(description))).strip()
+    sentence = clean.split(". ")[0].rstrip(".")
+    if len(sentence) > _ACLE_SUMMARY_CAP:
+        sentence = sentence[:_ACLE_SUMMARY_CAP].rsplit(" ", 1)[0]
+    return sentence
+
+
+def _acle_summaries_from_text(text: str) -> dict[str, str]:
+    """First-sentence summaries keyed by A64 mnemonic from ACLE intrinsics.
+
+    An entry counts only when it lowers to exactly one mnemonic; entries that
+    lower to several instructions describe the intrinsic, so their text would
+    mislabel the target (vtbx1_s8 lowers to TBL plus MOVI).
+    """
+    try:
+        entries = json.loads(text)
+    except ValueError:
+        return {}
+    if not isinstance(entries, list):
+        return {}
+    buckets: dict[str, Counter[str]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if "A64" not in (entry.get("Architectures") or []):
+            continue
+        mnemonics: set[str] = set()
+        for group in entry.get("instructions") or []:
+            if not isinstance(group, dict):
+                continue
+            for instruction in group.get("list") or []:
+                if not isinstance(instruction, dict):
+                    continue
+                base = str(instruction.get("base_instruction") or "").strip().upper()
+                if base:
+                    mnemonics.add(base)
+        if len(mnemonics) != 1:
+            continue
+        sentence = _acle_first_sentence(str(entry.get("description") or ""))
+        if sentence:
+            buckets.setdefault(mnemonics.pop(), Counter())[sentence] += 1
+    return {mnemonic: counts.most_common(1)[0][0] for mnemonic, counts in buckets.items()}
+
+
+@lru_cache(maxsize=1)
+def _acle_instruction_summaries() -> dict[str, str]:
+    for path in _ARM_INTRINSICS_JSON_PATHS:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        summaries = _acle_summaries_from_text(text)
+        if summaries:
+            return summaries
+    return {}
+
 
 # A64 condition-code spellings for B.cond, including the hs/lo forms
 # llvm-objdump prints (Arm ARM lists cs/cc for the same field values).
@@ -64,6 +138,9 @@ def _generated_summary(mnemonic: str) -> str:
     core = mnemonic.strip().upper()
     if not core:
         return "Arm instruction."
+    acle = _acle_instruction_summaries().get(core)
+    if acle:
+        return f"{acle}."
     title = _AARCHMRS_TITLES.get(core)
     if title:
         return f"{title}."
