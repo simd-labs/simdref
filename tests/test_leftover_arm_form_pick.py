@@ -12,14 +12,14 @@ mov form shows nothing. Hover and inlay hints go through the same picker,
 so they agree on every row.
 """
 
-import os
 import tempfile
 import unittest
 from pathlib import Path
 from urllib.parse import quote
 
 from simdref.lsp import _hover_markdown, _hint_label, _mnemonic_from_asm_line
-from simdref.storage import SQLITE_PATH, open_db
+from simdref.models import Catalog, InstructionRecord, SourceVersion
+from simdref.storage import build_sqlite, open_db
 
 
 def _form_evidence(fragment: str) -> str:
@@ -31,14 +31,137 @@ def _form_evidence(fragment: str) -> str:
     return quote(fragment, safe="()")
 
 
-_USER_CATALOG = Path.home() / ".local" / "share" / "simdref" / "catalog.db"
-_catalog_env = os.environ.get("SIMDREF_CATALOG", "")
-_missing = Path(tempfile.gettempdir()) / "simdref-test-no-catalog.db"
-CATALOG = (
-    Path(_catalog_env)
-    if _catalog_env and Path(_catalog_env).is_file()
-    else (_missing if _catalog_env else (SQLITE_PATH if SQLITE_PATH.is_file() else _USER_CATALOG))
-)
+def _record(mnemonic: str, form: str, summary: str, isa: str, architecture: str = "arm"):
+    return InstructionRecord(
+        mnemonic=mnemonic,
+        form=form,
+        summary=summary,
+        architecture=architecture,
+        isa=isa.split(),
+    )
+
+
+# The fixture catalog: one row per key the picks below must discriminate.
+# The asserted fragments are prefixes of these keys, so the matcher ranks the
+# same rows here as on a full aarchmrs catalog, without reading the ambient
+# one. The two MOVA rows keep the vendored FAT-2025-09 ZA-tile spelling the
+# pins name; the FAT-2026-06 bundle spells the tile <ZAD__ZERO>/<ZAN__ZERO>
+# and the pick is the same row either way.
+ROWS = [
+    _record("ADD", "ADD (<WDWSP_OPTION>, <WNWSP_OPTION>, <HASH>#0#0)", "Add operands.", "A64"),
+    _record("ADD", "ADD (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)", "Add operands.", "A64"),
+    _record("ADD", "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)", "Add operands.", "A64"),
+    _record(
+        "ADD",
+        "ADD (<XDSP_OPTION>, <XNSP_OPTION__6>, <R_OPTION__2><RM_OPTION><OPTIONAL_EXTEND__16>)",
+        "Add operands.",
+        "A64",
+    ),
+    _record("ADDS", "ADDS (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)", "Add operands.", "A64"),
+    _record("ADDS", "ADDS (<XDORXZR__6>, <XNSP_OPTION__3>, <HASH>#0#0)", "Add operands.", "A64"),
+    _record(
+        "ADDS",
+        "ADDS (<XDORXZR__6>, <XNSP_OPTION__6>, <R_OPTION__2><RM_OPTION><OPTIONAL_EXTEND__17>)",
+        "Add operands.",
+        "A64",
+    ),
+    _record("ANDS", "ANDS (<WDORWZR>, <WNORWZR>, <HASH>#0)", "Ands instruction.", "A64"),
+    _record("ANDS", "ANDS (<WDORWZR>, <WNORWZR__3>, <WMORWZR__2>#0)", "Ands instruction.", "A64"),
+    _record("ANDS", "ANDS (<XDORXZR__6>, <XNORXZR__11>, <HASH>#0)", "Ands instruction.", "A64"),
+    _record(
+        "ANDS", "ANDS (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)", "Ands instruction.", "A64"
+    ),
+    _record("ANDS", "ANDS (P0.B, P0/Z, P1.B, P2.B)", "Ands instruction.", "SVE"),
+    _record(
+        "LD1B",
+        "LD1B ({<OPT_SPACE><ZT1>.B-<ZT2>.B<OPT_SPACE>}, <PNG>/Z, [<XNSP__3>#0])",
+        "Load data.",
+        "SME",
+    ),
+    _record(
+        "LD1B",
+        "LD1B ({<OPT_SPACE><ZT1__2>.B-<ZT4>.B<OPT_SPACE>}, <PNG>/Z, [<XNSP__3>#0])",
+        "Load data.",
+        "SME",
+    ),
+    _record(
+        "LD1B", "LD1B ({<OPT_SPACE>Z0.B<OPT_SPACE>}, P0/Z, [<XNSP__3>#0])", "Load data.", "SVE"
+    ),
+    _record(
+        "LD1B", "LD1B ({<OPT_SPACE>Z0.B<OPT_SPACE>}, P0/Z, [<XNSP__3>, X2])", "Load data.", "SVE"
+    ),
+    _record(
+        "LD1W", "LD1W ({<OPT_SPACE>Z0.S<OPT_SPACE>}, P0/Z, [<XNSP__3>#0])", "Load data.", "SVE"
+    ),
+    _record("LDP", "LDP (<XT1ORXZR>, <XT2ORXZR>, [<XNSP_OPTION>], <HASH>#0)", "Load data.", "A64"),
+    _record("LDR", "LDR (<ST>, [<XNSP_OPTION>], <HASH>#0)", "Load data.", "A64"),
+    _record(
+        "LDR",
+        "LDR (<WTORWZR__4>, [<XNSP_OPTION>, <WORX_CHOICE><OPTIONAL_EXTEND__6>])",
+        "Load data.",
+        "A64",
+    ),
+    _record(
+        "LDR",
+        "LDR (<XTORXZR__11>, [<XNSP_OPTION>, <WORX_CHOICE><OPTIONAL_EXTEND__9>])",
+        "Load data.",
+        "A64",
+    ),
+    _record("MOVA", "MOVA (ZA0<HV__7>.B[W1, #0], P0/M, Z1.B)", "Mova instruction.", "SME"),
+    _record("MOVA", "MOVA (Z0.B, P0/M, ZA0<HV__4>.B[W1, #0])", "Mova instruction.", "SME"),
+    _record("MOVN", "MOVN (<WDORWZR>, <HASH>#0<OPTIONAL_EXTEND__12>)", "Movn instruction.", "A64"),
+    _record(
+        "MOVN", "MOVN (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)", "Movn instruction.", "A64"
+    ),
+    _record("MOVZ", "MOVZ (<WDORWZR>, <HASH>#0<OPTIONAL_EXTEND__12>)", "Movz instruction.", "A64"),
+    _record(
+        "MOVZ", "MOVZ (<XDORXZR__6>, <HASH>#0<OPTIONAL_EXTEND__13>)", "Movz instruction.", "A64"
+    ),
+    _record("ORR", "ORR (<WDWSP_OPTION>, <WNORWZR>, <HASH>#0)", "Orr instruction.", "A64"),
+    _record("ORR", "ORR (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)", "Orr instruction.", "A64"),
+    _record("ORR", "ORR (<XDSP_OPTION>, <XNORXZR__11>, <HASH>#0)", "Orr instruction.", "A64"),
+    _record(
+        "ST1B",
+        "ST1B ({<OPT_SPACE><ZT1>.B-<ZT2>.B<OPT_SPACE>}, <PNG>, [<XNSP__3>#0])",
+        "Store data.",
+        "SME",
+    ),
+    _record("ST1D", "ST1D ({<OPT_SPACE>Z0.D<OPT_SPACE>}, P0, [<XNSP__3>#0])", "Store data.", "SVE"),
+    _record(
+        "ST1W",
+        "ST1W ({<OPT_SPACE><ZT1>.S-<ZT2>.S<OPT_SPACE>}, <PNG>, [<XNSP__3>#0])",
+        "Store data.",
+        "SME",
+    ),
+    _record("STR", "STR (<XTORXZR__11>, [<XNSP_OPTION>, <HASH>#0]!)", "Store data.", "A64"),
+    _record(
+        "SUB",
+        "SUB (<XDSP_OPTION>, <XNSP_OPTION__6>, <R_OPTION__2><RM_OPTION><OPTIONAL_EXTEND__16>)",
+        "Subtract operands.",
+        "A64",
+    ),
+    _record("SUBS", "SUBS (<WDORWZR>, <WNORWZR__3>, <WMORWZR__2>#0)", "Subtract operands.", "A64"),
+    _record("SUBS", "SUBS (<WDORWZR>, <WNWSP_OPTION>, <HASH>#0#0)", "Subtract operands.", "A64"),
+    _record(
+        "SUBS",
+        "SUBS (<WDORWZR>, <WNWSP_OPTION__2>, <WMORWZR__2><OPTIONAL_EXTEND__15>)",
+        "Subtract operands.",
+        "A64",
+    ),
+    _record(
+        "SUBS", "SUBS (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)", "Subtract operands.", "A64"
+    ),
+    _record(
+        "SUBS", "SUBS (<XDORXZR__6>, <XNSP_OPTION__3>, <HASH>#0#0)", "Subtract operands.", "A64"
+    ),
+    _record(
+        "SUBS",
+        "SUBS (<XDORXZR__6>, <XNSP_OPTION__6>, <R_OPTION__2><RM_OPTION><OPTIONAL_EXTEND__17>)",
+        "Subtract operands.",
+        "A64",
+    ),
+    _record("STR", "STR (M16)", "Store Task Register.", "I286PROTECTED", architecture="x86"),
+]
 
 # (line, fragment in the hover form). None = no hover, no hint.
 FORM_ROWS = [
@@ -160,16 +283,27 @@ MOV_NULL_ROWS = [
 class LeftoverArmFormPickTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not CATALOG.is_file():
-            raise unittest.SkipTest(f"simdref catalog missing at {CATALOG}")
-        cls._conn = open_db(path=CATALOG)
-        cls._conn.execute("PRAGMA query_only=1")
-        cls._db_path = str(CATALOG)
+        cls._tmp = tempfile.TemporaryDirectory(prefix="simdref-arm-form-pick-")
+        db = Path(cls._tmp.name) / "catalog.db"
+        build_sqlite(
+            Catalog(
+                intrinsics=[],
+                instructions=ROWS,
+                sources=[
+                    SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")
+                ],
+                generated_at="2025-01-01",
+            ),
+            db,
+        )
+        cls._conn = open_db(path=db)
+        # _hint_label opens by path and caches per catalog path and mtime.
+        cls._db_path = str(db)
 
     @classmethod
     def tearDownClass(cls):
-        if getattr(cls, "_conn", None) is not None:
-            cls._conn.close()
+        cls._conn.close()
+        cls._tmp.cleanup()
 
     def _hover_and_hint(self, line):
         mnemonic, operand_count, operands = _mnemonic_from_asm_line(line, False)
