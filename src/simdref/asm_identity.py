@@ -926,3 +926,59 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
         else:
             result.reason = f"ambiguous: {len(rows)} rows share iform {facts['iform']}"
             result.candidates = [row.db_key for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# ISA detection by assembler acceptance
+# ---------------------------------------------------------------------------
+
+# Candidate triples for family detection, mapped to the catalog families.
+_ISA_CANDIDATES = (
+    ("x86", "att", "x86"),
+    ("x86", "intel", "x86"),
+    ("aarch64", "att", "arm"),
+    ("riscv64", "att", "riscv"),
+)
+
+
+def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
+    """Name each line's ISA family by the triples whose assembler encodes it.
+
+    One llvm-mc run per candidate triple (x86 AT&T and Intel, aarch64,
+    riscv64). A line one triple alone accepts takes that family. A line
+    several triples accept takes the document majority of the singly
+    accepted lines. An entry stays None when no strict majority exists or
+    llvm-mc is missing, and the caller keeps its old vote then. ``lines``
+    holds instruction text (mnemonic and operands) with objdump columns
+    and symbol annotations already stripped.
+    """
+    if not lines:
+        return [], None
+    llvm_mc = _tool_path("SIMDREF_LLVM_MC", "llvm-mc")
+    if llvm_mc is None:
+        return [None] * len(lines), None
+    accepted: list[set[str]] = [set() for _ in lines]
+    for arch, syntax, family in _ISA_CANDIDATES:
+        for entry, families in zip(_probe_lines(list(lines), arch, syntax, llvm_mc), accepted):
+            if entry["status"] == "OK":
+                families.add(family)
+    counts: dict[str, int] = {}
+    for families in accepted:
+        if len(families) == 1:
+            name = next(iter(families))
+            counts[name] = counts.get(name, 0) + 1
+    majority = None
+    if counts:
+        top = max(counts.values())
+        winners = [name for name, count in counts.items() if count == top]
+        if len(winners) == 1:
+            majority = winners[0]
+    out: list[str | None] = []
+    for families in accepted:
+        if len(families) == 1:
+            out.append(next(iter(families)))
+        elif families:
+            out.append(majority)
+        else:
+            out.append(None)
+    return out, majority
