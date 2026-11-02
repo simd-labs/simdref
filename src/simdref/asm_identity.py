@@ -111,7 +111,9 @@ class LineResult:
 def _tool_path(env_var: str, tool: str) -> str | None:
     override = os.environ.get(env_var)
     if override:
-        return override
+        # A dead override answers like no tool: callers degrade to their
+        # no-tool path instead of crashing (review REV3 finding 1).
+        return override if os.access(override, os.X_OK) else None
     try:
         import simdref_llvm_mc
     except ImportError:
@@ -958,10 +960,15 @@ def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
     if llvm_mc is None:
         return [None] * len(lines), None
     accepted: list[set[str]] = [set() for _ in lines]
-    for arch, syntax, family in _ISA_CANDIDATES:
-        for entry, families in zip(_probe_lines(list(lines), arch, syntax, llvm_mc), accepted):
-            if entry["status"] == "OK":
-                families.add(family)
+    try:
+        for arch, syntax, family in _ISA_CANDIDATES:
+            for entry, families in zip(_probe_lines(list(lines), arch, syntax, llvm_mc), accepted):
+                if entry["status"] == "OK":
+                    families.add(family)
+    except OSError:
+        # A missing or failing llvm-mc answers like no tool: all None and
+        # the caller keeps its register vote.
+        return [None] * len(lines), None
     counts: dict[str, int] = {}
     for families in accepted:
         if len(families) == 1:

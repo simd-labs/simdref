@@ -202,3 +202,24 @@ def test_helper_declines_without_the_tool(monkeypatch):
     families, majority = isa_by_acceptance(_doc("rv_x_regs.s"))
     assert families == [None, None]
     assert majority is None
+
+
+def test_dead_env_var_path_falls_back_to_the_register_vote(monkeypatch):
+    # A dead SIMDREF_LLVM_MC path must degrade to the register vote, the
+    # same answer a missing tool gives.
+    text = (FIXTURES / "issue_51" / "aarch64_stdin.s").read_text()
+    rows = _rows(
+        ("LSL", "LSL (R16, R16)", "Load Segment Limit.", "x86"),
+        ("LSL", "LSL (X0, X0, I12)", "Lsl instruction.", "arm"),
+        ("RET", "RET (X30)", "Ret instruction.", "arm"),
+    )
+    monkeypatch.setenv("SIMDREF_LLVM_MC", "/nonexistent")
+    env_records = _annotate_json(text, rows, monkeypatch)
+    monkeypatch.delenv("SIMDREF_LLVM_MC")
+    monkeypatch.setattr("simdref.asm_identity._tool_path", lambda *args: None)
+    none_records = _annotate_json(text, rows, monkeypatch)
+    assert env_records == none_records
+    assert [record["summary"] for record in env_records[:2]] == [
+        "Lsl instruction.",
+        "Ret instruction.",
+    ]
