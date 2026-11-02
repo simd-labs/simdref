@@ -42,6 +42,8 @@ def test_annotate_json_with_track_positions_emits_address(monkeypatch):
         }
         operand_details = []
         key = "VFMADD231PS (XMM, XMM, XMM)"
+        architecture = "x86"
+        isa = []
 
     monkeypatch.setattr(_annotate, "lookup", lambda mn, conn, isa=None: [_FakeRecord()])
     monkeypatch.setattr(
@@ -75,6 +77,8 @@ def test_annotate_default_mode_annotates_objdump_input(monkeypatch):
         }
         operand_details: ClassVar = []
         key = "VSUBPD (YMM, YMM, YMM)"
+        architecture: ClassVar = "x86"
+        isa: ClassVar = []
 
     monkeypatch.setattr(_annotate, "lookup", lambda mn, conn, isa=None: [_FakeRecord()])
     monkeypatch.setattr(

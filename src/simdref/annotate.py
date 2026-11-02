@@ -907,6 +907,7 @@ def _annotate_instruction(
     stats: dict[str, int] | None = None,
     identity_key: str | None = None,
     line_isa: str | None = None,
+    line_number: int | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Return the rendered output line and an optional JSON record.
 
@@ -933,6 +934,8 @@ def _annotate_instruction(
             no_row["source_file"] = parsed.source_file
         if parsed.source_line is not None:
             no_row["source_line"] = parsed.source_line
+        no_row["line"] = line_number
+        no_row["source"] = parsed.raw
         return f"{parsed.raw}   # {parsed.mnemonic}: no measured row", no_row
     # Byte identity wins over the form pick: the record is what the line
     # assembles to, and an empty row keeps the old pick unchanged.
@@ -980,6 +983,8 @@ def _annotate_instruction(
                 unknown_rec["source_file"] = parsed.source_file
             if parsed.source_line is not None:
                 unknown_rec["source_line"] = parsed.source_line
+            unknown_rec["line"] = line_number
+            unknown_rec["source"] = parsed.raw
             return f"{parsed.raw}   {marker}", unknown_rec
         return parsed.raw, None
 
@@ -1033,6 +1038,10 @@ def _annotate_instruction(
         json_record["source_file"] = parsed.source_file
     if parsed.source_line is not None:
         json_record["source_line"] = parsed.source_line
+    json_record["line"] = line_number
+    json_record["source"] = parsed.raw
+    json_record["architecture"] = record.architecture
+    json_record["isa"] = record.isa
 
     if opts.block:
         block_line = f"{parsed.indent}# {annotation}"
@@ -1157,6 +1166,7 @@ def annotate_stream(
             line_isa=opts.isa
             if not auto_isa
             else line_family.get(index) or _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
+            line_number=index + 1,
         )
         if collecting_json:
             if record is not None:

@@ -127,6 +127,8 @@ class TestNoCatalogRow:
             "mnemonic": "vmovapd",
             "known": False,
             "no_measured_row": True,
+            "line": 1,
+            "source": REG_REG[0],
         }
         assert records[1]["known"] is True
 
