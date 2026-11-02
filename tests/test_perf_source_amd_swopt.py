@@ -5,7 +5,12 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from simdref.perf_sources.amd_swopt import WORKBOOKS, load_vendored, parse_workbook
+from simdref.perf_sources.amd_swopt import (
+    WORKBOOKS,
+    concrete_lines,
+    load_vendored,
+    parse_workbook,
+)
 from simdref.perf_sources.cores import canonical_core_id
 from simdref.perf_sources.merge import SOURCE_AMD_SWOPT, PerfRow
 
@@ -69,6 +74,51 @@ class ParseWorkbookTests(unittest.TestCase):
         for spec in WORKBOOKS:
             with self.subTest(workbook=spec.match):
                 self.assertEqual(canonical_core_id(spec.core), spec.core)
+
+
+class ConcreteLinesTests(unittest.TestCase):
+    """The rewrite table turns workbook shapes into concrete instructions."""
+
+    def _lines(self, mnemonic: str, form: str) -> list[str]:
+        row = PerfRow(
+            mnemonic=mnemonic,
+            core="ZEN4",
+            source=SOURCE_AMD_SWOPT,
+            source_kind="modeled",
+            source_version="test",
+            architecture="x86",
+            form=form,
+        )
+        return concrete_lines(row)
+
+    def test_implicit_register_writes_as_its_register(self):
+        self.assertEqual(self._lines("BLENDVPD", "xmm1,xmm2,<xmm0>"), ["BLENDVPD xmm1, xmm2, xmm0"])
+
+    def test_shape_expands_to_one_instruction_per_width(self):
+        self.assertEqual(self._lines("vaddps", "xy"), ["vaddps xmm1", "vaddps ymm1"])
+
+    def test_slash_alternatives_name_each_form(self):
+        self.assertEqual(
+            self._lines("addpd", "x,x/m")[:2],
+            ["addpd xmm1, xmm2", "addpd xmm1, byte ptr [rax]"],
+        )
+
+    def test_width_alternatives_take_the_family_of_the_first_token(self):
+        self.assertEqual(
+            self._lines("fld", "mem32/64"),
+            ["fld dword ptr [rax]", "fld qword ptr [rax]"],
+        )
+
+    def test_bare_mnemonic_row_writes_the_mnemonic(self):
+        self.assertEqual(self._lines("aaa", ""), ["aaa"])
+
+    def test_x87_memory_form_drops_the_implicit_st0(self):
+        lines = self._lines("fadd", "s/m,s_")
+        self.assertIn("fadd st(1), st(0)", lines)
+        self.assertIn("fadd dword ptr [rax]", lines)
+
+    def test_unknown_shape_writes_no_instruction(self):
+        self.assertEqual(self._lines("vaddps", "quux,quux"), [])
 
 
 class LoadVendoredTests(unittest.TestCase):

@@ -1,0 +1,14 @@
+[
+  {
+    "mnemonic": "BLENDVPD",
+    "form": "BLENDVPD (XMM, XMM)",
+    "summary": "Variable Blend Packed Double Precision Floating-Point Values.",
+    "iform": "BLENDVPD_XMMdq_XMMdq"
+  },
+  {
+    "mnemonic": "BLENDVPD",
+    "form": "BLENDVPD (XMM, M128)",
+    "summary": "Variable Blend Packed Double Precision Floating-Point Values.",
+    "iform": "BLENDVPD_XMMdq_MEMdq"
+  }
+]
