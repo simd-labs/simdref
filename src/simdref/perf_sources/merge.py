@@ -194,8 +194,21 @@ def merge_perf_rows(
             [],
         ).append(record)
 
+    rows = list(rows)
+    amd_at = [i for i, row in enumerate(rows) if row.source == SOURCE_AMD_SWOPT]
+    amd_matches: dict[int, Any] = {}
+    if amd_at:
+        # AMD workbook rows name operand classes, so at ingest the encoded
+        # bytes pick the catalog rows. None keeps the operand-class matcher
+        # (tool missing or no encoding identity in the catalog).
+        from simdref.perf_sources.amd_swopt import match_rows_by_bytes
+
+        resolved = match_rows_by_bytes([rows[i] for i in amd_at], records)
+        if resolved is not None:
+            amd_matches = dict(zip(amd_at, resolved))
+
     written = 0
-    for row in rows:
+    for i, row in enumerate(rows):
         targets = by_arch_mnemonic.get(
             (row.architecture.casefold() or _arch_guess(row.core), row.mnemonic.casefold()),
             [],
@@ -203,18 +216,26 @@ def merge_perf_rows(
         if not targets:
             continue
         form_key = row.form.strip().casefold()
-        if row.form_classes:
-            # Class rows (AMD workbook operand codes) land on the catalog
-            # forms whose operands match the classes position by position.
-            matched = [
-                r
-                for r in targets
-                if _form_class_match(row.form_classes, _record_form_classes(r.form))
-            ]
+        if i in amd_matches:
+            # Bytes decide; a row that names no catalog row is dropped
+            # here and never spread over every variant.
+            named = set(amd_matches[i].targets)
+            matched = [r for r in targets if r.db_key in named]
         else:
-            matched = [r for r in targets if not form_key or r.form.strip().casefold() == form_key]
-        if not matched and (form_key or row.form_classes):
-            matched = targets  # graceful fallback: attach to every variant
+            if row.form_classes:
+                # Class rows (AMD workbook operand codes) land on the catalog
+                # forms whose operands match the classes position by position.
+                matched = [
+                    r
+                    for r in targets
+                    if _form_class_match(row.form_classes, _record_form_classes(r.form))
+                ]
+            else:
+                matched = [
+                    r for r in targets if not form_key or r.form.strip().casefold() == form_key
+                ]
+            if not matched and (form_key or row.form_classes):
+                matched = targets  # fallback when the bytes cannot decide
         entry = row.as_arch_details_entry()
         new_rank = _SOURCE_RANK.get(row.source)
         for record in matched:

@@ -926,3 +926,54 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
         else:
             result.reason = f"ambiguous: {len(rows)} rows share iform {facts['iform']}"
             result.candidates = [row.db_key for row in rows]
+
+
+def identify_x86_instructions(
+    texts: list[str],
+    rows: "list[Row]",
+    *,
+    llvm_mc: str | None = None,
+    xed: str | None = None,
+) -> list[LineResult]:
+    """Map concrete Intel-syntax instruction lines to one catalog row each.
+
+    The x86 path of :func:`identify` for generated instruction lines (the
+    AMD workbook rows at ingest): one llvm-mc run for the whole batch, one
+    XED decode pass, and the iform pools built from ``rows`` decide each
+    line exactly like a document line.
+    """
+    from types import SimpleNamespace
+
+    if not texts:
+        return []
+    if llvm_mc is None:
+        llvm_mc = _tool_path("SIMDREF_LLVM_MC", "llvm-mc")
+    if llvm_mc is None:
+        raise ToolUnavailableError("llvm-mc not found (set SIMDREF_LLVM_MC)")
+    if xed is None:
+        xed = _tool_path("SIMDREF_XED", "xed")
+    if xed is None:
+        raise ToolUnavailableError("xed decoder not found (set SIMDREF_XED)")
+    probed = _probe_lines(texts, "x86", "intel", llvm_mc)
+    results = [
+        LineResult(
+            n=entry["n"],
+            text=entry["text"],
+            status="not-an-instruction" if entry["status"] == "NOT-AN-INSTRUCTION" else "no-row",
+            reason=(
+                entry.get("kind", "")
+                if entry["status"] == "NOT-AN-INSTRUCTION"
+                else entry.get("error", "rejected by llvm-mc")
+                if entry["status"] == "REJECTED"
+                else ""
+            ),
+        )
+        for entry in probed
+    ]
+    iform_pools: dict[str, list[Row]] = {}
+    for row in rows:
+        if row.iform:
+            iform_pools.setdefault(row.iform, []).append(row)
+    # _identify_x86 reads only iform_pools from its catalog argument
+    _identify_x86(probed, results, SimpleNamespace(iform_pools=iform_pools), xed)
+    return results

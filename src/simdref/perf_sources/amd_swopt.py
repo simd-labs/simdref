@@ -459,6 +459,247 @@ def refresh(rawdir: Path | str, outdir: Path | str | None = None) -> RefreshRepo
     return report
 
 
+# ---------------------------------------------------------------------------
+# concrete instructions: workbook rows -> catalog rows by encoded bytes
+# ---------------------------------------------------------------------------
+
+# Memory and register names for the workbook width numbers. The bare
+# shapes (``m``, ``reg``) name every width the old class wildcard matched;
+# the assembler rejects the widths the instruction does not take.
+_MEM_SIZE = {
+    8: "byte",
+    16: "word",
+    32: "dword",
+    64: "qword",
+    80: "tbyte",
+    128: "xmmword",
+    256: "ymmword",
+    512: "zmmword",
+}
+_GPR_NAME = {8: "al", 16: "ax", 32: "eax", 64: "rax"}
+_SHAPES = {
+    "x": ("xmm",),
+    "y": ("ymm",),
+    "z": ("zmm",),
+    "xy": ("xmm", "ymm"),
+    "xyz": ("xmm", "ymm", "zmm"),
+    "yz": ("ymm", "zmm"),
+}
+# One small immediate takes the imm8 encoding, the wide ones force the
+# imm16/imm32 encodings, so the immediate-width forms stay distinct.
+_IMM = ("2", "0x1234", "0x12345678")
+
+
+def _operand_alts(operand: str) -> list[str]:
+    # Same tokenization as form_classes: trailing width alternatives take
+    # the family of the first token ("reg8/16/32" reads "reg8/reg16/reg32").
+    widen = re.fullmatch(r"([a-z\[\]_]*[a-z_\]])(\d+)((?:/\d+)+)", operand)
+    if widen:
+        return [f"{widen.group(1)}{w}" for w in [widen.group(2), *widen.group(3)[1:].split("/")]]
+    return operand.split("/")
+
+
+def _alt_token(alt: str) -> str:
+    # ``{k1}`` mask and ``{z}`` suffixes and the workbook's quote/bracket
+    # artifacts carry no operand meaning.
+    return re.sub(r"\{.*$", "", alt).strip().strip("'`_<>")
+
+
+def _alt_width(alt: str) -> int | None:
+    a = _alt_token(alt)
+    if a in _SHAPES:
+        return {"x": 128, "y": 256, "z": 512}.get(a[-1], 512)
+    reg = re.fullmatch(r"(?:xmm|ymm|zmm)(\d+)?", a, re.IGNORECASE)
+    if reg:
+        return {"xmm": 128, "ymm": 256, "zmm": 512}[a.lower()[:3]]
+    mem = re.fullmatch(r"mem(?:em)?(\d+)(?:bcst)?", a)
+    if mem:
+        return int(mem.group(1))
+    return None
+
+
+def _alt_lines(alt: str, pos: int, op_width: int) -> list[str]:
+    if alt.strip() == "s_":
+        return ["st(0)"]  # x87 ST(0); see the memory rule in concrete_lines
+    if alt.strip() == "m_":
+        return ["qword ptr [rax]"]
+    a = _alt_token(alt)
+    n = min(pos + 1, 7)
+    if not a:
+        return []
+    if a == "cl":
+        return ["cl"]
+    if a in ("s", "sti"):
+        return ["st(1)"]
+    if a in _SHAPES:
+        return [f"{family}{n}" for family in _SHAPES[a]]
+    if a == "M":
+        return [f"mm{n}"]  # workbook capital M is the MMX register
+    if a == "Mi":
+        return [f"mm{n}", _IMM[0]]  # MMX register or immediate
+    if a == "xi":
+        return [f"xmm{n}", _IMM[0]]  # xmm register or immediate
+    reg = re.fullmatch(r"(xmm|ymm|zmm|mmx|mm)(\d+)?", a, re.IGNORECASE)
+    if reg:
+        family = reg.group(1).lower()
+        family = "mm" if family == "mmx" else family
+        num = reg.group(2) or str(n)
+        return [f"{family}{num}"]
+    fixed = re.fullmatch(r"(?:\[)?r(?:eg)?(\d+)(?:\])?", a)
+    if fixed:
+        return [_GPR_NAME[int(fixed.group(1))]]
+    if re.fullmatch(r"(?:\[)?(?:r|reg|g|gx)(?:\])?", a):
+        return [_GPR_NAME[w] for w in (8, 16, 32, 64)]
+    imm = re.fullmatch(r"imm(\d+)?", a, re.IGNORECASE)
+    if imm:
+        if imm.group(1) == "8":
+            return [_IMM[0]]
+        if imm.group(1) == "16":
+            return [_IMM[1]]
+        if imm.group(1) is None:  # a bare imm names every immediate width
+            return list(_IMM)
+        return [_IMM[2]]
+    if a == "i":
+        return list(_IMM)
+    if re.fullmatch(r"k(\d+)?", a, re.IGNORECASE):
+        return ["k" + (re.fullmatch(r"k(\d+)?", a, re.IGNORECASE).group(1) or str(n))]
+    if a in ("m", "mem"):
+        return [f"{_MEM_SIZE[w]} ptr [rax]" for w in (8, 16, 32, 64, 80, 128, 256, 512)]
+    if a == "vm32x":  # VSIB memory; the index register width follows the form
+        return [f"dword ptr [rax + {family}2]" for family in ("xmm", "ymm", "zmm")]
+    if a == "mem (complex addressing)":
+        return ["qword ptr [rax + rcx*2 + 0x12345678]"]
+    if a == "mem (simple addressing)":
+        return ["qword ptr [rax]"]
+    bcst = re.fullmatch(r"mem(\d+)bcst", a)
+    if bcst:
+        width = int(bcst.group(1))
+        factor = max(op_width // width, 1)
+        return [f"{_MEM_SIZE[width]} ptr [rax]{{1to{factor}}}"]
+    mem = re.fullmatch(r"mem(?:em)?(\d+)", a)
+    if mem:
+        return [f"{_MEM_SIZE[int(mem.group(1))]} ptr [rax]"]
+    return []
+
+
+def concrete_lines(row: PerfRow) -> list[str]:
+    """Concrete Intel-syntax instructions that name the forms of one row.
+
+    One workbook operand shape can name several instructions (``xy`` is the
+    xmm and the ymm instruction, ``xmm2/mem128`` the register and the memory
+    form); every generated line must map to one catalog row on its own.
+    """
+    # "JMP (near)" writes as "jmp"; the parenthetical names a variant
+    mnemonic = row.mnemonic.strip().split("(", 1)[0].strip()
+    operands = [op.strip() for op in row.form.split(",") if op.strip()]
+    if mnemonic.casefold() in ("blendvpd", "blendvps", "pblendvb") and len(operands) == 3:
+        operands[2] = "xmm0"  # the legacy selector register is fixed to xmm0
+    combos: list[list[str]] = [[]]
+    for pos, operand in enumerate(operands):
+        alts = _operand_alts(operand)
+        widths = [_alt_width(alt) for alt in alts]
+        op_width = next((w for w in widths if w), 512)
+        expansions = [line for alt in alts for line in _alt_lines(alt, pos, op_width)]
+        if not expansions:
+            return []
+        combos = [combo + [line] for combo in combos for line in expansions]
+    out: list[str] = []
+    for combo in combos:
+        if not combo:
+            out.append(mnemonic)
+            continue
+        # x87 ST(0) is implicit on the memory form ("fadd s/m,s_" also
+        # names "fadd dword ptr [rax]").
+        if combo[-1] == "st(0)" and any("ptr" in part for part in combo[:-1]):
+            out.append(f"{mnemonic} " + ", ".join(combo[:-1]))
+        out.append(f"{mnemonic} " + ", ".join(combo))
+    return list(dict.fromkeys(out))
+
+
+@dataclass(frozen=True)
+class RowMatch:
+    """What the encoded bytes say one workbook row names."""
+
+    targets: tuple[str, ...] = ()  # catalog db_keys
+    assembled: bool = False  # at least one concrete line encoded
+
+
+def _norm_mnemonic(name: str) -> str:
+    return name.split("(", 1)[0].strip().casefold().split("/", 1)[0].strip()
+
+
+def match_rows_by_bytes(rows: list[PerfRow], records: Iterable[Any]) -> list[RowMatch] | None:
+    """Resolve each workbook row to the catalog rows its bytes name.
+
+    One llvm-mc run per core, XED decode and the iform pick through
+    asm_identity's x86 path. A row whose lines all fail to encode, or name
+    no catalog row, gets no target and is dropped by the caller. Returns
+    None when the tools or the catalog encoding identity are missing; the
+    caller then keeps the operand-class matcher (today's behavior).
+    """
+    from simdref.asm_identity import (
+        Row,
+        ToolUnavailableError,
+        identify_x86_instructions,
+    )
+
+    catalog_rows = [
+        Row(
+            db_key=record.db_key,
+            key=record.key,
+            architecture="x86",
+            mnemonic=record.mnemonic,
+            form=record.form,
+            enc_bits=0,
+            enc_mask=0,
+            enc_match=0,
+            enc_extra=(),
+            iform=record.metadata.get("iform", ""),
+            split_attrs=json.loads(record.metadata.get("split_attrs") or "{}"),
+        )
+        for record in records
+        if record.architecture.casefold() == "x86" and record.metadata.get("iform")
+    ]
+    if not catalog_rows:
+        # A catalog without encoding identity cannot be byte-matched, the
+        # schema-13 keyless case in asm_identity: the tool cannot decide.
+        return None
+    out: list[RowMatch] = [RowMatch()] * len(rows)
+    by_core: dict[str, list[int]] = {}
+    for i, row in enumerate(rows):
+        by_core.setdefault(row.core, []).append(i)
+    for indices in by_core.values():
+        texts: list[str] = []
+        owner: list[int] = []
+        for i in indices:
+            for line in concrete_lines(rows[i]):
+                texts.append(line)
+                owner.append(i)
+        if not texts:
+            continue
+        try:
+            results = identify_x86_instructions(texts, catalog_rows)
+        except (ToolUnavailableError, OSError):
+            return None
+        targets: dict[int, set[str]] = {i: set() for i in indices}
+        assembled: dict[int, bool] = {i: False for i in indices}
+        for i, result in zip(owner, results):
+            assembled[i] = (
+                assembled[i]
+                or result.status == "row"
+                or result.reason.startswith(("no catalog row", "ambiguous"))
+            )
+            if result.status != "row":
+                continue
+            # Only a row of the same instruction counts; an expansion can
+            # encode as a sibling mnemonic ("movd mm, rax" encodes MOVQ).
+            if _norm_mnemonic(rows[i].mnemonic) == _norm_mnemonic(result.row.mnemonic):
+                targets[i].add(result.row.db_key)
+        for i in indices:
+            out[i] = RowMatch(targets=tuple(sorted(targets[i])), assembled=assembled[i])
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m simdref.perf_sources.amd_swopt")
     sub = parser.add_subparsers(dest="command", required=True)
