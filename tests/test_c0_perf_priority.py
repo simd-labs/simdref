@@ -195,12 +195,12 @@ class TestAmdFormClassMatch(unittest.TestCase):
         self.assertIn("ZEN4", r32.arch_details)
         self.assertNotIn("ZEN4", r64.arch_details)
 
-    def test_unmatched_form_still_falls_back_to_all_variants(self):
+    def test_unmatched_form_attaches_nowhere(self):
         reg, mem = self._records()
         rows = [self._amd_row("xmm1,xmm2,imm8,imm16")]
         merge_perf_rows([reg, mem], rows)
-        self.assertIn("ZEN4", reg.arch_details)
-        self.assertIn("ZEN4", mem.arch_details)
+        self.assertNotIn("ZEN4", reg.arch_details)
+        self.assertNotIn("ZEN4", mem.arch_details)
 
 
 if __name__ == "__main__":
