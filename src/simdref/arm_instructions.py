@@ -115,27 +115,29 @@ def _acle_instruction_summaries() -> dict[str, str]:
     return {}
 
 
-# A64 condition-code spellings for B.cond, including the hs/lo forms
-# llvm-objdump prints (Arm ARM lists cs/cc for the same field values).
-_CONDITION_CODES: tuple[str, ...] = (
-    "eq",
-    "ne",
-    "hs",
-    "cs",
-    "lo",
-    "cc",
-    "mi",
-    "pl",
-    "vs",
-    "vc",
-    "hi",
-    "ls",
-    "ge",
-    "lt",
-    "gt",
-    "le",
-    "al",
-    "nv",
+# A64 condition-code spellings for B.cond with their encoded cond field value
+# (Arm ARM cond field, B.cond bits 3:0; llvm-mc -show-inst prints the same
+# value as the Bcc immediate). The hs/lo spellings share the cs/cc values, as
+# llvm-objdump prints for the same field values.
+_CONDITION_CODES: tuple[tuple[str, int], ...] = (
+    ("eq", 0),
+    ("ne", 1),
+    ("hs", 2),
+    ("cs", 2),
+    ("lo", 3),
+    ("cc", 3),
+    ("mi", 4),
+    ("pl", 5),
+    ("vs", 6),
+    ("vc", 7),
+    ("hi", 8),
+    ("ls", 9),
+    ("ge", 10),
+    ("lt", 11),
+    ("gt", 12),
+    ("le", 13),
+    ("al", 14),
+    ("nv", 15),
 )
 
 
@@ -697,7 +699,10 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 # B.cond assembles under one encoding with the condition in a
                 # free field; assemblers spell it B.EQ, B.NE, ... and the
                 # mnemonic matcher keys on that dotted form (issue #57a).
-                for code in _CONDITION_CODES:
+                # Each row fixes its own cond value in bits 3:0 (the family
+                # encodeset leaves them open), so byte identity tells the
+                # rows apart (issue #60).
+                for code, cond in _CONDITION_CODES:
                     cond_mnemonic = f"B.{code.upper()}"
                     records.append(
                         InstructionRecord(
@@ -713,8 +718,8 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                             metadata=dict(metadata),
                             source="arm-a64",
                             enc_bits=enc_bits,
-                            enc_mask=enc_mask,
-                            enc_match=enc_match,
+                            enc_mask=enc_mask | 0xF,
+                            enc_match=enc_match | cond,
                         )
                     )
                 return

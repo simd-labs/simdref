@@ -37,6 +37,28 @@ EXPECTED_SUMMARIES = {
 }
 
 ISSUE_57_FIVE = {"eq", "ne", "lt", "hs", "lo"}
+
+# The Arm ARM cond field value per B.cond spelling (issue #60).
+B_COND_VALUES = {
+    "B.EQ": 0,
+    "B.NE": 1,
+    "B.HS": 2,
+    "B.CS": 2,
+    "B.LO": 3,
+    "B.CC": 3,
+    "B.MI": 4,
+    "B.PL": 5,
+    "B.VS": 6,
+    "B.VC": 7,
+    "B.HI": 8,
+    "B.LS": 9,
+    "B.GE": 10,
+    "B.LT": 11,
+    "B.GT": 12,
+    "B.LE": 13,
+    "B.AL": 14,
+    "B.NV": 15,
+}
 ALL_CONDITION_CODES = {
     "eq",
     "ne",
@@ -197,7 +219,10 @@ class BCondRowTest(unittest.TestCase):
                 self.assertEqual(record.summary, "Branch conditionally.")
                 self.assertEqual(record.architecture, "arm")
                 self.assertEqual(record.enc_bits, 32)
-                self.assertEqual((record.enc_mask, record.enc_match), (0xFF000010, 0x54000000))
+                # Each row fixes its own cond value in bits 3:0 (issue #60),
+                # so byte identity tells the rows apart.
+                self.assertEqual(record.enc_mask, 0xFF00001F)
+                self.assertEqual(record.enc_match, 0x54000000 | B_COND_VALUES[record.mnemonic])
 
     def test_unconditional_branch_row_survives(self) -> None:
         forms = [record.form for record in self.records if record.mnemonic == "B"]

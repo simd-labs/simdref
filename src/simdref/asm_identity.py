@@ -843,14 +843,29 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
             if len(rows) > 1:
                 rows = _rv_tiebreak(rows, entry.get("opcode") or "")
             checks = [(mask, row) for _bits, mask, _match, row in entries]
+        if len(rows) > 1:
+            # Byte-identical rows are true spellings of one encoding (B.CC
+            # and B.LO share the cond value 3): the source spelling names the
+            # row (issue #60). A spelling no row carries keeps every row.
+            spelling = entry["text"].split(None, 1)[0].casefold().rstrip(":")
+            named_rows = [row for row in rows if row.mnemonic.casefold() == spelling]
+            if named_rows:
+                rows = named_rows
         if covered:
             # The row is decided without the placeholder only when one row
             # survives on the known bits and one of its matching patterns
             # reads no covered bit (audit A4): then the pattern holds for
             # every value of the placeholder and the row is not a guess.
             picked = {id(row): row for row in rows}
-            decided = len(picked) == 1 and any(
-                (mask & covered) == 0 and id(row) in picked for mask, row in checks
+            # llvm-mc's own MCInst opcode names the row too (review F3). The
+            # RISC-V branch fixups print whole covered bytes, which hides the
+            # opcode bits from the mask test, so the opcode name is the second
+            # decider (issue #60).
+            named = (entry.get("opcode") or "").casefold().replace("_", ".")
+            by_opcode = [row for row in picked.values() if row.key.casefold() == named]
+            decided = len(picked) == 1 and (
+                any((mask & covered) == 0 and id(row) in picked for mask, row in checks)
+                or len(by_opcode) == 1
             )
             if decided:
                 result.status = "row"

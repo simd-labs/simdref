@@ -1,0 +1,158 @@
+{
+ "instructions": [
+  {
+   "_type": "Instruction.InstructionSet",
+   "name": "A64",
+   "children": [
+    {
+     "_type": "Instruction.Instruction",
+     "name": "B_only_condbranch",
+     "operation_id": "B_cond",
+     "assembly": {
+      "_type": "Instruction.Assembly",
+      "symbols": [
+       {
+        "_type": "Instruction.Symbols.Literal",
+        "value": "B"
+       },
+       {
+        "_type": "Instruction.Symbols.Literal",
+        "value": "."
+       },
+       {
+        "_type": "Instruction.Symbols.RuleReference",
+        "rule_id": "cond_option"
+       },
+       {
+        "_type": "Instruction.Symbols.RuleReference",
+        "rule_id": "SPACE"
+       },
+       {
+        "_type": "Instruction.Symbols.RuleReference",
+        "rule_id": "label"
+       }
+      ]
+     },
+     "encoding": {
+      "_type": "Instruction.Encodeset.Encodeset",
+      "values": [
+       {
+        "_type": "Instruction.Encodeset.Field",
+        "name": "op0",
+        "range": {
+         "_type": "Range",
+         "start": 29,
+         "width": 3
+        },
+        "should_be_mask": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'000'"
+        },
+        "value": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'010'"
+        }
+       },
+       {
+        "_type": "Instruction.Encodeset.Bits",
+        "range": {
+         "_type": "Range",
+         "start": 26,
+         "width": 3
+        },
+        "should_be_mask": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'000'"
+        },
+        "value": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'101'"
+        }
+       },
+       {
+        "_type": "Instruction.Encodeset.Bits",
+        "range": {
+         "_type": "Range",
+         "start": 24,
+         "width": 2
+        },
+        "should_be_mask": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'00'"
+        },
+        "value": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'00'"
+        }
+       },
+       {
+        "_type": "Instruction.Encodeset.Field",
+        "name": "imm19",
+        "range": {
+         "_type": "Range",
+         "start": 5,
+         "width": 19
+        },
+        "should_be_mask": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'0000000000000000000'"
+        },
+        "value": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'xxxxxxxxxxxxxxxxxxx'"
+        }
+       },
+       {
+        "_type": "Instruction.Encodeset.Field",
+        "name": "o0",
+        "range": {
+         "_type": "Range",
+         "start": 4,
+         "width": 1
+        },
+        "should_be_mask": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'0'"
+        },
+        "value": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'0'"
+        }
+       },
+       {
+        "_type": "Instruction.Encodeset.Field",
+        "name": "cond",
+        "range": {
+         "_type": "Range",
+         "start": 0,
+         "width": 4
+        },
+        "should_be_mask": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'0000'"
+        },
+        "value": {
+         "_type": "Values.Value",
+         "meaning": null,
+         "value": "'xxxx'"
+        }
+       }
+      ],
+      "width": 32
+     }
+    }
+   ]
+  }
+ ]
+}

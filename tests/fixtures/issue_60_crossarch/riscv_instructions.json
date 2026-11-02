@@ -1,0 +1,607 @@
+{
+ "format": "riscv-unified-db-v1",
+ "upstream_repo": "https://github.com/riscv/riscv-unified-db",
+ "upstream_commit": "798d6a54d709a1584e7fa81bd8cc4ec7b7803a42",
+ "instructions": [
+  {
+   "mnemonic": "ld",
+   "form": "ld",
+   "summary": "Load doubleword.",
+   "isa": [
+    "I"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/ld.yaml",
+   "description": {
+    "Description": "For RV64, load 64 bits of data into register `xd` from an\naddress formed by adding `xs1` to a signed offset.",
+    "Operation": "XReg virtual_address = X[xs1] + $signed(imm);"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  RV32:\n    match: -----------------011-----0000011\n    variables:\n      - name: imm\n        location: 31-20\n        sign_extend: true\n      - name: xs1\n        location: 19-15\n      - name: xd\n        location: 11-7\n        not: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]\n  RV64:\n    match: -----------------011-----0000011\n    variables:\n      - name: imm\n        location: 31-20\n        sign_extend: true\n      - name: xs1\n        location: 19-15\n      - name: xd\n        location: 11-7"
+  },
+  {
+   "mnemonic": "lw",
+   "form": "lw",
+   "summary": "Load word.",
+   "isa": [
+    "I"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/lw.yaml",
+   "description": {
+    "Description": "Load 32 bits of data into register `xd` from an\naddress formed by adding `xs1` to a signed offset.\nSign extend the result.",
+    "Operation": "XReg virtual_address = X[xs1] + $signed(imm);"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------010-----0000011\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: xd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "lbu",
+   "form": "lbu",
+   "summary": "Load byte unsigned.",
+   "isa": [
+    "I"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/lbu.yaml",
+   "description": {
+    "Description": "Load 8 bits of data into register `xd` from an\naddress formed by adding `xs1` to a signed offset.\nZero extend the result.",
+    "Operation": "XReg virtual_address = X[xs1] + $signed(imm);"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------100-----0000011\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: xd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "addi",
+   "form": "addi",
+   "summary": "Add immediate.",
+   "isa": [
+    "I"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/addi.yaml",
+   "description": {
+    "Description": "",
+    "Operation": ""
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------000-----0010011\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: xd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "beq",
+   "form": "beq",
+   "summary": "Branch if equal.",
+   "isa": [
+    "I"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/beq.yaml",
+   "description": {
+    "Description": "Branch to PC + imm if\nthe value in register xs1 is equal to the value in register xs2.",
+    "Operation": "XReg lhs = X[xs1];\nXReg rhs = X[xs2];"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------000-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+  },
+  {
+   "mnemonic": "bne",
+   "form": "bne",
+   "summary": "Branch if not equal.",
+   "isa": [
+    "I"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/bne.yaml",
+   "description": {
+    "Description": "Branch to PC + imm if\nthe value in register xs1 is not equal to the value in register xs2.",
+    "Operation": "XReg lhs = X[xs1];\nXReg rhs = X[xs2];"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------001-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+  },
+  {
+   "mnemonic": "blt",
+   "form": "blt",
+   "summary": "Branch if less than.",
+   "isa": [
+    "I"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/blt.yaml",
+   "description": {
+    "Description": "Branch to PC + imm if\nthe signed value in register xs1 is less than the signed value in register xs2.",
+    "Operation": "XReg lhs = X[xs1];\nXReg rhs = X[xs2];"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------100-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+  },
+  {
+   "mnemonic": "bge",
+   "form": "bge",
+   "summary": "Branch if greater than or equal.",
+   "isa": [
+    "I"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/bge.yaml",
+   "description": {
+    "Description": "Branch to PC + imm if\nthe signed value in register xs1 is greater than or equal to the signed value in register xs2.",
+    "Operation": "XReg lhs = X[xs1];\nXReg rhs = X[xs2];"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------101-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+  },
+  {
+   "mnemonic": "jal",
+   "form": "jal",
+   "summary": "Jump and link.",
+   "isa": [
+    "I"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/I/jal.yaml",
+   "description": {
+    "Description": "Jump to a PC-relative offset and store the return\naddress in xd.",
+    "Operation": "XReg return_addr = $pc + 4;"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "I",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-------------------------1101111\"\n  variables:\n    - name: imm\n      location: 31|19-12|20|30-21\n      left_shift: 1\n      sign_extend: true\n    - name: xd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "flw",
+   "form": "flw",
+   "summary": "Floating-Point Load Single-Precision.",
+   "isa": [
+    "F"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/F/flw.yaml",
+   "description": {
+    "Description": "The `flw` instruction loads a single-precision floating-point value from memory at address `xs1` + `imm` into floating-point register `fd`.\nIt does not modify the bits being transferred; in particular, the payloads of non-canonical NaNs are preserved.",
+    "Operation": "check_f_ok($encoding);"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "F",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------010-----0000111\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "fsw",
+   "form": "fsw",
+   "summary": "Floating-Point Store Single-Precision.",
+   "isa": [
+    "F"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/F/fsw.yaml",
+   "description": {
+    "Description": "The `fsw` instruction stores a single-precision floating-point value in `fs2` to memory at address `xs1` + `imm`.\nIt does not modify the bits being transferred; in particular, the payloads of non-canonical NaNs are preserved.",
+    "Operation": "check_f_ok($encoding);"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "F",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------010-----0100111\"\n  variables:\n    - name: imm\n      location: 31-25|11-7\n      sign_extend: true\n    - name: fs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+  },
+  {
+   "mnemonic": "fld",
+   "form": "fld",
+   "summary": "Floating-Point Load Double-Precision.",
+   "isa": [
+    "D"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/D/fld.yaml",
+   "description": {
+    "Description": "The `fld` instruction loads a double-precision floating-point value from memory into floating-point\nregister `fd`. It is guaranteed to execute atomically if the effective address is naturally aligned\nand XLEN\u226564. It doesn't modify the bits being transferred; in particular, the payloads of non-canonical\nNaNs are preserved.",
+    "Operation": ""
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "D",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------011-----0000111\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "fsd",
+   "form": "fsd",
+   "summary": "Floating-Point Store Double-Precision.",
+   "isa": [
+    "D"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/D/fsd.yaml",
+   "description": {
+    "Description": "The `fsd` instruction stores a double-precision value from the floating-point registers to memory. It is guaranteed to execute\natomically if the effective address is naturally aligned and XLEN\u226564. It doesn't modify the bits being transferred; in particular,\nthe payloads of non-canonical NaNs are preserved.",
+    "Operation": ""
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "D",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: \"-----------------011-----0100111\"\n  variables:\n    - name: imm\n      location: 31-25|11-7\n      sign_extend: true\n    - name: fs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+  },
+  {
+   "mnemonic": "fsgnj.s",
+   "form": "fsgnj.s",
+   "summary": "Floating-Point Sign-Inject Single-Precision.",
+   "isa": [
+    "F"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/F/fsgnj.s.yaml",
+   "description": {
+    "Description": "The `fsgnj.s` instruction produces a result that takes all bits except the sign bit from `fs1`.\nThe result's sign bit is taken from `fs2`'s sign bit, and the result is written to the destination\nregister `fd`. Sign-injection instructions do not set floating-point exception flags, nor do they\ncanonicalize NaNs.",
+    "Operation": "check_f_ok($encoding);"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "F",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 0010000----------000-----1010011\n  variables:\n    - name: fs2\n      location: 24-20\n    - name: fs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "fsgnj.d",
+   "form": "fsgnj.d",
+   "summary": "Floating-Point Sign-Inject Double-Precision.",
+   "isa": [
+    "D"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/D/fsgnj.d.yaml",
+   "description": {
+    "Description": "The `fsgnj.d` instruction produces a result that takes all bits except the sign bit from `fs1`.\nThe result's sign bit is taken from `fs2`'s sign bit, and the result is written to the destination\nregister `fd`. Sign-injection instructions do not set floating-point exception flags, nor do they\ncanonicalize NaNs.",
+    "Operation": ""
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "D",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 0010001----------000-----1010011\n  variables:\n    - name: fs2\n      location: 24-20\n    - name: fs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "c.ldsp",
+   "form": "c.ldsp",
+   "summary": "Load doubleword from stack pointer.",
+   "isa": [
+    "Zclsd"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.ldsp.yaml",
+   "description": {
+    "Description": "C.LDSP is an RV64C/RV128C-only instruction that loads a 64-bit value from memory\ninto register xd.\nIt computes its effective address by adding the zero-extended offset, scaled by 8,\nto the stack pointer, x2.\nIt expands to `ld xd, offset(x2)`.\nC.LDSP is only valid when xd \u2260 x0; code points with xd=x0 are reserved.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "Zclsd",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  RV32:\n    match: 011-----------10\n    variables:\n      - name: imm\n        location: 4-2|12|6-5\n        left_shift: 3\n      - name: xd\n        location: 11-7\n        not: [0, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]\n  RV64:\n    match: 011-----------10\n    variables:\n      - name: imm\n        location: 4-2|12|6-5\n        left_shift: 3\n      - name: xd\n        location: 11-7"
+  },
+  {
+   "mnemonic": "c.sdsp",
+   "form": "c.sdsp",
+   "summary": "Store doubleword to stack.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.sdsp.yaml",
+   "description": {
+    "Description": "Stores a 64-bit value in register xs2 to memory.\nIt computes an effective address by adding the zero-extended offset, scaled by 8,\nto the stack pointer, x2.\nIt expands to `sd` `xs2, offset(x2)`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  RV32:\n    match: 111-----------10\n    variables:\n      - name: xs2\n        location: 6-2\n        not: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]\n      - name: imm\n        location: 9-7|12-10\n        left_shift: 3\n  RV64:\n    match: 111-----------10\n    variables:\n      - name: xs2\n        location: 6-2\n      - name: imm\n        location: 9-7|12-10\n        left_shift: 3"
+  },
+  {
+   "mnemonic": "c.addi",
+   "form": "c.addi",
+   "summary": "Add a sign-extended non-zero immediate.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.addi.yaml",
+   "description": {
+    "Description": "C.ADDI adds the non-zero sign-extended 6-bit immediate to the value in register xd then writes the result to xd.\nC.ADDI expands into `addi xd, xd, imm`.\nC.ADDI is only valid when xd &ne; x0 and imm &ne; 0.\nThe code points with xd=x0 encode the C.NOP instruction; the remaining code points with imm=0 encode HINTs.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 000-----------01\n  variables:\n    - name: imm\n      location: 12|6-2\n      not: 0\n      sign_extend: true\n    - name: xd\n      location: 11-7\n      not: 0"
+  },
+  {
+   "mnemonic": "c.addi16sp",
+   "form": "c.addi16sp",
+   "summary": "Add a sign-extended non-zero immediate.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.addi16sp.yaml",
+   "description": {
+    "Description": "C.ADDI16SP adds the non-zero sign-extended 6-bit immediate to the value in the stack pointer (sp=x2), where the immediate is scaled to represent multiples of 16 in the range (-512,496).\nC.ADDI16SP is used to adjust the stack pointer in procedure prologues and epilogues.\nIt expands into `addi x2, x2, nzimm[9:4]`.\nC.ADDI16SP is only valid when nzimm &ne; 0; the code point with nzimm=0 is reserved.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 011-00010-----01\n  variables:\n    - name: imm\n      location: 12|4-3|5|2|6\n      left_shift: 4\n      not: 0\n      sign_extend: true"
+  },
+  {
+   "mnemonic": "c.j",
+   "form": "c.j",
+   "summary": "Jump.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.j.yaml",
+   "description": {
+    "Description": "C.J performs an unconditional control transfer. The offset is sign-extended and added to the pc to form the jump target address. C.J can therefore target a &pm;2 KiB range.\nIt expands to `jal` `x0, offset`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 101-----------01\n  variables:\n    - name: imm\n      location: 12|8|10-9|6|7|2|11|5-3\n      left_shift: 1\n      sign_extend: true"
+  },
+  {
+   "mnemonic": "c.jal",
+   "form": "c.jal",
+   "summary": "Jump and Link.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.jal.yaml",
+   "description": {
+    "Description": "C.JAL is an RV32C-only instruction that performs the same operation as C.J, but additionally writes the address of the instruction following the jump (pc+2) to the link register, x1.\nIt expands to `jal` `x1, offset`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 001-----------01\n  variables:\n    - name: imm\n      location: 12|8|10-9|6|7|2|11|5-3\n      left_shift: 1\n      sign_extend: true"
+  },
+  {
+   "mnemonic": "c.beqz",
+   "form": "c.beqz",
+   "summary": "Branch if Equal Zero.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.beqz.yaml",
+   "description": {
+    "Description": "C.BEQZ performs conditional control transfers. The offset is sign-extended and added to the pc to form the branch target address. It can therefore target a &pm;256 B range. C.BEQZ takes the branch if the value in register xs1' is zero.\nIt expands to `beq` `xs1, x0, offset`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}\nif (X[creg2reg(xs1)] == 0) {\n  jump($pc + $signed(imm));\n}"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 110-----------01\n  variables:\n    - name: imm\n      location: 12|6-5|2|11-10|4-3\n      left_shift: 1\n      sign_extend: true\n    - name: xs1\n      location: 9-7"
+  },
+  {
+   "mnemonic": "c.bnez",
+   "form": "c.bnez",
+   "summary": "Branch if NOT Equal Zero.",
+   "isa": [
+    "Zca"
+   ],
+   "category": "Arithmetic",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/C/c.bnez.yaml",
+   "description": {
+    "Description": "C.BNEZ performs conditional control transfers. The offset is sign-extended and added to the pc to form the branch target address. It can therefore target a &pm;256 B range. C.BNEZ takes the branch if the value in register xs1' is NOT zero.\nIt expands to `bne` `xs1, x0, offset`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}\nif (X[creg2reg(xs1)] != 0) {\n  jump($pc + $signed(imm));\n}"
+   },
+   "metadata": {
+    "category": "Arithmetic",
+    "extension": "Zca",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 111-----------01\n  variables:\n    - name: imm\n      location: 12|6-5|2|11-10|4-3\n      left_shift: 1\n      sign_extend: true\n    - name: xs1\n      location: 9-7"
+  },
+  {
+   "mnemonic": "c.fldsp",
+   "form": "c.fldsp",
+   "summary": "Load doubleword into floating-point register from stack.",
+   "isa": [
+    "Zcd"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/Zcd/c.fldsp.yaml",
+   "description": {
+    "Description": "Loads a double-precision floating-point value from memory into floating-point register fd.\nIt computes its effective address by adding the zero-extended offset, scaled by 8,\nto the stack pointer, x2.\nIt expands to `fld` `fd, offset(x2)`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}\nif (implemented?(ExtensionName::D) && MISA_CSR_IMPLEMENTED && (CSR[misa].D == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "Zcd",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 001-----------10\n  variables:\n    - name: imm\n      location: 4-2|12|6-5\n      left_shift: 3\n    - name: fd\n      location: 11-7"
+  },
+  {
+   "mnemonic": "c.fsdsp",
+   "form": "c.fsdsp",
+   "summary": "Store double-precision value to stack.",
+   "isa": [
+    "Zcd"
+   ],
+   "category": "Loads and Stores",
+   "url": "https://github.com/riscv/riscv-unified-db/blob/798d6a54d709a1584e7fa81bd8cc4ec7b7803a42/spec/std/isa/inst/Zcd/c.fsdsp.yaml",
+   "description": {
+    "Description": "Stores a double-precision floating-point value in floating-point register fs2 to memory.\nIt computes an effective address by adding the zero-extended offset, scaled by 8,\nto the stack pointer, x2.\nIt expands to `fsd` `fs2, offset(x2)`.",
+    "Operation": "if (implemented?(ExtensionName::C) && MISA_CSR_IMPLEMENTED && (CSR[misa].C == 1'b0)) {\n  reserved_instruction($encoding);\n}\nif (implemented?(ExtensionName::D) && MISA_CSR_IMPLEMENTED && (CSR[misa].D == 1'b0)) {\n  reserved_instruction($encoding);\n}"
+   },
+   "metadata": {
+    "category": "Loads and Stores",
+    "extension": "Zcd",
+    "policy": "agnostic",
+    "masking": "unmasked",
+    "tail_policy": "agnostic"
+   },
+   "policy": "agnostic",
+   "masking": "unmasked",
+   "encoding": "  match: 101-----------10\n  variables:\n    - name: imm\n      location: 9-7|12-10\n      left_shift: 3\n    - name: fs2\n      location: 6-2"
+  }
+ ]
+}
