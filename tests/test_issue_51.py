@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from simdref import annotate as annotate_mod
@@ -37,11 +38,12 @@ def _rows() -> list[InstructionRecord]:
         InstructionRecord(
             mnemonic="LSL", form="LSL (R16, R16)", summary="Load Segment Limit.", architecture="x86"
         ),
+        InstructionRecord(mnemonic="JMP", form="JMP (Rel32)", summary="Jump.", architecture="x86"),
         InstructionRecord(
-            mnemonic="JMP", form="JMP (Rel32)", summary="Jump.", architecture="x86"
-        ),
-        InstructionRecord(
-            mnemonic="ADD", form="ADD (R64, R64)", summary="Add 64-bit operands.", architecture="x86"
+            mnemonic="ADD",
+            form="ADD (R64, R64)",
+            summary="Add 64-bit operands.",
+            architecture="x86",
         ),
         InstructionRecord(
             mnemonic="ADD", form="ADD (X0, X0, X0)", summary="Arm add.", architecture="arm"
@@ -209,3 +211,14 @@ def test_symbol_annotations_do_not_vote_the_isa(tmp_path, monkeypatch):
     assert records[0]["summary"] == "Jump."
     assert records[1]["known"] is True
     assert records[1]["summary"] == "Add 64-bit operands."
+
+
+def test_objdump_lines_probe_stripped_with_the_tool(tmp_path):
+    # With llvm-mc present the assembler acceptance probe sees the objdump
+    # line as its mnemonic and operands only: the arm row still wins.
+    from simdref.asm_identity import _tool_path
+
+    if _tool_path("SIMDREF_LLVM_MC", "llvm-mc") is None:
+        pytest.skip("llvm-mc not found (simdref-llvm-mc wheel or SIMDREF_LLVM_MC)")
+    records = _run_json(tmp_path, OBJDUMP_REPRO)
+    assert [record["summary"] for record in records] == ["Ret instruction."]

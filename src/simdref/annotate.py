@@ -17,6 +17,7 @@ from enum import Enum
 from typing import Any, Iterable, Iterator
 
 from simdref import perf
+from simdref.asm_identity import isa_by_acceptance
 from simdref.lsp import NO_CATALOG_ROW, _CATALOG_ISA, _document_arch, identity_keys
 from simdref.models import InstructionRecord
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
@@ -255,6 +256,8 @@ def detect_isa(lines: Iterable[str]) -> str | None:
     AArch64 register names x0-x30, w0-w30, v0-v31, sp, the ``b.<cond>``
     branches and the RISC-V register names vote. Returns None when the
     input carries no ISA signal.
+    Fallback only: annotate_stream prefers asm_identity.isa_by_acceptance
+    when llvm-mc runs.
     shortcut: a RISC-V listing that uses only xN names and sp votes arm,
     upgrade when a form pick on rv64 rows needs those listings split
     """
@@ -1084,11 +1087,30 @@ def annotate_stream(
         if key
     }
     auto_isa = opts.isa not in ("x86", "arm", "riscv")
+    line_family: dict[int, str] = {}
     if auto_isa:
-        # auto: the input signals name the ISA, then the document arch from
-        # _document_arch; x86 stays the guess when both stay silent.
+        # Assembler acceptance decides each line's family: one llvm-mc run
+        # per candidate triple. The register vote below is the fallback when
+        # llvm-mc is missing or a line no triple accepts.
+        probe_texts = []
+        for parsed in parsed_lines:
+            if parsed.kind != LineKind.INSTRUCTION:
+                continue
+            obj = _parse_objdump_instr(parsed.raw)
+            # The probe sees the mnemonic and operands only: objdump columns
+            # and <symbol> annotations never reach the assembler. Trailing
+            # comments and immediates stay on the line, because the '#' of an
+            # AArch64 "#2" immediate is not a comment.
+            text = obj[1] if obj is not None else parsed.raw
+            probe_texts.append(_SYMBOL_ANNOTATION_RE.sub(" ", text).strip())
+        families, majority = isa_by_acceptance(probe_texts)
+        line_family = {index: family for (index, _text), family in zip(items, families) if family}
+        # auto: the acceptance majority names the ISA, then the input
+        # signals, then the document arch from _document_arch; x86 stays
+        # the guess when all stay silent.
         opts.isa = (
-            detect_isa(parsed.raw for parsed in parsed_lines)
+            majority
+            or detect_isa(parsed.raw for parsed in parsed_lines)
             or (arch_out[0] if arch_out else None)
             or "x86"
         )
@@ -1130,10 +1152,11 @@ def annotate_stream(
             lookup_cache,
             stats,
             identity_key=identity.get(index),
-            # A pin forces one family; auto mode splits the batch per line.
+            # A pin forces one family; auto mode splits the batch per line,
+            # the assembler verdict first and the register vote as fallback.
             line_isa=opts.isa
             if not auto_isa
-            else _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
+            else line_family.get(index) or _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
         )
         if collecting_json:
             if record is not None:
