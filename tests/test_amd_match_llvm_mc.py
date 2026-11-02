@@ -88,14 +88,36 @@ class ByteMatchTests(unittest.TestCase):
 class FallbackTests(unittest.TestCase):
     """Without the tool the operand-class matcher keeps today's behavior."""
 
+    def test_parenthesized_mnemonic_reaches_its_catalog_slot(self):
+        # The workbook names JMP "JMP (near)"; the merge key must cut the
+        # parenthetical the way the byte matcher does, else the row drops.
+        jmp32 = InstructionRecord(
+            mnemonic="JMP",
+            form="JMP (R32)",
+            summary="Jump.",
+            architecture="x86",
+            isa=["SSE4.1"],
+            metadata={},
+        )
+        with mock.patch("simdref.asm_identity._tool_path", return_value=None):
+            merge_perf_rows([jmp32], [_amd_row("reg16/32/64", mnemonic="JMP (near)")])
+        self.assertIn("ZEN4", jmp32.arch_details)
+
     def test_tool_missing_keeps_the_class_matcher(self):
+        # A class row the matcher matches still attaches; a row it does not
+        # match attaches nowhere: no spread over every variant.
         with mock.patch("simdref.asm_identity._tool_path", return_value=None):
             reg, mem = _records()
-            merge_perf_rows([reg, mem], [_amd_row("xmm1,xmm2,<xmm0>")])
-        # Three row operands match no two-operand form, so the old
-        # fallback attaches the row to every variant.
-        self.assertIn("ZEN4", reg.arch_details)
-        self.assertIn("ZEN4", mem.arch_details)
+            written = merge_perf_rows([reg, mem], [_amd_row("xmm,xmm/mem128")])
+            self.assertEqual(written, 2)
+            self.assertIn("ZEN4", reg.arch_details)
+            self.assertIn("ZEN4", mem.arch_details)
+        with mock.patch("simdref.asm_identity._tool_path", return_value=None):
+            reg, mem = _records()
+            written = merge_perf_rows([reg, mem], [_amd_row("xmm1,xmm2,<xmm0>")])
+            self.assertEqual(written, 0)
+            self.assertNotIn("ZEN4", reg.arch_details)
+            self.assertNotIn("ZEN4", mem.arch_details)
 
 
 if __name__ == "__main__":

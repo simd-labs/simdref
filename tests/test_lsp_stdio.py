@@ -971,6 +971,9 @@ class LspArmFixtureTests(unittest.TestCase):
         self.assertIn("ADD%20(V0.4S%2C%20V1.4S%2C%20V2.4S)", value)
         self.assertNotIn("V0.<T_OPTION>", value)
         self.assertNotIn("ADD (R16", value)
+        # The rendered summary stays the ACLE text of the vector row.
+        hints = self.server.hints(uri)
+        self.assertEqual([h["label"] for h in hints], ["Add (vector)."])
 
 
 class MissingCatalogTests(unittest.TestCase):

@@ -187,10 +187,15 @@ def merge_perf_rows(
     Returns the number of ``arch_details[core]`` entries newly written.
     """
     records = list(records)
+    # amd_swopt imports this module, so the import stays function-local.
+    # Mnemonic keys normalize the way the byte matcher does: the workbook
+    # "JMP (near)" and the catalog "JMP" share one key.
+    from simdref.perf_sources.amd_swopt import _norm_mnemonic
+
     by_arch_mnemonic: dict[tuple[str, str], list[InstructionRecord]] = {}
     for record in records:
         by_arch_mnemonic.setdefault(
-            (record.architecture.casefold(), record.mnemonic.casefold()),
+            (record.architecture.casefold(), _norm_mnemonic(record.mnemonic)),
             [],
         ).append(record)
 
@@ -209,8 +214,16 @@ def merge_perf_rows(
 
     written = 0
     for i, row in enumerate(rows):
+        # Only the AMD workbook carries parenthetical mnemonics that must
+        # normalize like the byte matcher ("JMP (near)" keys "jmp"); other
+        # sources keep their raw key so nothing else reattaches.
+        key_mnemonic = (
+            _norm_mnemonic(row.mnemonic)
+            if row.source == SOURCE_AMD_SWOPT
+            else row.mnemonic.casefold()
+        )
         targets = by_arch_mnemonic.get(
-            (row.architecture.casefold() or _arch_guess(row.core), row.mnemonic.casefold()),
+            (row.architecture.casefold() or _arch_guess(row.core), key_mnemonic),
             [],
         )
         if not targets:
@@ -234,7 +247,10 @@ def merge_perf_rows(
                 matched = [
                     r for r in targets if not form_key or r.form.strip().casefold() == form_key
                 ]
-            if not matched and (form_key or row.form_classes):
+            # Plain form rows keep the mnemonic-level spread when the form
+            # text matches nothing (intel-guide and friends name iforms).
+            # An AMD class row the classes do not match attaches nowhere.
+            if not matched and form_key and not row.form_classes:
                 matched = targets  # fallback when the bytes cannot decide
         entry = row.as_arch_details_entry()
         new_rank = _SOURCE_RANK.get(row.source)
