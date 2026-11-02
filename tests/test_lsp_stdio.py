@@ -1,18 +1,26 @@
 """End-to-end LSP tests over stdio: inlay hints, inline asm, missing catalog."""
 
+import atexit
 import json
 import os
 import select
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
 
 from simdref import lsp
 from simdref.lsp import _mnemonic_from_asm_line
-from simdref.storage import SQLITE_PATH, load_instructions_by_mnemonic_from_db, open_db
+from simdref.models import Catalog, InstructionRecord, SourceVersion
+from simdref.storage import (
+    SQLITE_PATH,
+    build_sqlite,
+    load_instructions_by_mnemonic_from_db,
+    open_db,
+)
 
 # The dev-install data dir has no catalog, so fall back to the user-level one.
 # SIMDREF_CATALOG needs "isa update" output at that path, not a missing file:
@@ -578,30 +586,6 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertNotIn("Rel8", hover)
         self.assertIn("JMP (M64)", hover)
 
-    def test_arm_scalar_lines_keep_the_arm_form(self):
-        # The labels are the ACLE first-sentence summaries the arm rows carry
-        # now. "r0" and a bare "sp" are not x86 registers, and a "#16"
-        # immediate excludes x86 forms.
-        lines = ("sub sp, sp, #16", "add sp, sp, #16", "add r0, r1, r2", "add r8, r9, #16")
-        self.server.open(ASM_URI, "asm", "\n".join(lines) + "\n")
-        self.assertEqual(
-            [h["label"] for h in self.server.hints(ASM_URI)],
-            ["Subtract (vector).", "Add (vector).", "Add (vector).", "Add (vector)."],
-        )
-
-    def test_arm_three_register_add_keeps_the_arm_form(self):
-        # x0/x1/x2 are AArch64 general registers, not x86, so the hover and
-        # hint must not name an x86 form like ADD (R16, M16, I16).
-        self.server.open(ASM_URI, "asm", "add x0, x1, x2\n")
-        hover = self.server.hover(ASM_URI, 0, 1)
-        self.assertIsNotNone(hover, "add x0, x1, x2 got no hover")
-        value = hover["contents"]["value"]
-        for x86_token in ("R16", "R64", "M16", "I16"):
-            self.assertNotIn(x86_token, value, f"hover named an x86 form: {x86_token}")
-        self.assertIn("Add (vector).", value)
-        hints = self.server.hints(ASM_URI)
-        self.assertEqual([h["label"] for h in hints], ["Add (vector)."])
-
     def test_riscv_word_ops_do_not_resolve_to_x86(self):
         # A catalog with the RISC-V word rows shows the RISC-V form; without
         # them the line stays silent, except a documented pseudo-op, which byte
@@ -741,21 +725,6 @@ class LspEndToEndTests(unittest.TestCase):
         self.assertIn("CMPSD_XMM", value)
         self.assertNotIn("String", value)
 
-    def test_arm_vector_add_keeps_the_arm_form(self):
-        # AArch64: the .4s arrangement is an ARM vector signal. The line must rank
-        # the AArch64 vector form, not an x86 ADD form. The hover body shows only
-        # the mnemonic; the picked row's key stays in the deep link.
-        uri = "file:///tmp/simdref_lsp_arm_vec.s"
-        self.server.open(uri, "asm", "add v0.4s, v1.4s, v2.4s\n")
-        result = self.server.hover(uri, 0, 1)
-        self.assertIsNotNone(result, "hover on an arm vector add returned null")
-        value = result["contents"]["value"]
-        # The picked row's key holds the rendered arrangement now (the
-        # case-folded rule lookup expands T_option to 4S), in the deep link.
-        self.assertIn("ADD%20(V0.4S%2C%20V1.4S%2C%20V2.4S)", value)
-        self.assertNotIn("V0.<T_OPTION>", value)
-        self.assertNotIn("ADD (R16", value)
-
     def test_arm_fp_register_keeps_the_arm_form(self):
         # AArch64: fp is x29, not the stack pointer. The line must rank an
         # X-register (or XZR) ADD form, not an x86 ADD form.
@@ -883,6 +852,125 @@ class LspEndToEndTests(unittest.TestCase):
             [h["position"]["line"] for h in self.server.hints(uri)],
             [line for line, op in enumerate(ops) if _riscv_rows(op)],
         )
+
+
+def _arm_record(form: str, summary: str, isa: str, enc_mask: int = 0, enc_match: int = 0):
+    mnemonic = form.split(" ", 1)[0]
+    return InstructionRecord(
+        mnemonic=mnemonic,
+        form=form,
+        summary=summary,
+        architecture="arm",
+        isa=[isa],
+        enc_bits=32 if enc_mask else 0,
+        enc_mask=enc_mask,
+        enc_match=enc_match,
+    )
+
+
+# The arm pins run on a small fixture catalog, not the ambient one. The
+# scalar ADD/SUB rows carry the generated sentence ("Add operands."); the
+# NEON vector form keeps the ACLE first sentence ("Add (vector)."). The
+# enc_mask/enc_match pairs let byte identity pick the same rows llvm-mc
+# encodes for these lines; they are the fixed bits of the AARCHMRS encoding
+# patterns for the sp-immediate, shifted-register and vector forms.
+ARM_ROWS = [
+    _arm_record(
+        "SUB (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)",
+        "Subtract operands.",
+        "A64",
+        4286578688,
+        3506438144,
+    ),
+    _arm_record(
+        "ADD (<XDSP_OPTION>, <XNSP_OPTION__3>, <HASH>#0#0)",
+        "Add operands.",
+        "A64",
+        4286578688,
+        2432696320,
+    ),
+    _arm_record(
+        "ADD (<XDORXZR__6>, <XNORXZR__12>, <XMORXZR__4>#0)",
+        "Add operands.",
+        "A64",
+        4280287232,
+        2332033024,
+    ),
+    _arm_record("ADD (<WDORWZR>, <WNORWZR__3>, <WMORWZR__2>#0)", "Add operands.", "A64"),
+    _arm_record("ADD (V0.4S, V1.4S, V2.4S)", "Add (vector).", "NEON", 3206609920, 237011968),
+]
+
+ARM_FIXTURE_CATALOG: Path | None = None
+
+
+def _arm_fixture_catalog() -> Path:
+    global ARM_FIXTURE_CATALOG
+    if ARM_FIXTURE_CATALOG is None:
+        tmp = tempfile.TemporaryDirectory(prefix="simdref-arm-lsp-")
+        atexit.register(tmp.cleanup)
+        db = Path(tmp.name) / "catalog.db"
+        build_sqlite(
+            Catalog(
+                intrinsics=[],
+                instructions=ARM_ROWS,
+                sources=[
+                    SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")
+                ],
+                generated_at="2025-01-01",
+            ),
+            db,
+        )
+        ARM_FIXTURE_CATALOG = db
+    return ARM_FIXTURE_CATALOG
+
+
+class LspArmFixtureTests(unittest.TestCase):
+    """The arm form pins, on the fixture catalog: the result does not depend
+    on the ambient catalog at ~/.local/share/simdref or data/derived."""
+
+    def setUp(self):
+        self.server = _Server(_arm_fixture_catalog())
+        self.addCleanup(self.server.stop)
+        caps = self.server.start()
+        self.assertTrue(caps.get("inlayHintProvider"), "inlayHintProvider not advertised")
+
+    def test_arm_scalar_lines_keep_the_arm_form(self):
+        # Scalar arm rows show the generated sentence. "r0" and a bare "sp"
+        # are not x86 registers, and a "#16" immediate excludes x86 forms.
+        lines = ("sub sp, sp, #16", "add sp, sp, #16", "add r0, r1, r2", "add r8, r9, #16")
+        self.server.open(ASM_URI, "asm", "\n".join(lines) + "\n")
+        self.assertEqual(
+            [h["label"] for h in self.server.hints(ASM_URI)],
+            ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
+        )
+
+    def test_arm_three_register_add_keeps_the_arm_form(self):
+        # x0/x1/x2 are AArch64 general registers, not x86, so the hover and
+        # hint must not name an x86 form like ADD (R16, M16, I16).
+        self.server.open(ASM_URI, "asm", "add x0, x1, x2\n")
+        hover = self.server.hover(ASM_URI, 0, 1)
+        self.assertIsNotNone(hover, "add x0, x1, x2 got no hover")
+        value = hover["contents"]["value"]
+        for x86_token in ("R16", "R64", "M16", "I16"):
+            self.assertNotIn(x86_token, value, f"hover named an x86 form: {x86_token}")
+        self.assertIn("Add operands.", value)
+        hints = self.server.hints(ASM_URI)
+        self.assertEqual([h["label"] for h in hints], ["Add operands."])
+
+    def test_arm_vector_add_keeps_the_arm_form(self):
+        # AArch64: the .4s arrangement is an ARM vector signal. The line must
+        # rank the AArch64 vector form, not an x86 ADD form. The hover body
+        # shows only the mnemonic; the picked row's key stays in the deep
+        # link.
+        uri = "file:///tmp/simdref_lsp_arm_vec.s"
+        self.server.open(uri, "asm", "add v0.4s, v1.4s, v2.4s\n")
+        result = self.server.hover(uri, 0, 1)
+        self.assertIsNotNone(result, "hover on an arm vector add returned null")
+        value = result["contents"]["value"]
+        # Byte identity picks the vector row; the deep link holds its key.
+        self.assertIn("ADD%20(V0.4S%2C%20V1.4S%2C%20V2.4S)", value)
+        self.assertNotIn("V0.<T_OPTION>", value)
+        self.assertNotIn("ADD (R16", value)
 
 
 class MissingCatalogTests(unittest.TestCase):
