@@ -1,0 +1,8 @@
+
+aarch64.o:	file format elf64-littleaarch64
+
+Disassembly of section .text:
+
+0000000000000000 <.text>:
+       0: f9400020     	ldr	x0, [x1]
+       4: 8b020020     	add	x0, x1, x2

@@ -54,12 +54,13 @@ _INSTR_RE = re.compile(
 )
 _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
 # objdump -d line shape: optional whitespace, hex VA, ':', hex bytes, mnemonic ops.
-# Byte tokens are 2-8 hex digits: x86 emits one whitespace-separated token per
-# byte ("48 8b 45 f8"), ARM/RISC-V emit the whole encoding as one token
-# ("a9bf7bfd" / "00050513").
+# A byte column is either one 4- or 8-digit instruction-word token (ARM/RISC-V:
+# "a9bf7bfd", the word value) or a run of 2-digit memory-order byte tokens
+# (x86: "48 8b 45 f8"). A mnemonic may be all hex digits ("add", "fadd"), so
+# only 2-digit tokens may extend the run.
 _OBJDUMP_INSTR_RE = re.compile(
     r"^\s*(?P<addr>[0-9a-fA-F]+):\s+"
-    r"(?P<bytes>(?:[0-9a-fA-F]{2,8}\s+){1,10})?"
+    r"(?P<bytes>(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2}){0,9})\s+)?"
     r"(?P<rest>\S.*?)\s*$"
 )
 # objdump -S injects "file:line" comment lines before the instruction block.
@@ -107,7 +108,8 @@ def _parse_objdump_instr(line: str) -> tuple[int, str, str | None] | None:
     """Match an ``objdump -d`` instruction line: ``<hexaddr>: [bytes] mnemonic ...``.
 
     Returns ``(address, rest, bytehex)`` where ``rest`` starts at the mnemonic
-    and ``bytehex`` is the byte column as raw hex (e.g. ``488b45f8``), or None
+    and ``bytehex`` is the byte column's hex tokens, whitespace-normalized
+    (e.g. ``48 8b 45 f8``; ARM/RISC-V print one word-value token), or None
     when the line is not objdump-shaped (e.g. a column-0 numeric local label
     ``1:`` does not match).
     """
@@ -128,7 +130,7 @@ def _parse_objdump_instr(line: str) -> tuple[int, str, str | None] | None:
     except ValueError:
         return None
     byte_run = obj_m.group("bytes") or ""
-    return addr, obj_m.group("rest"), "".join(byte_run.split()) or None
+    return addr, obj_m.group("rest"), " ".join(byte_run.split()) or None
 
 
 def _split_comment(text: str) -> tuple[str, str]:

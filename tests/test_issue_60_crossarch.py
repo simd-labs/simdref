@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from simdref.annotate import _SYMBOL_TARGET_RE, _parse_objdump_instr
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.asm_identity import _tool_path, identify, identify_lines
 from simdref.models import Catalog, InstructionRecord, SourceVersion
@@ -329,14 +330,116 @@ class TestEntryPathsAgree:
             server.stop()
             conn.close()
 
+
+@needs_tools
+class TestObjdumpByteColumn:
+    """The objdump byte column names what its bytes encode (issue #60).
+
+    llvm-objdump prints one hex token per AArch64/RISC-V instruction word:
+    the c.j of ``j 8`` is the token ``a021``, the word value 0xa021 whose
+    memory bytes are ``21 a0`` (llvm-mc -show-encoding). The fixture text is
+    real tool output: ``llvm-mc --triple=riscv64-unknown-linux-gnu
+    -mattr=+c -filetype=obj`` and ``--triple=aarch64-unknown-linux-gnu
+    -filetype=obj``, then ``llvm-objdump -d`` and ``riscv64-linux-gnu-objdump
+    -d``. ``jal x0, 1000`` assembles under ``.option norvc`` because
+    ``-mattr=+c`` compresses that spelling to c.j.
+    """
+
+    FIXTURES = Path(__file__).resolve().parent / "fixtures" / "objdump_byte_column"
+    # The row each fixture line's byte column must name.
+    EXPECTED = {
+        "riscv64-llvm.txt": ["c.j", "jal"],
+        "riscv64-gnu.txt": ["c.j", "jal"],
+        "aarch64-llvm.txt": ["ldr", "add"],
+    }
+
+    @staticmethod
+    def _rows() -> list[InstructionRecord]:
+        return [
+            InstructionRecord(
+                mnemonic="c.j",
+                form="c.j",
+                summary="row c.j.",
+                architecture="riscv",
+                isa=["C"],
+                enc_bits=16,
+                enc_mask=0xE003,
+                enc_match=0xA001,
+            ),
+            InstructionRecord(
+                mnemonic="jal",
+                form="jal",
+                summary="row jal.",
+                architecture="riscv",
+                isa=["I"],
+                enc_bits=32,
+                enc_mask=0x7F,
+                enc_match=0x6F,
+            ),
+            InstructionRecord(
+                mnemonic="ldr",
+                form="ldr",
+                summary="row ldr.",
+                architecture="arm",
+                isa=["A64"],
+                enc_bits=32,
+                enc_mask=0xFFC00000,
+                enc_match=0xF9400000,
+            ),
+            InstructionRecord(
+                mnemonic="add",
+                form="add",
+                summary="row add.",
+                architecture="arm",
+                isa=["A64"],
+                enc_bits=32,
+                enc_mask=0xFF200000,
+                enc_match=0x8B000000,
+            ),
+        ]
+
+    @classmethod
+    def _items(cls, name: str) -> list[tuple[str, str | None]]:
+        # The annotate pipeline feeds identify_lines stripped text and the
+        # parsed byte column; take both from the fixture lines the same way.
+        items = []
+        for line in (cls.FIXTURES / name).read_text().splitlines():
+            parsed = _parse_objdump_instr(line)
+            if parsed is not None:
+                items.append((_SYMBOL_TARGET_RE.sub(r"\1", parsed[1]).strip(), parsed[2]))
+        return items
+
     def test_byte_column_bytes_name_what_they_encode(self, tmp_path):
-        # "21a0" is the c.j encoding of "j 8" (llvm-mc 24, -mattr=+c). The
-        # byte column names c.j; the same source text without one follows
-        # the no-compression rule and names jal.
         db = _db(self._rows(), tmp_path)
-        source = identify("j 8\n", "riscv64", catalog_path=db)[0]
-        assert source.status == "row", source.reason
-        assert source.row.mnemonic == "jal"
-        raw = identify_lines([("j 8", "21a0")], catalog_path=db)[0]
-        assert raw.status == "row", raw.reason
-        assert raw.row.mnemonic == "c.j"
+        for name, expected in self.EXPECTED.items():
+            results = identify_lines(self._items(name), catalog_path=db)
+            got = [
+                result.row.mnemonic if result.row is not None else result.reason
+                for result in results
+            ]
+            assert got == expected, name
+
+    def test_with_column_equals_text_only_but_compressed(self, tmp_path):
+        db = _db(self._rows(), tmp_path)
+        for name, expected in self.EXPECTED.items():
+            items = self._items(name)
+            with_column = identify_lines(items, catalog_path=db)
+            text_only = identify_lines([(text, None) for text, _col in items], catalog_path=db)
+            for index, (raw, plain) in enumerate(zip(with_column, text_only)):
+                if expected[index] == "c.j":
+                    # the same text without a column follows the
+                    # no-compression rule and names jal
+                    assert raw.row.mnemonic == "c.j", name
+                    assert plain.row.mnemonic == "jal", name
+                    continue
+                assert raw.row.mnemonic == plain.row.mnemonic == expected[index], (name, index)
+
+    def test_per_byte_columns_stay_memory_order(self):
+        from simdref.asm_identity import _bytes_entry
+
+        # llvm-mc prints the c.j of "j 8" as [0x21,0xa0]: a GNU per-byte
+        # column holds those bytes, a word token holds their value, and an
+        # x86 per-byte column is unchanged.
+        assert _bytes_entry("a021", word=True)["bytes"] == "0x21,0xa0"
+        assert _bytes_entry("21 a0", word=True)["bytes"] == "0x21,0xa0"
+        assert _bytes_entry("48 89 d8")["bytes"] == "0x48,0x89,0xd8"

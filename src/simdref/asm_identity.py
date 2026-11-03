@@ -1175,9 +1175,21 @@ def _catalog_for(catalog_path: str | os.PathLike | None, arch: str) -> _Catalog:
     return catalog
 
 
-def _bytes_entry(byte_hex: str) -> dict:
-    """Build one probe-shaped entry from an objdump byte column."""
-    hexbytes = "0x" + ",0x".join(byte_hex[pos : pos + 2] for pos in range(0, len(byte_hex), 2))
+def _bytes_entry(byte_hex: str, *, word: bool = False) -> dict:
+    """Build one probe-shaped entry from an objdump byte column.
+
+    ``word`` (AArch64 and RISC-V lines): objdump prints one hex token per
+    instruction word, and the token is the word value, not memory order
+    (``a021`` is the word 0xa021, bytes ``21 a0``). A column with more than
+    one 2-digit token is memory order (x86 bytes, GNU per-byte columns).
+    """
+    tokens = byte_hex.split()
+    if word and len(tokens) == 1 and len(tokens[0]) in (4, 8):
+        raw = int(tokens[0], 16).to_bytes(len(tokens[0]) // 2, "little")
+        hexbytes = ",".join(f"0x{byte:02x}" for byte in raw)
+    else:
+        joined = "".join(tokens)
+        hexbytes = "0x" + ",0x".join(joined[pos : pos + 2] for pos in range(0, len(joined), 2))
     return {"status": "OK", "bytes": hexbytes, "mode": "64", "text": "", "n": 0}
 
 
@@ -1194,7 +1206,10 @@ def identify_lines(
     ``items`` holds one ``(text, byte_column_hex)`` pair per source line: the
     raw instruction text (objdump address and byte columns and any ``<sym>``
     suffix already stripped, the trailing comment kept so each triple applies
-    its own comment rule) and the objdump byte column hex, or None.
+    its own comment rule) and the objdump byte column hex, or None. The
+    column keeps its printed tokens: on AArch64 and RISC-V a single 4- or
+    8-digit token is the instruction word value, and a multi-token column is
+    memory order.
 
     One llvm-mc run per candidate triple covers the batch, and each line takes
     the family whose assembler accepts it and the x86 syntax its own text
@@ -1312,7 +1327,11 @@ def identify_lines(
             # what they encode (a 2-byte c.j stays c.j). Only source text
             # follows the no-compression rule; the probe opcode then names
             # the text's instruction, never the bytes', so it is dropped.
-            entry = {**entry, "bytes": _bytes_entry(byte_hex)["bytes"], "opcode": ""}
+            entry = {
+                **entry,
+                "bytes": _bytes_entry(byte_hex, word=chosen[0] != "x86")["bytes"],
+                "opcode": "",
+            }
         groups.setdefault(chosen, []).append((index, entry))
     for (arch, _syntax), members in groups.items():
         idxs = [index for index, _entry in members]

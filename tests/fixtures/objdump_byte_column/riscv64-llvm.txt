@@ -1,0 +1,8 @@
+
+riscv.o:	file format elf64-littleriscv
+
+Disassembly of section .text:
+
+0000000000000000 <.text>:
+       0: a021         	j	0x8 <.text+0x8>
+       2: 3e80006f     	j	0x3ea <.text+0x3ea>
