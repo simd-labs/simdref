@@ -12,6 +12,7 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 - Format: XML in a JavaScript wrapper (`data.js`) in a versioned zip.
 - License: no licence grant found in the zip or on the Intel site. Used under the removal-request policy in the README.
 - Refresh: a few times per year with new extensions. Pin the local `vendor/intel/` copy, update on releases.
+- Cache: the `upstream-cache` GitHub release asset `intel-intrinsics.zip`. The `upstream-cache.yml` workflow updates it each day. The build reads it when no live source answers.
 - Gaps: none in the ~7k published intrinsics.
 
 ### uops.info

@@ -1,0 +1,41 @@
+name: Refresh upstream cache
+
+# Daily refresh of the `upstream-cache` release asset. build-catalog in
+# ci.yml falls back to this asset when every live Intel source fails,
+# so a source outage does not break the catalog build.
+
+on:
+  schedule:
+    - cron: "23 4 * * *" # daily (04:23 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-cache
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          enable-cache: true
+          activate-environment: true
+          python-version: "3.14"
+
+      - name: Install package
+        run: uv pip install -e .
+
+      - name: Refresh cache asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/refresh_upstream_cache.py

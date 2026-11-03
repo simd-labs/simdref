@@ -68,9 +68,18 @@ jobs:
         # One LLVM version across the org: llvmorg-23.1.4 (tested version).
         # 23 is now the stable line on apt.llvm.org.
         run: |
-          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          wget -q --tries=3 --retry-connrefused --waitretry=30 -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
           chmod +x /tmp/llvm.sh
-          sudo /tmp/llvm.sh 23
+          for attempt in 1 2 3; do
+            if sudo /tmp/llvm.sh 23; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "llvm.sh failed 3 times" >&2
+              exit 1
+            fi
+            sleep $(( attempt * 30 ))
+          done
           echo "/usr/lib/llvm-23/bin" >> "$GITHUB_PATH"
 
       - name: Install package
@@ -89,6 +98,16 @@ jobs:
           git -C /tmp/riscv-unified-db checkout -q FETCH_HEAD
           git clone --depth 1 https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc /tmp/riscv-rvv-intrinsic-doc
           python tools/vendor_riscv_sources.py
+
+      - name: Download upstream cache (fallback)
+        # Intel source fallback for the build below. A missing asset must
+        # not fail CI: the live sources may still be reachable.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p vendor/intel-cache
+          gh release download upstream-cache -p intel-intrinsics.zip -D vendor/intel-cache
 
       - name: Build catalog
         run: python -u -m simdref build

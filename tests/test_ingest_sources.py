@@ -51,6 +51,7 @@ def test_derive_arm_arch_none_for_non_arm():
 def _isolate_network(monkeypatch, *, raise_on_urls=(), responses=None):
     """Disable all local archive/vendor paths and stub _fetch_text."""
     monkeypatch.setattr(src, "LOCAL_INTEL_ARCHIVES", [])
+    monkeypatch.setattr(src, "LOCAL_INTEL_CACHE_ARCHIVES", [])
     monkeypatch.setattr(src, "LOCAL_UOPS_XMLS", [])
     monkeypatch.setattr(src, "LOCAL_ARM_ACLE_JSONS", [])
     monkeypatch.setattr(src, "LOCAL_ARM_INTRINSICS_JSONS", [])
@@ -125,6 +126,38 @@ def test_intel_data_candidate_fallback(monkeypatch):
         text, version = src.fetch_intel_data()
         assert text == payload
         assert version.url in urls
+
+
+def _write_intel_cache_zip(
+    tmp_path, data_js="cached intel data", fetched_at="2026-11-03T00:00:00+00:00"
+):
+    archive = tmp_path / "intel-intrinsics.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("files/data.js", data_js)
+        zf.writestr(
+            "SOURCE.json",
+            json.dumps({"url": "u", "fetched_at": fetched_at, "sha256": "s"}),
+        )
+    return archive
+
+
+def test_intel_cache_fallback_used_when_network_fails(tmp_path, monkeypatch):
+    cache = _write_intel_cache_zip(tmp_path)
+    _isolate_network(monkeypatch, raise_on_urls=tuple(src.INTEL_CANDIDATE_DATA_URLS))
+    monkeypatch.setattr(src, "LOCAL_INTEL_CACHE_ARCHIVES", [cache])
+    text, version = src.fetch_intel_data()
+    assert text == "cached intel data"
+    assert version.version == "upstream-cache:2026-11-03T00:00:00+00:00"
+
+
+def test_intel_cache_ignored_when_network_works(tmp_path, monkeypatch):
+    cache = _write_intel_cache_zip(tmp_path)
+    url = src.INTEL_CANDIDATE_DATA_URLS[0]
+    _isolate_network(monkeypatch, responses={url: "live payload"})
+    monkeypatch.setattr(src, "LOCAL_INTEL_CACHE_ARCHIVES", [cache])
+    text, version = src.fetch_intel_data()
+    assert text == "live payload"
+    assert version.version == "live"
 
 
 # ---------------------------------------------------------------------------

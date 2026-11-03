@@ -18,7 +18,7 @@ Edges: `test` and `package` follow `build-catalog`. `publish-data` follows all t
 
 ### Phase 1: data creation
 
-- `build-catalog` installs LLVM 23 (tested version 23.1.4) and the `simdref[ingest]` extra, vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact.
+- `build-catalog` installs LLVM 23 (tested version 23.1.4) and the `simdref[ingest]` extra, vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact. Before the build it downloads the `upstream-cache` asset into `vendor/intel-cache/`. The Intel fetch reads that copy only when no live source answers.
 
 ### Phase 2: data use (parallel)
 
@@ -43,6 +43,10 @@ The static web app moved to the simdref-web repo. Pages deployment lives there. 
 - `workflow_call` (release-candidate.yml): phases 1-2 only.
 
 Caching: none. Each run rebuilds the catalog from upstream, trading runtime for freshness. A stale cache cannot hide an ingestion regression.
+
+## Upstream cache (`.github/workflows/upstream-cache.yml`)
+
+Runs each day and on request. `tools/refresh_upstream_cache.py` fetches the Intel intrinsics data. It updates the `upstream-cache` release asset `intel-intrinsics.zip` when the content changed. `build-catalog` reads that asset when no live source answers.
 
 ## Release flow (`.github/workflows/release-candidate.yml`)
 

@@ -67,6 +67,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 LOCAL_INTEL_ARCHIVES = [
     _REPO_ROOT / "vendor" / "intel" / "Intel-Intrinsics-Guide-Offline-3.6.9.zip",
 ]
+LOCAL_INTEL_CACHE_ARCHIVES = [
+    _REPO_ROOT / "vendor" / "intel-cache" / "intel-intrinsics.zip",
+]
 LOCAL_UOPS_XMLS = [
     _REPO_ROOT / "vendor" / "uops" / "instructions.xml",
 ]
@@ -128,10 +131,29 @@ def _read_local_intel_archive() -> tuple[str, SourceVersion] | None:
         if not archive_path.exists():
             continue
         with zipfile.ZipFile(archive_path) as zf:
-            text = zf.read("Intel Intrinsics Guide/files/data.js").decode("utf-8", "replace")
+            text = _extract_zip_text(zf, "data.js")
         return text, SourceVersion(
             source="intel-intrinsics-guide",
             version=f"offline-package:{archive_path.stem}",
+            fetched_at=now_iso(),
+            url=str(archive_path),
+        )
+    return None
+
+
+def _read_local_intel_cache_archive() -> tuple[str, SourceVersion] | None:
+    for archive_path in LOCAL_INTEL_CACHE_ARCHIVES:
+        if not archive_path.exists():
+            continue
+        try:
+            with zipfile.ZipFile(archive_path) as zf:
+                text = _extract_zip_text(zf, "data.js")
+                fetched_at = json.loads(zf.read("SOURCE.json"))["fetched_at"]
+        except Exception:
+            continue
+        return text, SourceVersion(
+            source="intel-intrinsics-guide",
+            version=f"upstream-cache:{fetched_at}",
             fetched_at=now_iso(),
             url=str(archive_path),
         )
@@ -212,8 +234,12 @@ def fetch_intel_data() -> tuple[str, SourceVersion]:
     except Exception:
         pass
 
+    cached = _read_local_intel_cache_archive()
+    if cached is not None:
+        return cached
+
     raise SourceUnavailableError(
-        "Intel intrinsics data is unreachable (network + local archives all failed). "
+        "Intel intrinsics data is unreachable (network + local archives + upstream cache all failed). "
         "Install llvm-mca + a working network, or run `simdref update` (no --build) to "
         "use the pre-built release catalog."
     )
