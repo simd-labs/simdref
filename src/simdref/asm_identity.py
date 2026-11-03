@@ -371,12 +371,15 @@ _BYTE_RE = re.compile(r"0x([0-9a-fA-F]{2})(?:'A')?$")
 _BITS_RE = re.compile(r"0b([01Aa]{8})$")
 
 
-def _covered_mask(hexbytes: str | None) -> int:
+def _covered_mask(hexbytes: str | None, *, marked_byte_covers: bool = True) -> int:
     """Bit mask of fixup-covered bits (bit i of the little-endian word).
 
     Mirrors the ``_bytes_to_words`` token shapes. llvm-mc names bits only in
     the binary shape; a whole byte, a marked byte and an unknown shape name
-    none of their bits, so all 8 count as covered."""
+    none of their bits, so all 8 count as covered. With
+    ``marked_byte_covers=False`` a marked hex byte keeps its printed digits
+    as values, and only the bare placeholder tokens cover: that is the
+    known-bit view the opcode decider compares against (review F1)."""
     if not hexbytes:
         return 0
     mask = 0
@@ -386,7 +389,7 @@ def _covered_mask(hexbytes: str | None) -> int:
         match = _BITS_RE.match(token)
         if match:
             bits = sum(1 << (7 - pos) for pos, ch in enumerate(match.group(1)) if ch in "Aa")
-        elif _BYTE_RE.match(token) and not token.endswith("'A'"):
+        elif _BYTE_RE.match(token) and (not marked_byte_covers or not token.endswith("'A'")):
             bits = 0
         mask |= bits << (8 * index)
     return mask
@@ -916,9 +919,19 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
             # llvm-mc's own MCInst opcode names the row too (review F3). The
             # RISC-V branch fixups print whole covered bytes, which hides the
             # opcode bits from the mask test, so the opcode name is the second
-            # decider (issue #60).
+            # decider (issue #60). The name alone is no byte proof (review F1):
+            # a row may win only when its (mask, match) agrees with the
+            # printed bytes on every bit that is no fixup placeholder. A
+            # contradiction on a known bit means no row, or the pick would
+            # deny the operand bits llvm-mc printed.
             named = (entry.get("opcode") or "").casefold().replace("_", ".")
-            by_opcode = [row for row in picked.values() if row.key.casefold() == named]
+            placeholder = _covered_mask(entry.get("bytes"), marked_byte_covers=False)
+            by_opcode = [
+                row
+                for row in picked.values()
+                if row.key.casefold() == named
+                and ((word ^ row.enc_match) & row.enc_mask & ~placeholder) == 0
+            ]
             decided = len(picked) == 1 and (
                 any((mask & covered) == 0 and id(row) in picked for mask, row in checks)
                 or len(by_opcode) == 1

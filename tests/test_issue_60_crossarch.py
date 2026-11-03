@@ -202,3 +202,50 @@ class TestRiscvIdentity:
             result = identify(text + "\n", "riscv64", catalog_path=db)[0]
             assert result.status == "row", (text, result.reason)
             assert result.row.mnemonic == mnemonic, text
+
+
+@needs_tools
+class TestOpcodeDeciderNeedsKnownBitProof:
+    """The MCInst name may pick a row only with proof on the known bits.
+
+    A fixup placeholder can cover the whole word (a RISC-V symbolic branch
+    prints covered bytes). A row whose key equals the MCInst name but whose
+    fixed operand bits contradict the printed bytes then has no byte proof,
+    and the name alone must not pick it (review F1)."""
+
+    # Control: the row fixes only op+funct3, the fields the name proves.
+    HONEST = InstructionRecord(
+        mnemonic="bge",
+        form="bge",
+        summary="ROW-BGE-HONEST",
+        architecture="riscv",
+        isa=["rvi"],
+        enc_bits=32,
+        enc_mask=0x707F,
+        enc_match=0x5063,
+    )
+    # Same key "bge" (matches MCInst BGE), but it fixes rs2 = x1 while the
+    # printed bytes carry rs2 = a0. The row contradicts known bits.
+    CONTRADICTING = InstructionRecord(
+        mnemonic="bge",
+        form="bge",
+        summary="ROW-BGE-RS2-X1",
+        architecture="riscv",
+        isa=["rvi"],
+        enc_bits=32,
+        enc_mask=0x707F | 0x1F00000,
+        enc_match=0x5063 | (1 << 20),
+    )
+
+    def test_contradicting_row_gets_no_row(self, tmp_path):
+        db = _db([self.CONTRADICTING], tmp_path)
+        result = identify("blez a0, .L1\n", "riscv64", catalog_path=db)[0]
+        assert result.status == "no-row", (result.status, result.reason)
+        assert result.row is None
+
+    def test_row_agreeing_with_the_bytes_still_wins(self, tmp_path):
+        db = _db([self.HONEST], tmp_path)
+        result = identify("blez a0, .L1\n", "riscv64", catalog_path=db)[0]
+        assert result.status == "row", result.reason
+        assert result.row.mnemonic == "bge"
+        assert result.row.enc_match == 0x5063
