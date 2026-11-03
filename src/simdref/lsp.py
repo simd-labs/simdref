@@ -1044,6 +1044,27 @@ def _mnemonic_has_rows(conn, text: str, semicolon_is_comment: bool) -> bool:
 _CATALOG_ISA = {"x86": "x86", "aarch64": "arm", "riscv64": "riscv"}
 
 
+def _exact_key_beats_identity(conn, text: str, intel: bool, slot: str) -> bool:
+    """Whether the line keeps its exact catalog key over the byte-identity row.
+
+    A line with no architecture vote and an exact key keeps that key when the
+    bytes prove no row in the key's family (issue #60: "mulw sym" hovers the
+    RISC-V key "mulw", never the x86 MUL its AT&T suffix spelling assembles
+    to). A decided line keeps its byte row: there the bytes name the form.
+    """
+    parsed = _mnemonic_from_asm_line(text, intel)
+    if not parsed:
+        return False
+    if _classify_line(parsed[2], intel)[0]:
+        return False
+    exact = load_instruction_from_db(conn, parsed[0])
+    if exact is None:
+        return False
+    if slot == NO_CATALOG_ROW:
+        return True
+    return not slot.casefold().startswith(exact.architecture.casefold() + ":")
+
+
 def identity_keys(
     texts: Sequence[str],
     intel: bool | None,
@@ -1101,14 +1122,16 @@ def identity_keys(
     if len(byte_cols) != len(items):
         byte_cols = (None,) * len(items)
     slots = list(_identity_batch(items, vote, bool(intel), byte_cols, catalog, mtime_ns))
-    return [
-        (
-            None
-            if slot == NO_CATALOG_ROW and not _mnemonic_has_rows(conn, text, bool(intel))
-            else slot
-        )
-        for text, slot in zip(items, slots)
-    ]
+    out: list[str | None] = []
+    for text, slot in zip(items, slots):
+        if slot == NO_CATALOG_ROW and not _mnemonic_has_rows(conn, text, bool(intel)):
+            slot = None
+        elif slot and _exact_key_beats_identity(conn, text, bool(intel), slot):
+            # The exact key is the only name the line has: the old matcher
+            # answers it and hover and hint agree on the key's row.
+            slot = None
+        out.append(slot)
+    return out
 
 
 def _hover_markdown(

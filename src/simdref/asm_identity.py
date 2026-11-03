@@ -188,7 +188,29 @@ def _parse_echo_blocks(listing: str) -> list[tuple[str, str | None, str | None, 
     return [tuple(block) for block in blocks]
 
 
-def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list[dict]:
+# Probe results are deterministic per (lines, arch, syntax, tool, mattr), so a
+# document probed by both identify_lines and isa_by_acceptance runs llvm-mc
+# once per triple, not twice (perf gate: 8 runs per document became 4).
+_PROBE_CACHE: dict[tuple, list[dict]] = {}
+
+
+def _probe_lines(
+    lines: list[str], arch: str, syntax: str, llvm_mc: str, *, mattr: str | None = None
+) -> list[dict]:
+    key = (tuple(lines), arch, syntax, llvm_mc, mattr)
+    cached = _PROBE_CACHE.get(key)
+    if cached is None:
+        if len(_PROBE_CACHE) >= 16:
+            _PROBE_CACHE.clear()
+        cached = _PROBE_CACHE[key] = _probe_lines_uncached(
+            lines, arch, syntax, llvm_mc, mattr=mattr
+        )
+    return cached
+
+
+def _probe_lines_uncached(
+    lines: list[str], arch: str, syntax: str, llvm_mc: str, *, mattr: str | None = None
+) -> list[dict]:
     """Run llvm-mc once per document; map each line to bytes or a reason.
 
     The map comes from llvm-mc's own output, never from counting: a unique
@@ -201,8 +223,8 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
     every other instruction line reports no row (review E1/E2)."""
     cfg = _ARCH_CFG[arch]
     cmd = [llvm_mc, f"--triple={cfg['triple']}", "-show-encoding", "-show-inst"]
-    if cfg["mattr"]:
-        cmd.append(f"-mattr={cfg['mattr']}")
+    if mattr or cfg["mattr"]:
+        cmd.append(f"-mattr={mattr or cfg['mattr']}")
     if arch == "x86":
         cmd.append(_X86_SYNTAX_FLAG[syntax])
 
@@ -313,6 +335,36 @@ def _probe_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list
             reason = "line mapping unverified (no instruction echo for the line)"
         results.append({"n": i, "text": text, "status": "REJECTED", "error": reason})
     return results
+
+
+def _probe_lines_split(lines: list[str], arch: str, syntax: str, llvm_mc: str) -> list[dict]:
+    """Probe each line with the encoding class its spelling names.
+
+    A RISC-V line whose mnemonic does not start with ``c.`` must identify by
+    its uncompressed encoding, so it is probed without ``+c``: with ``+c``
+    llvm-mc compresses e.g. ``addi s0, sp, 16`` to the C.ADDI4SPN bytes and
+    the bytes name the wrong row. ``+c`` stays on only for ``c.`` lines.
+    """
+    if not arch.startswith("riscv"):
+        return _probe_lines(lines, arch, syntax, llvm_mc)
+    out: list[dict | None] = [None] * len(lines)
+    groups: dict[bool, list[int]] = {True: [], False: []}
+    for index, text in enumerate(lines):
+        parts = text.strip().split(None, 1)
+        head = parts[0].casefold() if parts else ""
+        groups[head.startswith("c.")].append(index)
+    for is_compressed, indexes in groups.items():
+        if not indexes:
+            continue
+        mattr = None
+        if not is_compressed:
+            mattr = ",".join(t for t in _ARCH_CFG[arch]["mattr"].split(",") if t != "+c")
+        sub = _probe_lines([lines[i] for i in indexes], arch, syntax, llvm_mc, mattr=mattr)
+        for index, entry in zip(indexes, sub):
+            merged = dict(entry)
+            merged["n"] = index + 1
+            out[index] = merged
+    return out
 
 
 _BYTE_RE = re.compile(r"0x([0-9a-fA-F]{2})(?:'A')?$")
@@ -751,6 +803,10 @@ def identify(
     if arch == "x86" and xed is None:
         raise ToolUnavailableError("xed decoder not found (set SIMDREF_XED)")
 
+    # identify() is the byte-identity document API (lane crossarch: "mv a0,
+    # a1" and "j 8" identify the c.mv / c.j rows their bytes name). The
+    # uncompressed rule binds the source-line pipeline (identify_lines), not
+    # this one, so this probe keeps +c.
     probed = _probe_lines(lines, arch, syntax, llvm_mc)
     results = [
         LineResult(
@@ -977,7 +1033,9 @@ def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
     accepted: list[set[str]] = [set() for _ in lines]
     try:
         for arch, syntax, family in _ISA_CANDIDATES:
-            for entry, families in zip(_probe_lines(list(lines), arch, syntax, llvm_mc), accepted):
+            for entry, families in zip(
+                _probe_lines_split(list(lines), arch, syntax, llvm_mc), accepted
+            ):
                 if entry["status"] == "OK":
                     families.add(family)
     except OSError:
@@ -1130,7 +1188,7 @@ def identify_lines(
     probed: dict[tuple[str, str], list[dict]] = {}
     try:
         for arch, syntax, _family in _ISA_CANDIDATES:
-            probed[(arch, syntax)] = _probe_lines(texts, arch, syntax, llvm_mc)
+            probed[(arch, syntax)] = _probe_lines_split(texts, arch, syntax, llvm_mc)
     except OSError as exc:
         raise ToolUnavailableError(f"llvm-mc failed to run: {exc}") from exc
     # Family per line = isa_by_acceptance's rule: the line's own accepting
@@ -1180,14 +1238,14 @@ def identify_lines(
         if family is not None:
             runs = [(arch, syntax) for arch, syntax, name in accepted if name == family]
             if family == "x86":
+                # The syntax the text speaks is tried first; a parser that
+                # rejects the line falls through to the byte column or the
+                # other syntax below (the Intel vs AT&T retry).
                 primary = (
                     "x86",
                     "intel" if ("%" not in text and "$" not in text) else "att",
                 )
-                if primary in runs:
-                    chosen = primary
-                elif runs:
-                    chosen = runs[0]
+                chosen = primary
             elif runs:
                 chosen = runs[0]
             if chosen is not None:

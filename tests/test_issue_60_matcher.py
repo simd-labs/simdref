@@ -16,6 +16,7 @@ from simdref.annotate import (
     annotate_stream,
 )
 from simdref.asm_identity import _bytes_to_words, _probe_lines, _tool_path, _xed_facts
+from simdref.lsp import identity_keys
 from simdref.models import Catalog, InstructionRecord, SourceVersion
 from simdref.storage import build_sqlite, open_db
 
@@ -64,6 +65,12 @@ def _catalog(records: list[InstructionRecord]) -> Catalog:
         sources=[SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")],
         generated_at="2025-01-01",
     )
+
+
+# The catalog holds no arm alias rows (GAS mov/cmp/cmn/tst assemble as
+# MOVZ/SUBS/ADDS/ANDS): the rows carry the target name, so only byte identity
+# names them and the old matcher never covers a lost identity.
+_ALIAS_TARGETS = {"mov": "movz", "cmp": "subs", "cmn": "adds", "tst": "ands"}
 
 
 def _fixture_db(tmp_path: Path) -> Path:
@@ -121,7 +128,7 @@ def _fixture_db(tmp_path: Path) -> Path:
         match = sum(byte << (8 * index) for index, byte in enumerate(word))
         rows.append(
             InstructionRecord(
-                mnemonic=line.split()[0],
+                mnemonic=_ALIAS_TARGETS.get(line.split()[0], line.split()[0]),
                 form=line,
                 summary=f"{line} row.",
                 architecture="arm",
@@ -131,6 +138,21 @@ def _fixture_db(tmp_path: Path) -> Path:
                 enc_extra=[("", 32, 0xFFFFFFFF, match)],
             )
         )
+    # The AARCHMRS B.cond encodeset (mask 0xFF00001F, cond LE) for the C6
+    # symbol line. Its key is not "b.le", so only byte identity names it.
+    rows.append(
+        InstructionRecord(
+            mnemonic="B",
+            form="B (LE, <label>)",
+            summary="Branch conditionally.",
+            architecture="arm",
+            isa=["A64"],
+            enc_bits=32,
+            enc_mask=0xFF00001F,
+            enc_match=0x5400000D,
+            enc_extra=[("", 32, 0xFF00001F, 0x5400000D)],
+        )
+    )
     db = tmp_path / "catalog.db"
     build_sqlite(_catalog(rows), db)
     return db
@@ -151,6 +173,9 @@ def _annotate(lines: list[str], conn) -> list[dict]:
 
 @pytest.fixture(scope="module")
 def conn(tmp_path_factory):
+    llvm_mc, xed = _tool_paths()
+    if not (llvm_mc and xed):
+        pytest.skip("llvm-mc/xed not found")
     db = _fixture_db(tmp_path_factory.mktemp("issue60"))
     connection = open_db(path=db)
     yield connection
@@ -165,6 +190,14 @@ class TestSymbolExpression:
             _SYMBOL_TARGET_RE.sub(r"\1", "b.le\t114 <my_memcmp+0x40>").strip()
             == "b.le\tmy_memcmp+0x40"
         )
+
+    @needs_tools
+    def test_b_le_symbol_line_resolves_to_the_b_cond_row(self, conn):
+        # The stripped symbol assembles and its bytes name the B.cond row
+        # (mask 0xFF00001F, cond LE); the bare "b.le 114" is rejected.
+        records = _annotate(["b.le\t114 <my_memcmp+0x40>"], conn)
+        assert records[0]["known"] is True
+        assert records[0]["summary"] == "Branch conditionally."
 
     @needs_tools
     def test_aarch64_symbol_line_assembles(self):
@@ -193,6 +226,39 @@ class TestSilentRecordDrops:
     def test_every_line_yields_one_record(self, conn):
         records = _annotate(X86_LINES + ARM_LINES, conn)
         assert len(records) == len(X86_LINES) + len(ARM_LINES)
+
+
+class TestCommentImmediates:
+    @needs_tools
+    def test_hash_immediate_lines_keep_their_identity(self, conn):
+        # A "#" immediate (AArch64) is not a comment and must reach llvm-mc,
+        # so the bytes name the row; a mixed batch keeps the x86 line too.
+        records = _annotate(["mov x1, #0x1234", "cmp x0, #16", "cltq"], conn)
+        assert [record["known"] for record in records] == [True, True, True]
+        assert [record["summary"] for record in records] == [
+            "mov x1, #0x1234 row.",
+            "cmp x0, #16 row.",
+            "CDQE row.",
+        ]
+
+    def test_unknown_lines_with_trailing_comments_keep_their_record(self, tmp_path):
+        # issue #60 class 4 (b): a line no row answers still keeps its JSON
+        # record, trailing comment or not. Two lines, two records, input
+        # order, on a catalog whose rows name neither line.
+        db = tmp_path / "empty.db"
+        build_sqlite(_catalog([]), db)
+        connection = open_db(path=db)
+        try:
+            records = _annotate(
+                [
+                    "movzwl 0x3352(%rip),%r15d        # 4052e8 <_ZTISt4plusIdE+0x158>",
+                    "mul    r14",
+                ],
+                connection,
+            )
+        finally:
+            connection.close()
+        assert [record["mnemonic"] for record in records] == ["movzwl", "mul"]
 
 
 class TestBatchContextIdentity:
@@ -247,6 +313,19 @@ class TestIntelVsAtt:
             conn,
         )
         assert [record["known"] for record in records] == [True, True, True, True]
+
+    @needs_tools
+    def test_intel_style_jump_line_resolves_through_the_att_retry(self, conn):
+        # The Intel parser rejects objdump jump text; the AT&T retry assembles
+        # it and the bytes name the JZ row (issue #60 class 7). An AT&T line in
+        # an Intel-context document resolves through the same retry.
+        records = _annotate(["je     401012 <printf@plt-0x1e>"], conn)
+        assert records[0]["known"] is True
+        assert records[0]["summary"] == "JZ_RELBRb row."
+        # "cltq" reads as Intel text (no %/$) but only the AT&T parser takes
+        # it: the retry must be what resolves the line to the CDQE row.
+        keys = identity_keys(["cltq"], True, conn)
+        assert keys == ["x86:cdqe"]
 
 
 class TestLonePrefixLines:

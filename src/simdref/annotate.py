@@ -862,6 +862,7 @@ def format_annotation(
     arch: str | None,
     agg: str,
     include_modeled: bool,
+    perf_summary: PerfSummary | None = None,
 ) -> str:
     """Compose the comment fragment (without the leading ``# `` marker)."""
     parts: list[str] = []
@@ -880,7 +881,11 @@ def format_annotation(
                 if microcoded_val:
                     uops_frag += " microcoded"
         else:
-            summary = aggregate_perf(record, mode=agg, include_modeled=include_modeled)
+            summary = (
+                perf_summary
+                if perf_summary is not None
+                else aggregate_perf(record, mode=agg, include_modeled=include_modeled)
+            )
             lat, cpi = summary.latency, summary.cpi
             if summary.n_archs == 0:
                 tag = "[no data]"
@@ -921,6 +926,7 @@ def _annotate_instruction(
     identity_key: str | None = None,
     line_isa: str | None = None,
     line_number: int | None = None,
+    identity_cache: dict[str, tuple[InstructionRecord, PerfSummary | None]] | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Return the rendered output line and an optional JSON record.
 
@@ -973,8 +979,18 @@ def _annotate_instruction(
         no_row["source"] = parsed.raw
         return f"{parsed.raw}   # {parsed.mnemonic}: no measured row", no_row
     # Byte identity wins over the form pick: the record is what the line
-    # assembles to, and an empty row keeps the old pick unchanged.
-    record = load_instruction_from_db(conn, identity_key) if identity_key else None
+    # assembles to, and an empty row keeps the old pick unchanged. The perf
+    # input repeats a few hundred keys over thousands of lines, so the load
+    # and the aggregate are cached per key within one stream.
+    record: InstructionRecord | None = None
+    summary: PerfSummary | None = None
+    cached = (
+        identity_cache.get(identity_key) if (identity_key and identity_cache is not None) else None
+    )
+    if cached is not None:
+        record, summary = cached
+    else:
+        record = load_instruction_from_db(conn, identity_key) if identity_key else None
     if record is not None:
         if stats is not None:
             stats["recognized"] = stats.get("recognized", 0) + 1
@@ -1024,6 +1040,16 @@ def _annotate_instruction(
     if not (opts.performance or opts.docs):
         return parsed.raw, None
 
+    # One aggregate per record: format_annotation and the JSON fields below
+    # read the same summary (perf gate: this ran twice per line).
+    if summary is None:
+        summary = (
+            aggregate_perf(record, mode=opts.agg, include_modeled=opts.include_modeled)
+            if opts.arch is None
+            else None
+        )
+        if identity_key and identity_cache is not None and record is not None:
+            identity_cache[identity_key] = (record, summary)
     annotation = format_annotation(
         record,
         performance=opts.performance,
@@ -1031,6 +1057,7 @@ def _annotate_instruction(
         arch=opts.arch,
         agg=opts.agg,
         include_modeled=opts.include_modeled,
+        perf_summary=summary,
     )
     if not annotation:
         return parsed.raw, None
@@ -1039,7 +1066,6 @@ def _annotate_instruction(
         lat_val, cpi_val, _ = arch_perf(record, opts.arch)
         archs_used: list[str] = [opts.arch] if (opts.arch in (record.arch_details or {})) else []
     else:
-        summary = aggregate_perf(record, mode=opts.agg, include_modeled=opts.include_modeled)
         lat_val, cpi_val = summary.latency, summary.cpi
         archs_used = list(summary.archs_used)
     ports_val = collect_ports(record, arch=opts.arch, archs_used=archs_used)
@@ -1104,6 +1130,7 @@ def annotate_stream(
     pending_src_file: str | None = None
     pending_src_line: int | None = None
     lookup_cache: dict[tuple[str, str | None], list[InstructionRecord]] = {}
+    identity_cache: dict[str, tuple[InstructionRecord, PerfSummary | None]] = {}
     arch_out: list[str] = []
 
     parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
@@ -1196,6 +1223,7 @@ def annotate_stream(
             if not auto_isa
             else line_family.get(index) or _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
             line_number=index + 1,
+            identity_cache=identity_cache,
         )
         if collecting_json:
             if record is not None:
