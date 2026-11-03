@@ -973,31 +973,39 @@ NO_CATALOG_ROW = "?:no-catalog-row"
 
 @functools.lru_cache(maxsize=32)
 def _identity_batch(
-    texts: tuple[str, ...], intel: bool, syntax: bool, catalog: str, mtime_ns: int
+    texts: tuple[str, ...],
+    intel: bool,
+    syntax: bool,
+    byte_cols: tuple[str | None, ...],
+    catalog: str,
+    mtime_ns: int,
 ) -> tuple[str | None, ...]:
-    from simdref.asm_identity import ToolUnavailableError, identify
+    from simdref.asm_identity import ToolUnavailableError, identify_lines
 
     slots: list[str | None] = [None] * len(texts)
-    # A blank text ends as None anyway (a blank line is not an instruction),
-    # and identify() splits with splitlines(), which drops a trailing blank.
-    probed = [index for index, text in enumerate(texts) if text.strip()]
-    picked = _document_arch(tuple(texts[index] for index in probed), intel, syntax)
-    if picked is None:
-        return tuple(slots)
-    arch, x86_syntax, keep = picked
+    # The document vote only names the family whose assembler to try for
+    # lines no per-line acceptance answer exists for. No line is dropped.
+    picked = _document_arch(texts, intel, syntax)
+    fallback_family = (
+        {"x86": "x86", "aarch64": "arm", "riscv64": "riscv"}.get(picked[0])
+        if picked is not None
+        else None
+    )
     try:
-        results = identify(
-            "\n".join(texts[index] for index in probed), arch, x86_syntax, catalog_path=catalog
+        results = identify_lines(
+            list(zip(texts, byte_cols)),
+            catalog_path=catalog,
+            fallback_family=fallback_family,
         )
-    except (ToolUnavailableError, ValueError, OSError, sqlite3.Error):
+    except (ToolUnavailableError, ValueError, OSError, FileNotFoundError, sqlite3.Error):
         # No tool, no keys or no row: the old matcher answers these lines.
         return tuple(slots)
-    if len(results) != len(probed):
+    if len(results) != len(texts):
         return tuple(slots)
-    for index, held, result in zip(probed, keep, results):
+    for index, result in enumerate(results):
         # The text check keeps a row on its own line even if a text carries
         # its own line break.
-        if not held or result.text != texts[index]:
+        if result.text != texts[index]:
             continue
         if result.row is not None:
             slots[index] = result.row.db_key
@@ -1042,23 +1050,25 @@ def identity_keys(
     conn: sqlite3.Connection,
     *,
     arch_out: list[str] | None = None,
+    byte_columns: Sequence[str | None] | None = None,
 ) -> list[str | None]:
     """Map each text to the catalog db_key its encoded bytes name, or a mark.
 
     One shared entry for hover, inlay hints, annotate and the llm query: one
-    llvm-mc run per document batch, cached per document content. A None means
+    llvm-mc run per family over the batch, decided per line. A None means
     byte identity could not run for the line (tools missing, a schema-13
-    catalog, a document byte identity declined, or a line that votes another
-    arch) and the caller's old matcher answers that line unchanged.
-    NO_CATALOG_ROW means byte identity identified the instruction and the
-    catalog has no row for that form: the caller reports no measured row and
-    never guesses a neighbour form. The mark is dropped when the catalog
-    holds no row at all for the line's mnemonic; ``intel`` is the file-type
-    syntax flag; None infers the x86 syntax from the text, and keeps the
-    operand votes neutral so a bare AArch64 or RISC-V line never reads as
-    forced x86. ``arch_out`` receives the catalog architecture that
-    _document_arch infers for the document, so the fallback matcher can
-    keep rows of that architecture even without an --isa pin.
+    catalog, or a line the candidate assemblers reject) and the caller's old
+    matcher answers that line unchanged. NO_CATALOG_ROW means byte identity
+    identified the instruction and the catalog has no row for that form: the
+    caller reports no measured row and never guesses a neighbour form. The
+    mark is dropped when the catalog holds no row at all for the line's
+    mnemonic; ``intel`` is the file-type syntax flag; None infers the x86
+    syntax from the text, and keeps the operand votes neutral so a bare
+    AArch64 or RISC-V line never reads as forced x86. ``byte_columns`` holds
+    the objdump byte column hex per line, or None. ``arch_out`` receives the
+    catalog architecture that _document_arch infers for the document, so the
+    fallback matcher can keep rows of that architecture even without an
+    --isa pin.
     """
     if not texts:
         return []
@@ -1087,7 +1097,10 @@ def identity_keys(
         mtime_ns = Path(catalog).stat().st_mtime_ns
     except OSError:
         return [None] * len(items)
-    slots = list(_identity_batch(items, vote, bool(intel), catalog, mtime_ns))
+    byte_cols = tuple(byte_columns) if byte_columns is not None else (None,) * len(items)
+    if len(byte_cols) != len(items):
+        byte_cols = (None,) * len(items)
+    slots = list(_identity_batch(items, vote, bool(intel), byte_cols, catalog, mtime_ns))
     return [
         (
             None

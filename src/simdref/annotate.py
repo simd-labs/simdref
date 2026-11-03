@@ -59,7 +59,7 @@ _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
 # ("a9bf7bfd" / "00050513").
 _OBJDUMP_INSTR_RE = re.compile(
     r"^\s*(?P<addr>[0-9a-fA-F]+):\s+"
-    r"(?:(?:[0-9a-fA-F]{2,8}\s+){1,10})?"
+    r"(?P<bytes>(?:[0-9a-fA-F]{2,8}\s+){1,10})?"
     r"(?P<rest>\S.*?)\s*$"
 )
 # objdump -S injects "file:line" comment lines before the instruction block.
@@ -86,6 +86,12 @@ _X86_PREFIX_TOKENS = frozenset(
     }
 )
 
+# A bare line holding one prefix token is the prefix instruction by itself
+# (issue #52 prefix padding, issue #60 class 4 silent drop). addr16/data32
+# and the REX spellings join the set objdump prints before a mnemonic.
+_LONE_PREFIX_RE = re.compile(r"rex(?:\.[A-Za-z]{1,4})?")
+_LONE_PREFIX_TOKENS = _X86_PREFIX_TOKENS | {"addr16", "data32"}
+
 
 def _strip_prefix_tokens(head: str) -> str:
     """Drop leading x86 prefix tokens; return the text from the mnemonic on."""
@@ -97,10 +103,11 @@ def _strip_prefix_tokens(head: str) -> str:
         rest = parts[1]
 
 
-def _parse_objdump_instr(line: str) -> tuple[int, str] | None:
+def _parse_objdump_instr(line: str) -> tuple[int, str, str | None] | None:
     """Match an ``objdump -d`` instruction line: ``<hexaddr>: [bytes] mnemonic ...``.
 
-    Returns ``(address, rest)`` where ``rest`` starts at the mnemonic, or None
+    Returns ``(address, rest, bytehex)`` where ``rest`` starts at the mnemonic
+    and ``bytehex`` is the byte column as raw hex (e.g. ``488b45f8``), or None
     when the line is not objdump-shaped (e.g. a column-0 numeric local label
     ``1:`` does not match).
     """
@@ -117,9 +124,11 @@ def _parse_objdump_instr(line: str) -> tuple[int, str] | None:
     if not obj_m:
         return None
     try:
-        return int(obj_m.group("addr"), 16), obj_m.group("rest")
+        addr = int(obj_m.group("addr"), 16)
     except ValueError:
         return None
+    byte_run = obj_m.group("bytes") or ""
+    return addr, obj_m.group("rest"), "".join(byte_run.split()) or None
 
 
 def _split_comment(text: str) -> tuple[str, str]:
@@ -144,7 +153,7 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
     if track_positions:
         obj = _parse_objdump_instr(stripped)
         if obj is not None:
-            address, rest = obj
+            address, rest, _bytehex = obj
             head, comment = _split_comment(rest)
             m = _INSTR_RE.match(_strip_prefix_tokens(head))
             if m:
@@ -171,7 +180,7 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
     # "  <hexaddr>:\t" (and any raw bytes column) so the mnemonic parses.
     obj = _parse_objdump_instr(stripped)
     if obj is not None:
-        address, rest = obj
+        address, rest, _bytehex = obj
         head, comment = _split_comment(rest)
         m = _INSTR_RE.match(_strip_prefix_tokens(head))
         if m:
@@ -247,6 +256,10 @@ _A64_SHARED_RE = re.compile(r"(?<![%\w])(?:x(?:[0-9]|[12][0-9]|30)|sp)(?![\w])")
 _RISCV_ISA_RE = re.compile(r"(?<![%\w])(?:zero|ra|gp|tp|fp|t[0-6]|a[0-7]|x31)(?![\w])")
 # objdump symbol annotation ("jmp 50 <x0+0x50>"): a target label, never input.
 _SYMBOL_ANNOTATION_RE = re.compile(r"<[^>]*>")
+# Same annotation for the assembler input: keep the symbol expression and
+# drop the target address in front of it (lane C6: "b.le 114 <f+0x40>" must
+# reach llvm-mc as "b.le f+0x40"; llvm-mc rejects the bare numeric offset).
+_SYMBOL_TARGET_RE = re.compile(r"(?:0x[0-9a-fA-F]+|[0-9a-fA-F]+)?\s*<([^>]*)>")
 
 
 def detect_isa(lines: Iterable[str]) -> str | None:
@@ -917,6 +930,28 @@ def _annotate_instruction(
     """
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
+    token = parsed.mnemonic.lower()
+    if not parsed.operands and (token in _LONE_PREFIX_TOKENS or _LONE_PREFIX_RE.fullmatch(token)):
+        # A lone x86 prefix assembles to its prefix byte and its row is the
+        # prefix record: never a neighbour form and never a silent drop.
+        summary = f"Instruction prefix ({token})."
+        prefix_rec: dict[str, Any] = {
+            "mnemonic": parsed.mnemonic,
+            "known": True,
+            "summary": summary,
+            "annotation": summary,
+        }
+        if parsed.address is not None:
+            prefix_rec["address"] = f"0x{parsed.address:x}"
+        if parsed.source_file:
+            prefix_rec["source_file"] = parsed.source_file
+        if parsed.source_line is not None:
+            prefix_rec["source_line"] = parsed.source_line
+        if stats is not None:
+            stats["recognized"] = stats.get("recognized", 0) + 1
+        if parsed.trailing_comment:
+            return parsed.raw, prefix_rec
+        return f"{parsed.raw}   # {summary}", prefix_rec
     if identity_key == NO_CATALOG_ROW:
         # Byte identity identified the form and the catalog has no row for
         # it (issue #49: uops.info carries no AVX reg-reg VMOVAPD/VMOVUPS):
@@ -971,8 +1006,6 @@ def _annotate_instruction(
             return parsed.raw, None
         if opts.unknown == "mark":
             marker = "# ??"
-            if parsed.trailing_comment:
-                return parsed.raw, None
             unknown_rec: dict[str, Any] = {
                 "mnemonic": parsed.mnemonic,
                 "known": False,
@@ -1074,24 +1107,30 @@ def annotate_stream(
     arch_out: list[str] = []
 
     parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
-    # One llvm-mc run for the whole input: byte identity per instruction
-    # line. An objdump line assembles as its mnemonic and operands only, so
-    # the address and byte columns never reach the assembler.
-    items = [
-        (
-            index,
-            f"{parsed.mnemonic} {parsed.operands}".strip()
-            if parsed.address is not None
-            else parsed.raw,
-        )
-        for index, parsed in enumerate(parsed_lines)
-        if parsed.kind == LineKind.INSTRUCTION
-    ]
+    # Byte identity per instruction line. llvm-mc sees the raw instruction
+    # text after the objdump address and byte columns and the <sym> suffix
+    # are stripped; the trailing comment stays so each assembler applies its
+    # own comment rule (an AArch64 "#2" immediate is not a comment).
+    items: list[tuple[int, str]] = []
+    byte_columns: list[str | None] = []
+    for index, parsed in enumerate(parsed_lines):
+        if parsed.kind != LineKind.INSTRUCTION:
+            continue
+        obj = _parse_objdump_instr(parsed.raw)
+        text = obj[1] if obj is not None else parsed.raw
+        items.append((index, _SYMBOL_TARGET_RE.sub(r"\1", text).strip()))
+        byte_columns.append(obj[2] if obj is not None else None)
     identity = {
         index: key
         for (index, _text), key in zip(
             items,
-            identity_keys([text for _index, text in items], None, conn, arch_out=arch_out),
+            identity_keys(
+                [text for _index, text in items],
+                None,
+                conn,
+                arch_out=arch_out,
+                byte_columns=byte_columns,
+            ),
         )
         if key
     }
@@ -1101,17 +1140,7 @@ def annotate_stream(
         # Assembler acceptance decides each line's family: one llvm-mc run
         # per candidate triple. The register vote below is the fallback when
         # llvm-mc is missing or a line no triple accepts.
-        probe_texts = []
-        for parsed in parsed_lines:
-            if parsed.kind != LineKind.INSTRUCTION:
-                continue
-            obj = _parse_objdump_instr(parsed.raw)
-            # The probe sees the mnemonic and operands only: objdump columns
-            # and <symbol> annotations never reach the assembler. Trailing
-            # comments and immediates stay on the line, because the '#' of an
-            # AArch64 "#2" immediate is not a comment.
-            text = obj[1] if obj is not None else parsed.raw
-            probe_texts.append(_SYMBOL_ANNOTATION_RE.sub(" ", text).strip())
+        probe_texts = [text for _index, text in items]
         families, majority = isa_by_acceptance(probe_texts)
         line_family = {index: family for (index, _text), family in zip(items, families) if family}
         # auto: the acceptance majority names the ISA, then the input

@@ -1055,3 +1055,201 @@ def identify_x86_instructions(
     # _identify_x86 reads only iform_pools from its catalog argument
     _identify_x86(probed, results, SimpleNamespace(iform_pools=iform_pools), xed)
     return results
+
+
+# ---------------------------------------------------------------------------
+# per-line identity: one llvm-mc run per family, no document-wide vote
+# ---------------------------------------------------------------------------
+
+
+def _catalog_for(catalog_path: str | os.PathLike | None, arch: str) -> _Catalog:
+    if catalog_path is None:
+        from simdref.storage import SQLITE_PATH
+
+        catalog_path = SQLITE_PATH
+    path = Path(catalog_path)
+    if not path.exists():
+        raise FileNotFoundError(path)
+    cache_key = (str(path), arch, path.stat().st_mtime_ns)
+    catalog = _CATALOG_CACHE.get(cache_key)
+    if catalog is None:
+        catalog = _CATALOG_CACHE[cache_key] = _Catalog(path, arch)
+    return catalog
+
+
+def _bytes_entry(byte_hex: str) -> dict:
+    """Build one probe-shaped entry from an objdump byte column."""
+    hexbytes = "0x" + ",0x".join(byte_hex[pos : pos + 2] for pos in range(0, len(byte_hex), 2))
+    return {"status": "OK", "bytes": hexbytes, "mode": "64", "text": "", "n": 0}
+
+
+def identify_lines(
+    items: list[tuple[str, str | None]],
+    *,
+    catalog_path: str | os.PathLike | None = None,
+    llvm_mc: str | None = None,
+    xed: str | None = None,
+    fallback_family: str | None = None,
+) -> list[LineResult]:
+    """Map each instruction text to one catalog row, decided per line.
+
+    ``items`` holds one ``(text, byte_column_hex)`` pair per source line: the
+    raw instruction text (objdump address and byte columns and any ``<sym>``
+    suffix already stripped, the trailing comment kept so each triple applies
+    its own comment rule) and the objdump byte column hex, or None.
+
+    One llvm-mc run per candidate triple covers the batch, and each line takes
+    the family whose assembler accepts it and the x86 syntax its own text
+    speaks. A line never depends on its neighbours: no document-wide family
+    vote and no dropped lines. An Intel line that llvm-mc's Intel parser
+    rejects takes the objdump byte column directly, or retries once through
+    the AT&T parser.
+    """
+    if not items:
+        return []
+    texts = [text for text, _hex in items]
+    results = [
+        LineResult(n=index + 1, text=text, status="no-row") for index, text in enumerate(texts)
+    ]
+    catalog = _catalog_for(catalog_path, "x86")
+    if catalog.keyless:
+        for result in results:
+            result.reason = "catalog lacks encoding keys (schema 13)"
+        return results
+    if llvm_mc is None:
+        llvm_mc = _tool_path("SIMDREF_LLVM_MC", "llvm-mc")
+    if not llvm_mc:
+        raise ToolUnavailableError("llvm-mc not found (set SIMDREF_LLVM_MC)")
+    for arch, syntax, _family in _ISA_CANDIDATES:
+        if _string_spans_lines(texts, arch, syntax, llvm_mc):
+            # One open string poisons the run (Sol r4 F1/F2, r5 P2): the
+            # older matcher answers every line.
+            for result in results:
+                result.reason = "quoted string spans lines"
+            return results
+    probed: dict[tuple[str, str], list[dict]] = {}
+    try:
+        for arch, syntax, _family in _ISA_CANDIDATES:
+            probed[(arch, syntax)] = _probe_lines(texts, arch, syntax, llvm_mc)
+    except OSError as exc:
+        raise ToolUnavailableError(f"llvm-mc failed to run: {exc}") from exc
+    # Family per line = isa_by_acceptance's rule: the line's own accepting
+    # family, else the batch majority of the singly accepted lines, else the
+    # line keeps the old matcher (no byte identity).
+    families_of: list[set[str]] = []
+    counts: dict[str, int] = {}
+    for index in range(len(texts)):
+        families = {
+            family
+            for arch, syntax, family in _ISA_CANDIDATES
+            if probed[(arch, syntax)][index].get("status") == "OK"
+        }
+        families_of.append(families)
+        if len(families) == 1:
+            name = next(iter(families))
+            counts[name] = counts.get(name, 0) + 1
+    majority = None
+    if counts:
+        top = max(counts.values())
+        winners = [name for name, count in counts.items() if count == top]
+        if len(winners) == 1:
+            majority = winners[0]
+    groups: dict[tuple[str, str], list[tuple[int, dict]]] = {}
+    for index, text in enumerate(texts):
+        if probed[("x86", "intel")][index].get("status") == "NOT-AN-INSTRUCTION":
+            results[index].status = "not-an-instruction"
+            results[index].reason = str(probed[("x86", "intel")][index].get("kind") or "")
+            continue
+        accepted = [
+            (arch, syntax, family)
+            for arch, syntax, family in _ISA_CANDIDATES
+            if probed[(arch, syntax)][index].get("status") == "OK"
+        ]
+        chosen: tuple[str, str] | None = None
+        entry: dict | None = None
+        families = families_of[index]
+        family = None
+        if len(families) == 1:
+            family = next(iter(families))
+        elif families:
+            family = majority
+        if family is None:
+            # no per-line answer: the caller's old document vote says which
+            # family's assembler to try (no keep mask; every line is tried)
+            family = fallback_family
+        if family is not None:
+            runs = [(arch, syntax) for arch, syntax, name in accepted if name == family]
+            if family == "x86":
+                primary = (
+                    "x86",
+                    "intel" if ("%" not in text and "$" not in text) else "att",
+                )
+                if primary in runs:
+                    chosen = primary
+                elif runs:
+                    chosen = runs[0]
+            elif runs:
+                chosen = runs[0]
+            if chosen is not None:
+                entry = probed[chosen][index]
+        byte_hex = items[index][1]
+        if chosen is not None and chosen[0] == "x86" and entry.get("status") != "OK":
+            other = ("x86", "intel" if chosen[1] == "att" else "att")
+            if byte_hex:
+                # the objdump byte column is the real encoding
+                chosen, entry = ("x86", "att"), _bytes_entry(byte_hex)
+            elif probed[other][index].get("status") == "OK":
+                chosen, entry = other, probed[other][index]
+        elif chosen is None and byte_hex:
+            chosen, entry = ("x86", "att"), _bytes_entry(byte_hex)
+        if chosen is None or entry is None or entry.get("status") != "OK":
+            error = (
+                probed[("x86", "intel")][index].get("error")
+                if probed[("x86", "intel")][index].get("status") == "REJECTED"
+                else "rejected by llvm-mc"
+            )
+            results[index].reason = str(error or "rejected by llvm-mc")
+            continue
+        groups.setdefault(chosen, []).append((index, entry))
+    for (arch, _syntax), members in groups.items():
+        idxs = [index for index, _entry in members]
+        entries = [entry for _index, entry in members]
+        sub = [results[index] for index in idxs]
+        if arch == "x86":
+            if xed is None:
+                xed = _tool_path("SIMDREF_XED", "xed")
+            if not xed:
+                raise ToolUnavailableError("xed decoder not found (set SIMDREF_XED)")
+            _identify_x86(entries, sub, _catalog_for(catalog_path, "x86"), xed)
+        else:
+            _identify_words(entries, sub, _catalog_for(catalog_path, arch), arch)
+    # REP/REPE/REPNE MOVSB, CMPSB, ... share their iform; the prefix byte is
+    # the only byte-level difference and picks the sibling row.
+    catalog_x86 = None
+    hexbytes_of = {
+        index: member_entry.get("bytes") or ""
+        for members in groups.values()
+        for index, member_entry in members
+    }
+    for index in range(len(texts)):
+        result = results[index]
+        if result.status != "no-row" or not result.candidates:
+            continue
+        hexbytes = hexbytes_of.get(index, "")
+        words = _bytes_to_words(hexbytes) if hexbytes else []
+        if not words or words[0] not in (0xF2, 0xF3):
+            continue
+        want = {"REPE", "REP"} if words[0] == 0xF3 else {"REPNE"}
+        if catalog_x86 is None:
+            catalog_x86 = _catalog_for(catalog_path, "x86")
+        named = [
+            row
+            for row in catalog_x86.rows
+            if row.db_key in result.candidates and row.key.split(" ", 1)[0] in want
+        ]
+        if len(named) == 1:
+            result.status = "row"
+            result.reason = ""
+            result.row = named[0]
+            result.candidates = []
+    return results
