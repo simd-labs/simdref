@@ -54,7 +54,7 @@ jobs:
           echo "/usr/lib/llvm-23/bin" >> "$GITHUB_PATH"
 
       - name: Install package
-        run: uv pip install -e .
+        run: uv pip install -e '.[ingest]'
 
       - name: Vendor RISC-V sources
         # Mirrors ci.yml:build-catalog, but at upstream HEAD, not at the CI pin.

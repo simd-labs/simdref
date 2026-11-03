@@ -33,8 +33,11 @@ isa            # open the TUI
 ```
 
 The package installs two equivalent executables, `isa` and `simdref`. The
-catalog download does not use `llvm-mca`. Only `isa build` uses
-`llvm-mca` 18+ on `PATH`.
+catalog download does not use `llvm-mca`. Python 3.11 or newer is
+necessary. The plain `pip install simdref` covers queries, the LSP and
+`isa update`. `isa build` uses the ingest extra:
+`pip install 'simdref[ingest]'`, or `uv tool install 'simdref[ingest]'`
+with uv. Only `isa build` uses `llvm-mca` 18+ on `PATH`.
 
 Pre-release builds live on TestPyPI:
 
@@ -123,12 +126,12 @@ Commands
 
 Dev commands
 
-| Command                          | Description                                             |
-| -------------------------------- | ------------------------------------------------------- |
-| `isa build`                      | Rebuild the catalog from upstream, needs `llvm-mca` 18+ |
-| `isa export`                     | Export the site-data JSON for the `simdref-web` repo    |
-| `isa completion install [SHELL]` | Install shell completion into the user profile          |
-| `isa completion show [SHELL]`    | Print the completion script                             |
+| Command                          | Description                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| `isa build`                      | Rebuild the catalog from upstream, needs `simdref[ingest]` and `llvm-mca` 18+ |
+| `isa export`                     | Export the site-data JSON for the `simdref-web` repo                          |
+| `isa completion install [SHELL]` | Install shell completion into the user profile                                |
+| `isa completion show [SHELL]`    | Print the completion script                                                   |
 
 ## Data sources
 
@@ -170,7 +173,7 @@ Each perf row carries a `(measured, <core>)` or `(modeled, <core>)` tag.
 git clone https://github.com/simd-labs/simdref.git
 cd simdref
 python3 -m venv .venv
-.venv/bin/pip install -e .
+.venv/bin/pip install -e '.[ingest]'
 .venv/bin/isa build          # needs llvm-mca 18+
 .venv/bin/python -m pytest tests/ -v
 ```

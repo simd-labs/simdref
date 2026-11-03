@@ -18,11 +18,11 @@ Edges: `test` and `package` follow `build-catalog`. `publish-data` follows all t
 
 ### Phase 1: data creation
 
-- `build-catalog` installs LLVM 23 (tested version 23.1.4), vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact.
+- `build-catalog` installs LLVM 23 (tested version 23.1.4) and the `simdref[ingest]` extra, vendors RISC-V sources, runs `simdref build` (SDM always included), validates upstream ingestion, uploads the catalog bundle as the `catalog` artifact.
 
 ### Phase 2: data use (parallel)
 
-- `test` (`needs: build-catalog`). Matrix 3.10 to 3.14. Downloads the artifact, installs the package, asserts schema current, runs pytest, syntax-checks Python sources, runs `simdref doctor`, checks catalog structural invariants.
+- `test` (`needs: build-catalog`). Matrix 3.11 to 3.14. Downloads the artifact, installs the package, asserts schema current, runs pytest, syntax-checks Python sources, runs `simdref doctor`, checks catalog structural invariants.
 - `package` (`needs: build-catalog`). `uv build`, `twine check`, uploads the wheel artifact.
 
 ### Phase 3: deploy (push to main, release, schedule, manual dispatch)

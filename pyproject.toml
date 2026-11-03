@@ -7,7 +7,7 @@ name = "simdref"
 version = "0.0.15"
 description = "Searchable SIMD intrinsic and instruction reference with CLI, manpages, TUI, and LSP."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "GPL-3.0-or-later"}
 authors = [
   {name = "Marco"}
@@ -19,7 +19,6 @@ classifiers = [
   "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -27,30 +26,34 @@ classifiers = [
   "Topic :: Software Development :: Documentation",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-# `requires-python` tracks the non-EOL CPython range; 3.10 goes EOL 2026-10-31.
-# Lower dependency bound is the version CI resolves and tests; anything older is
-# an untested compatibility claim. Upper bound is the next major (next minor for
-# 0.x, where that is the compatibility unit). msgpack floors above its own
-# advisory: 1.2.0 and earlier carry GHSA-6v7p-g79w-8964.
+# `requires-python` tracks the non-EOL CPython range. Lower dependency
+# bound is the version CI resolves and tests; anything older is an untested
+# compatibility claim. Upper bound is the next major (next minor for 0.x,
+# where that is the compatibility unit). msgpack floors at 1.2.4 for
+# GHSA-j8c6-9vc5-hj6x; 1.2.0 and earlier also carry GHSA-6v7p-g79w-8964.
 dependencies = [
-  "click>=8.5,<9",
-  "httpx>=0.28,<1",
-  "msgpack>=1.2.1,<2",
-  "pdfplumber>=0.11.10,<1",
-  # PyMuPDF ships no PyPy wheel and its sdist needs a C compiler, so the
-  # marker keeps the dependency off PyPy, where a PDF parse falls back to
-  # pdfplumber.
-  'PyMuPDF>=1.28,<2; platform_python_implementation == "CPython"',
+  "click>=8.5.0,<9",
+  "httpx>=0.28.1,<1",
+  "msgpack>=1.2.4,<2",
   "PyYAML>=6.0.3,<7",
-  "rapidfuzz>=3.14,<4",
-  "rich>=15,<16",
+  "rapidfuzz>=3.14.6,<4",
+  "rich>=15.0.0,<16",
   # Pinned to the LLVM the catalog build used. Wheels exist only for
   # manylinux x86_64 aarch64, macOS arm64 x86_64 and win_amd64, so the
   # marker keeps the dependency off every other platform (musl included),
   # where pip must see no candidate instead of failing to resolve.
   'simdref-llvm-mc==23.1.4; (sys_platform == "linux" and (platform_machine == "x86_64" or platform_machine == "aarch64")) or (sys_platform == "darwin" and (platform_machine == "arm64" or platform_machine == "x86_64")) or (sys_platform == "win32" and platform_machine == "AMD64")',
-  "textual>=8.2,<9",
-  "typer>=0.27,<1",
+  "textual>=8.2.8,<9",
+  "typer>=0.27.3,<1",
+]
+
+[project.optional-dependencies]
+# PDF ingest for `simdref build` only. pdfplumber parses the Intel SDM;
+# PyMuPDF is its fast path. Both stay out of the plain install, which then
+# works on PyPy and needs no C toolchain.
+ingest = [
+  "pdfplumber>=0.11.10,<1",
+  "PyMuPDF>=2.1,<3",
 ]
 
 [project.scripts]
@@ -66,4 +69,4 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"

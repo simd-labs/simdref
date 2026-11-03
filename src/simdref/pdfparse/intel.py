@@ -669,13 +669,18 @@ def parse_intel_sdm(
     Mnemonics with ``/`` separators are expanded so each variant maps to the
     same payload.
     """
-    import pdfplumber
+    try:
+        import pdfplumber
+    except ImportError as exc:
+        raise ImportError(
+            "PDF ingest needs the simdref[ingest] extra. Install it with: pip install 'simdref[ingest]'"
+        ) from exc
 
     from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
     log.info("parsing Intel SDM: %s", pdf_path)
     try:
-        import fitz
+        import pymupdf as fitz
     except ImportError:
         fitz = None
 

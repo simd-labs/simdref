@@ -74,7 +74,7 @@ jobs:
           echo "/usr/lib/llvm-23/bin" >> "$GITHUB_PATH"
 
       - name: Install package
-        run: uv pip install -e .
+        run: uv pip install -e '.[ingest]'
 
       - name: Vendor RISC-V sources
         # Pin unified-db like vendor/riscv/docs_pages.json: an upstream
@@ -162,7 +162,7 @@ jobs:
       # left `build_sqlite` publishing a header-only database, which a floor-and-
       # ceiling matrix would have missed.
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     name: test (py${{ matrix.python-version }})
     steps:
       - uses: actions/checkout@v7
@@ -178,7 +178,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install package and test dependencies
-        run: uv pip install -e . pytest 'tomli; python_version < "3.11"'
+        run: uv pip install -e '.[ingest]' pytest
 
       # actions/upload-artifact preserves path structure when multiple
       # paths are listed, so catalog.msgpack / catalog.db land back at
@@ -436,7 +436,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install package and test dependencies
-        run: uv pip install -e . pytest
+        run: uv pip install -e '.[ingest]' pytest
 
       - name: Pull freshly-published data-latest
         run: simdref update --from-release

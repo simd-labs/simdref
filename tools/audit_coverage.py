@@ -27,10 +27,7 @@ import os
 import re
 import sys
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10 predates tomllib
-    import tomli as tomllib
+import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any

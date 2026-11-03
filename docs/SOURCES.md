@@ -112,7 +112,7 @@ See above. All rows carry `source_kind="measured"`.
 - Cache: intermediate artifacts in `vendor/perf-cache/<triple>/<cpu>/{exegesis.yaml, disassembly.s, mca.json}`. Same-host reruns short-circuit.
 - Coverage: 17 AArch64 cores (Cortex-A72/76/78, Cortex-X1/X2, Neoverse-N1/N2/E1/V1/V2/V3/V3AE, Apple M1/M2, A64FX, ThunderX2), 7 RISC-V cores (SiFive U74/X280/P400/P600, XiangShan C908/C910, SpacemiT X60).
 - License: Apache-2.0 with LLVM exception.
-- `simdref build` aborts with an install hint when an LLVM binary is missing. `simdref update` fetches the pre-built release catalog, needs no LLVM.
+- `simdref build` uses the `simdref[ingest]` extra. It aborts with an install hint when an LLVM binary is missing. `simdref update` fetches the pre-built release catalog, needs no LLVM.
 
 ### RISC-V measured per-instruction perf (not available)
 
@@ -122,6 +122,6 @@ No public upstream publishes per-mnemonic measured RVV latency or throughput. `c
 
 1. Edit `src/simdref/ingest_sources.py` candidate-URL lists when upstreams move.
 1. `python -m simdref update` downloads the pre-built release catalog.
-1. `python -m simdref build` rebuilds from live sources, needs `llvm-exegesis`, `llvm-mc`, `llvm-mca` on PATH.
+1. `python -m simdref build` rebuilds from live sources. It uses the `simdref[ingest]` extra, and `llvm-exegesis`, `llvm-mc`, `llvm-mca` on PATH.
 1. `python tools/audit_coverage.py fetch` re-runs extraction, compares against the fresh catalog, rewrites `docs/coverage/summary.json`.
 1. Commit the updated summary. `tests/test_coverage_parity.py` obeys the floors in `docs/coverage/thresholds.toml` on each CI run.

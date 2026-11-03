@@ -10,7 +10,7 @@ git clone https://github.com/simd-labs/simdref.git
 cd simdref
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e '.[ingest]'
 isa update     # download the pre-built catalog
 isa doctor     # check the install
 ```
@@ -32,6 +32,7 @@ a catalog. Run `isa update` first.
 
 `isa build` rebuilds the catalog from upstream. It uses:
 
+- The `simdref[ingest]` extra. Install it with `pip install 'simdref[ingest]'`.
 - `llvm-mca` 18+ on `PATH` (23.1.4 is the tested version). On Debian or Ubuntu: `sudo apt install llvm`.
 - About 4 GB of free RAM.
 - Optional: a local `AARCHMRS_BSD*.tar.gz` in `vendor/arm/` to skip the

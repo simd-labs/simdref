@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `amd_ops_per_cycle` value, and Intel guide round/SAE note text lands on
   the intrinsics that reference it.
 
+### Changed
+
+- Python 3.11 or newer is necessary.
+- `pdfplumber` and `PyMuPDF` moved to the `simdref[ingest]` extra. The
+  plain install covers queries, the LSP and `isa update`. For
+  `simdref build`, run `pip install 'simdref[ingest]'`.
+- All dependencies moved to their latest release.
+
 ## [0.0.15], 2026-10-31
 
 ### Fixed
