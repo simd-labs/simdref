@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from contextlib import contextmanager
 from contextlib import nullcontext as _nullcontext
 from dataclasses import asdict
@@ -279,9 +280,25 @@ def _download_from_release() -> None:
                     else:
                         err_console.print(f"downloading {asset} from {tag}...", style="dim")
                         written = 0
+                        last_progress = time.monotonic()
                         for chunk in resp.iter_bytes(chunk_size=1024 * 64):
                             fh.write(chunk)
                             written += len(chunk)
+                            now = time.monotonic()
+                            if now - last_progress >= 5.0:
+                                last_progress = now
+                                mb = written / 1_048_576
+                                if total:
+                                    pct = 100 * written / total
+                                    err_console.print(
+                                        f"downloading {asset}: {mb:.1f} / "
+                                        f"{total / 1_048_576:.1f} MB ({pct:.0f}%)",
+                                        style="dim",
+                                    )
+                                else:
+                                    err_console.print(
+                                        f"downloading {asset}: {mb:.1f} MB", style="dim"
+                                    )
                         if total:
                             err_console.print(
                                 f"downloaded {asset}: {written / 1_048_576:.1f} MB "
