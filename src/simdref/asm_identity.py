@@ -292,8 +292,11 @@ def _probe_lines_uncached(
             current = marker
 
     results: list[dict] = []
+    kind_of: dict[str, str | None] = {}
     for i, text in enumerate(lines, 1):
-        kind = _classify_line(text)
+        if text not in kind_of:
+            kind_of[text] = _classify_line(text)
+        kind = kind_of[text]
         error = errors.get(2 * i)
         if error is not None:
             results.append({"n": i, "text": text, "status": "REJECTED", "error": error})
@@ -449,6 +452,8 @@ class _Catalog:
             for raw in conn.execute(
                 f"SELECT {_ROW_COLUMNS} FROM instructions_data WHERE architecture = ?", (want,)
             ):
+                extra = raw[8]
+                splits = raw[10]
                 row = Row(
                     db_key=raw[0],
                     key=raw[1],
@@ -458,9 +463,16 @@ class _Catalog:
                     enc_bits=raw[5] or 0,
                     enc_mask=raw[6] or 0,
                     enc_match=raw[7] or 0,
-                    enc_extra=tuple(tuple(item) for item in json.loads(raw[8] or "[]")),
+                    # Most rows carry no alternate patterns and no split
+                    # attributes: skip the JSON parse for the empty columns
+                    # (json.loads("[]") == (), json.loads("{}") == {}).
+                    enc_extra=(
+                        ()
+                        if not extra or extra == "[]"
+                        else tuple(tuple(item) for item in json.loads(extra))
+                    ),
                     iform=raw[9] or "",
-                    split_attrs=json.loads(raw[10] or "{}"),
+                    split_attrs=({} if not splits or splits == "{}" else json.loads(splits)),
                 )
                 self.rows.append(row)
         finally:
@@ -806,11 +818,10 @@ def identify(
     if arch == "x86" and xed is None:
         raise ToolUnavailableError("xed decoder not found (set SIMDREF_XED)")
 
-    # identify() is the byte-identity document API (lane crossarch: "mv a0,
-    # a1" and "j 8" identify the c.mv / c.j rows their bytes name). The
-    # uncompressed rule binds the source-line pipeline (identify_lines), not
-    # this one, so this probe keeps +c.
-    probed = _probe_lines(lines, arch, syntax, llvm_mc)
+    # One shared no-compression rule for every path (identify, identify_lines,
+    # isa_by_acceptance): a RISC-V source line whose mnemonic does not start
+    # with "c." probes without +c, so the bytes name the uncompressed row.
+    probed = _probe_lines_split(lines, arch, syntax, llvm_mc)
     results = [
         LineResult(
             n=entry["n"],
@@ -1027,6 +1038,23 @@ _ISA_CANDIDATES = (
 )
 
 
+def _probe_all_triples(lines: list[str], llvm_mc: str) -> dict[tuple[str, str], list[dict]]:
+    """Probe every candidate triple, one llvm-mc run per triple.
+
+    The runs are independent, so they run concurrently: on a 2000-line
+    document the rejecting triples cost more than the accepting one and the
+    wall time then falls to the slowest run, not the sum.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=len(_ISA_CANDIDATES)) as pool:
+        futures = {
+            (arch, syntax): pool.submit(_probe_lines_split, lines, arch, syntax, llvm_mc)
+            for arch, syntax, _family in _ISA_CANDIDATES
+        }
+        return {key: future.result() for key, future in futures.items()}
+
+
 def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
     """Name each line's ISA family by the triples whose assembler encodes it.
 
@@ -1045,10 +1073,9 @@ def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
         return [None] * len(lines), None
     accepted: list[set[str]] = [set() for _ in lines]
     try:
+        runs = _probe_all_triples(list(lines), llvm_mc)
         for arch, syntax, family in _ISA_CANDIDATES:
-            for entry, families in zip(
-                _probe_lines_split(list(lines), arch, syntax, llvm_mc), accepted
-            ):
+            for entry, families in zip(runs[(arch, syntax)], accepted):
                 if entry["status"] == "OK":
                     families.add(family)
     except OSError:
@@ -1200,8 +1227,7 @@ def identify_lines(
             return results
     probed: dict[tuple[str, str], list[dict]] = {}
     try:
-        for arch, syntax, _family in _ISA_CANDIDATES:
-            probed[(arch, syntax)] = _probe_lines_split(texts, arch, syntax, llvm_mc)
+        probed = _probe_all_triples(texts, llvm_mc)
     except OSError as exc:
         raise ToolUnavailableError(f"llvm-mc failed to run: {exc}") from exc
     # Family per line = isa_by_acceptance's rule: the line's own accepting
@@ -1281,6 +1307,12 @@ def identify_lines(
             )
             results[index].reason = str(error or "rejected by llvm-mc")
             continue
+        if byte_hex:
+            # The objdump byte column is the real encoding: raw bytes name
+            # what they encode (a 2-byte c.j stays c.j). Only source text
+            # follows the no-compression rule; the probe opcode then names
+            # the text's instruction, never the bytes', so it is dropped.
+            entry = {**entry, "bytes": _bytes_entry(byte_hex)["bytes"], "opcode": ""}
         groups.setdefault(chosen, []).append((index, entry))
     for (arch, _syntax), members in groups.items():
         idxs = [index for index, _entry in members]

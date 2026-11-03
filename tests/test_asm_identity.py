@@ -241,14 +241,16 @@ class TestRiscvDocument:
         assert [r.status for r in results] == ["row", "row"]
         assert [r.row.mnemonic for r in results] == ["lr.w", "lr.w.aq"]
 
-    def test_j_on_rv64_is_c_j_never_c_jal(self, tmp_path):
-        # c.j and c.jal differ in the pattern; c.jal is RV32-only and
-        # c.addiw (RV64) shares its pattern. The manager requirement: 'j' on
-        # RV64 gives c.j; 'c.jal' on RV32 resolves its tie to c.jal.
+    def test_j_on_rv64_names_the_jal_row_never_c_jal(self, tmp_path):
+        # Source text follows the no-compression rule: 'j' on RV64 names
+        # the jal row; only a c. spelling names c.j. c.jal is RV32-only and
+        # c.addiw (RV64) shares its pattern: 'c.jal' on RV32 resolves its
+        # tie to c.jal.
         db = tmp_path / "catalog.db"
         build_sqlite(
             _catalog(
                 [
+                    _rv_row("jal", "jal", 32, 127, 111),
                     _rv_row("c.j", "c.j", 16, 57347, 40961),
                     _rv_row("c.jal", "c.jal", 16, 57347, 8193),
                     _rv_row("c.addiw", "c.addiw", 16, 57347, 8193),
@@ -257,6 +259,9 @@ class TestRiscvDocument:
             db,
         )
         results = identify("j 8", "riscv64", catalog_path=db)
+        assert results[0].status == "row"
+        assert results[0].row.mnemonic == "jal"
+        results = identify("c.j 8", "riscv64", catalog_path=db)
         assert results[0].status == "row"
         assert results[0].row.mnemonic == "c.j"
         results = identify("c.jal 8", "riscv32", catalog_path=db)
@@ -269,28 +274,29 @@ class TestRiscvDocument:
             _catalog([_rv_row("foo", "foo", 16, 0, 0), _rv_row("bar", "bar", 16, 0, 0)]),
             db,
         )
-        result = identify("mv a0, a1", "riscv64", catalog_path=db)[0]
+        result = identify("c.mv a0, a1", "riscv64", catalog_path=db)[0]
         assert result.status == "no-row"
         assert result.reason.startswith("ambiguous")
         assert set(result.candidates) == {"riscv:foo", "riscv:bar"}
 
-    def test_both_spellings_byte_identify_to_c_mv(self, tmp_path):
-        # mv a0, a1 and c.mv a0, a1 assemble to the same two bytes; the bytes
-        # are the c.mv encoding, so both lines identify the c.mv row.
+    def test_source_uncompressed_and_c_keeps_compression(self, tmp_path):
+        # Source text follows the no-compression rule: mv a0, a1 names the
+        # addi row its uncompressed bytes encode. A c. spelling keeps the
+        # compressed row.
         db = tmp_path / "catalog.db"
         build_sqlite(
             _catalog(
                 [
-                    _rv_row("mv", "mv", 16, 0, 0),
-                    _rv_row("c.mv", "c.mv", 16, 0, 0),
-                    _rv_row("sub", "sub", 32, 0, 0),
+                    _rv_row("addi", "addi", 32, 0x707F, 0x13),
+                    _rv_row("c.mv", "c.mv", 16, 0xE003, 0x8002),
+                    _rv_row("sub", "sub", 32, 0xFE00707F, 0x40000033),
                 ]
             ),
             db,
         )
         results = identify("mv a0, a1\nc.mv a0, a1\nsub a0, a1, a2", "riscv64", catalog_path=db)
         assert [r.status for r in results] == ["row", "row", "row"]
-        assert [r.row.mnemonic for r in results] == ["c.mv", "c.mv", "sub"]
+        assert [r.row.mnemonic for r in results] == ["addi", "c.mv", "sub"]
 
     def test_base_scoped_patterns(self, tmp_path):
         row = InstructionRecord(

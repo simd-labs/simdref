@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from simdref.arm_instructions import parse_arm_instruction_payload
-from simdref.asm_identity import _tool_path, identify
+from simdref.asm_identity import _tool_path, identify, identify_lines
 from simdref.models import Catalog, InstructionRecord, SourceVersion
 from simdref.riscv import parse_riscv_instruction_payload
 from simdref.storage import build_sqlite
@@ -163,12 +163,12 @@ class TestRiscvIdentity:
     """Sp forms, pseudo-branches, j and FP loads/stores/moves resolve."""
 
     SP_FP_CASES = [
-        ("ld\ts0,16(sp)", "c.ldsp"),
-        ("ld\ts11,8(sp)", "c.ldsp"),
-        ("addi\tsp,sp,-16", "c.addi"),
+        ("ld\ts0,16(sp)", "ld"),
+        ("ld\ts11,8(sp)", "ld"),
+        ("addi\tsp,sp,-16", "addi"),
         ("lbu\ts1,3(sp)", "lbu"),
-        ("fsd\tfa1,64(sp)", "c.fsdsp"),
-        ("fld\tfa0,8(sp)", "c.fldsp"),
+        ("fsd\tfa1,64(sp)", "fsd"),
+        ("fld\tfa0,8(sp)", "fld"),
         ("flw\tfa0,0(a0)", "flw"),
         ("fsw\tfa1,64(sp)", "fsw"),
         ("fmv.s\tfa0,fa1", "fsgnj.s"),
@@ -183,10 +183,10 @@ class TestRiscvIdentity:
         ("bgtz\ta0, .L1", "blt"),
         ("ble\ta0,a1, .L1", "bge"),
         ("bgt\ta0,a1,0x1c", "blt"),
-        ("beqz\ta0, .L1", "c.beqz"),
-        ("bnez\ta0, .L1", "c.bnez"),
-        ("j\t.L34", "c.j"),
-        ("j\t100", "c.j"),
+        ("beqz\ta0, .L1", "beq"),
+        ("bnez\ta0, .L1", "bne"),
+        ("j\t.L34", "jal"),
+        ("j\t100", "jal"),
     ]
 
     def test_sp_and_fp_lines_get_their_rows(self, tmp_path):
@@ -249,3 +249,94 @@ class TestOpcodeDeciderNeedsKnownBitProof:
         assert result.status == "row", result.reason
         assert result.row.mnemonic == "bge"
         assert result.row.enc_match == 0x5063
+
+
+@needs_tools
+class TestEntryPathsAgree:
+    """hover, inlay hint, annotate and identify() name one row per line.
+
+    Source text follows the no-compression rule (a non-c. line names its
+    uncompressed row, a c. line keeps the compressed row); raw bytes keep
+    naming what they encode (review REV60B finding 1)."""
+
+    CASES = [
+        ("j 100", "jal"),
+        ("mv a0, a1", "addi"),
+        ("addi sp, sp, -16", "addi"),
+        ("c.addi a0, 1", "c.addi"),
+        ("c.mv a0, a1", "c.mv"),
+        ("jal x0, 100", "jal"),
+    ]
+
+    @staticmethod
+    def _rows() -> list[InstructionRecord]:
+        return [
+            InstructionRecord(
+                mnemonic=mnemonic,
+                form=mnemonic,
+                summary=f"row {mnemonic}.",
+                architecture="riscv",
+                isa=["I"],
+                enc_bits=bits,
+                enc_mask=mask,
+                enc_match=match,
+            )
+            for mnemonic, bits, mask, match in (
+                ("jal", 32, 0x7F, 0x6F),
+                ("addi", 32, 0x707F, 0x13),
+                ("c.addi", 16, 0xE003, 0x1),
+                ("c.mv", 16, 0xE003, 0x8002),
+                ("c.j", 16, 0xE003, 0xA001),
+            )
+        ]
+
+    def test_four_paths_name_the_same_row(self, tmp_path):
+        import json
+
+        from simdref.annotate import AnnotateOptions, annotate_stream
+        from simdref.storage import open_db
+        from test_lsp_stdio import _Server
+
+        db = _db(self._rows(), tmp_path)
+        text = "".join(line + "\n" for line, _mnemonic in self.CASES)
+        results = identify(text, "riscv64", catalog_path=db)
+        conn = open_db(path=db)
+        server = _Server(db)
+        try:
+            server.start()
+            uri = "file:///tmp/fx60_paths.s"
+            server.open(uri, "asm", text)
+            hints = server.hints(uri, 0, len(self.CASES))
+            out = "".join(
+                annotate_stream(
+                    [line + "\n" for line, _mnemonic in self.CASES],
+                    opts=AnnotateOptions(fmt="json"),
+                    conn=conn,
+                )
+            )
+            records = json.loads(out) if out.strip() else []
+            for index, (line, mnemonic) in enumerate(self.CASES):
+                summary = f"row {mnemonic}."
+                result = results[index]
+                assert result.row is not None, (line, result.reason)
+                assert result.row.mnemonic == mnemonic, line
+                assert records[index]["summary"] == summary, line
+                assert hints[index]["label"] == summary, (line, hints[index])
+                hover = server.hover(uri, index, 1)
+                assert hover is not None, line
+                assert summary in hover["contents"]["value"], line
+        finally:
+            server.stop()
+            conn.close()
+
+    def test_byte_column_bytes_name_what_they_encode(self, tmp_path):
+        # "21a0" is the c.j encoding of "j 8" (llvm-mc 24, -mattr=+c). The
+        # byte column names c.j; the same source text without one follows
+        # the no-compression rule and names jal.
+        db = _db(self._rows(), tmp_path)
+        source = identify("j 8\n", "riscv64", catalog_path=db)[0]
+        assert source.status == "row", source.reason
+        assert source.row.mnemonic == "jal"
+        raw = identify_lines([("j 8", "21a0")], catalog_path=db)[0]
+        assert raw.status == "row", raw.reason
+        assert raw.row.mnemonic == "c.j"

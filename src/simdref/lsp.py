@@ -939,15 +939,23 @@ def _document_arch(
     counts: dict[str, int] = {}
     strongs: list[frozenset] = []
     arm32 = False
+    # Repeated lines share one parse and one classification (the 2000-line
+    # hint document holds two distinct lines).
+    memo: dict[str, tuple[frozenset, bool]] = {}
     for text in texts:
-        parsed = _mnemonic_from_asm_line(text, intel)
-        if parsed is None:
-            strongs.append(frozenset())
-            continue
-        arch, classes, _reverse, weak = _classify_line(parsed[2], intel)
-        strong = frozenset() if weak else arch
+        hit = memo.get(text)
+        if hit is None:
+            parsed = _mnemonic_from_asm_line(text, intel)
+            if parsed is None:
+                hit = (frozenset(), False)
+            else:
+                arch, classes, _reverse, weak = _classify_line(parsed[2], intel)
+                strong = frozenset() if weak else arch
+                hit = (strong, "arm" in strong and "ar" in classes)
+            memo[text] = hit
+        strong, line_arm32 = hit
         strongs.append(strong)
-        arm32 = arm32 or ("arm" in strong and "ar" in classes)
+        arm32 = arm32 or line_arm32
         for bucket in strong:
             counts[bucket] = counts.get(bucket, 0) + 1
     if arm32 or not counts:
@@ -1123,14 +1131,22 @@ def identity_keys(
         byte_cols = (None,) * len(items)
     slots = list(_identity_batch(items, vote, bool(intel), byte_cols, catalog, mtime_ns))
     out: list[str | None] = []
+    # The gate is deterministic per (text, slot): a repeated line reuses the
+    # first answer instead of re-running the matcher and the catalog read
+    # per line (the 2000-line hint request holds two distinct lines).
+    decided: dict[tuple[str, str | None], str | None] = {}
     for text, slot in zip(items, slots):
-        if slot == NO_CATALOG_ROW and not _mnemonic_has_rows(conn, text, bool(intel)):
-            slot = None
-        elif slot and _exact_key_beats_identity(conn, text, bool(intel), slot):
-            # The exact key is the only name the line has: the old matcher
-            # answers it and hover and hint agree on the key's row.
-            slot = None
-        out.append(slot)
+        key = (text, slot)
+        if key not in decided:
+            if slot == NO_CATALOG_ROW and not _mnemonic_has_rows(conn, text, bool(intel)):
+                decided[key] = None
+            elif slot and _exact_key_beats_identity(conn, text, bool(intel), slot):
+                # The exact key is the only name the line has: the old matcher
+                # answers it and hover and hint agree on the key's row.
+                decided[key] = None
+            else:
+                decided[key] = slot
+        out.append(decided[key])
     return out
 
 
