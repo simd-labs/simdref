@@ -68,6 +68,29 @@ class SmeParseTests(unittest.TestCase):
         self.assertIn("Requires streaming features", sme.notes)
 
 
+LIVE_HEADERS = Path(__file__).parent / "fixtures" / "b5" / "arm_live_sve_sme_headers.json"
+
+
+def _live_records():
+    from simdref.ingest_catalog import parse_arm_intrinsics_json_bundle
+
+    payload = {
+        "intrinsics_json": LIVE_HEADERS.read_text(),
+        "operations_json": "[]",
+    }
+    return {record.name: record for record in parse_arm_intrinsics_json_bundle(payload)}
+
+
+class SveSmeHeaderTests(unittest.TestCase):
+    def test_sve_items_tagged_sme_still_declare_arm_sve_h(self):
+        # Real arm-intrinsics rows, one per CI failure group: each pairs
+        # "SME and SME2" with SVE or SVE2 and is declared in arm_sve.h.
+        records = _live_records()
+        for name in ("svaesd_lane_u8_x2", "svpmov_u8_z"):
+            with self.subTest(name=name):
+                self.assertEqual(records[name].header, "arm_sve.h")
+
+
 class SmeFilterTests(unittest.TestCase):
     def test_sme_maps_to_arm_family(self):
         from simdref.display import display_isa, isa_family

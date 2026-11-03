@@ -1,0 +1,106 @@
+[
+  {
+    "SIMD_ISA": [
+      "SME and SME2",
+      "SVE"
+    ],
+    "required_streaming_features": {
+      "title": "Required streaming features",
+      "intro": "This intrinsic requires the following <a href=\"https://developer.arm.com/documentation/109697/\"> architecture features</a> to be run in streaming mode and appear in streaming functions (functions marked with the __arm_streaming attribute).",
+      "features": "FEAT_SME,FEAT_SVE_AES2,FEAT_SSVE_AES"
+    },
+    "name": "svaesd_lane[_u8_x2]",
+    "return_type": {
+      "return_base_type": "uint8",
+      "element_bit_size": "8",
+      "value": "svuint8x2_t"
+    },
+    "sme_modes": [],
+    "arguments": [
+      "svuint8x2_t zdn",
+      "svuint8_t zm",
+      "uint64_t index"
+    ],
+    "Architectures": [
+      "A64"
+    ],
+    "instruction_group": "Cryptography|AES",
+    "Arguments_Preparation": {
+      "zdn": {
+        "Z multi-vector": "{ Zreg1.B, Zreg2.B }"
+      },
+      "zm": {
+        "register": "Zreg3.Q"
+      },
+      "index": {
+        "immediate": "imm1"
+      }
+    },
+    "results": [
+      {
+        "{ Zreg1.B, Zreg2.B }": "result"
+      }
+    ],
+    "description": "Multi-vector AES single round decryption",
+    "instructions": [
+      {
+        "preamble": "This intrinsic compiles to an instruction sequence that is semantically equivalent to:",
+        "list": [
+          {
+            "base_instruction": "AESD",
+            "url": "https://developer.arm.com/documentation/ddi0602/latest/SVE-Instructions/AESD--indexed---Multi-vector-AES-single-round-decryption-",
+            "operands": "{ Zreg1.B, Zreg2.B }, { Zreg1.B, Zreg2.B }, Zreg3.Q[imm1]"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "SIMD_ISA": [
+      "SME and SME2",
+      "SVE2"
+    ],
+    "required_streaming_features": {
+      "title": "Required streaming features",
+      "intro": "This intrinsic requires the following <a href=\"https://developer.arm.com/documentation/109697/\"> architecture features</a> to be run in streaming mode and appear in streaming functions (functions marked with the __arm_streaming attribute).",
+      "features": "(FEAT_SME,FEAT_SVE2p1)|FEAT_SME2p1"
+    },
+    "name": "svpmov_u8_z",
+    "return_type": {
+      "return_base_type": "uint8",
+      "element_bit_size": "8",
+      "value": "svuint8_t"
+    },
+    "sme_modes": [],
+    "arguments": [
+      "svbool_t pn"
+    ],
+    "Architectures": [
+      "A64"
+    ],
+    "instruction_group": "Predication|Predicate move",
+    "Arguments_Preparation": {
+      "pn": {
+        "register": "Preg1"
+      }
+    },
+    "results": [
+      {
+        "Zreg1": "result"
+      }
+    ],
+    "description": "Move predicate to vector",
+    "instructions": [
+      {
+        "preamble": "This intrinsic compiles to an instruction sequence that is semantically equivalent to:",
+        "list": [
+          {
+            "base_instruction": "PMOV",
+            "url": "https://developer.arm.com/documentation/ddi0602/latest/SVE-Instructions/PMOV--to-vector---Move-predicate-to-vector-",
+            "operands": "Zreg1, Preg1.B"
+          }
+        ]
+      }
+    ]
+  }
+]

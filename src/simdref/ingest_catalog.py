@@ -746,8 +746,14 @@ def parse_arm_intrinsics_json_bundle(payload: dict[str, Any]) -> list[IntrinsicR
                 name=name,
                 signature=f"{str((item.get('return_type') or {}).get('value') or '').strip()} {name}({', '.join(args)})".strip(),
                 description=str(item.get("description") or "").strip(),
+                # "SME and SME2" on an SVE/SVE2 item marks SME availability,
+                # not the header: ACLE declares those in arm_sve.h.
                 header=(
-                    "arm_neon.h" if "NEON" in isa else "arm_sme.h" if "SME" in isa else "arm_sve.h"
+                    "arm_neon.h"
+                    if "NEON" in isa
+                    else "arm_sve.h"
+                    if "SVE" in isa or "SVE2" in isa
+                    else "arm_sme.h"
                 ),
                 url=_arm_intrinsic_url(name),
                 architecture="arm",
