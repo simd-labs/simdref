@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 from simdref import annotate as annotate_mod
-from simdref.annotate import AnnotateOptions, annotate_stream, arch_perf, format_annotation
+from simdref.annotate import AnnotateOptions, annotate_stream, arch_latency, format_annotation
 from simdref.display import measurement_rows
 from simdref.models import InstructionRecord
 
@@ -95,8 +95,7 @@ POPCNT_R64_R64_ICL = _record(
 
 
 def test_m7_write_only_destination_pair_is_skipped():
-    lat, _cpi, _kind = arch_perf(POPCNT_R64_R64_ICL, "ICL")
-    assert lat == 3.0
+    assert arch_latency(POPCNT_R64_R64_ICL, "ICL") == 3.0
 
 
 # VCVTSI2SS (XMM, XMM, R32) on ZEN4: xmm pair 0, r32 pair 8 (upper bound).
@@ -110,8 +109,7 @@ def test_m7_zero_pair_beside_a_real_pair_does_not_win():
             {"start_op": "3", "target_op": "1", "cycles": "8", "cycles_is_upper_bound": "1"},
         ],
     )
-    lat, _cpi, _kind = arch_perf(rec, "ZEN4")
-    assert lat == 8.0
+    assert arch_latency(rec, "ZEN4") == 8.0
 
 
 # ADD (R64, I8) on ADL-P: pairs 0 and 1, uops 0 in the source.
@@ -161,7 +159,7 @@ def test_m15_stored_range_is_shown_and_kept_in_json(monkeypatch):
 
 
 def test_hover_row_and_annotate_agree():
-    # The hover perf table reads measurement_rows; annotate reads arch_perf.
+    # The hover perf table reads measurement_rows; annotate reads arch_latency.
     for record, arch, text in (
         (ADD_R64_M64_SKL, "SKL", "6"),
         (POPCNT_R64_R64_ICL, "ICL", "3"),
@@ -169,5 +167,17 @@ def test_hover_row_and_annotate_agree():
     ):
         row = measurement_rows(record)[0]
         assert row["latency"] == text
-        lat, _cpi, _kind = arch_perf(record, arch)
-        assert lat == float(text.split("-")[-1])
+        assert arch_latency(record, arch) == float(text.split("-")[-1])
+
+
+# KMOVQ (M64, K): the only pair starts at the write-only memory operand.
+# No read-start pair has data, so the stored value stays (never 0 or None).
+def test_no_read_start_pair_keeps_the_stored_value():
+    rec = _record(
+        "KMOVQ (M64, K)",
+        [{"idx": "1", "type": "mem", "w": "1"}, _reg(2)],
+        "SKL",
+        [{"start_op": "1", "target_op": "1", "cycles_addr": "5"}],
+    )
+    assert arch_latency(rec, "SKL") == 5.0
+    assert measurement_rows(rec)[0]["latency"] == "5"

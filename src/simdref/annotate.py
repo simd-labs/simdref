@@ -685,8 +685,18 @@ def _latency_for(
 ) -> list[str]:
     # One value per row: the largest latency over the read-operand pairs
     # (simdref#65), never the first listed pair.
-    bounds = perf.latency_bounds(details, operands)
-    return [] if bounds is None else [bounds[1]]
+    # Without operands (arch_perf, aggregate_perf) the old first-value pick stays.
+    bounds = None if operands is None else perf.latency_bounds(details, operands)
+    if bounds is None:
+        # No read-start pair has data (KMOVQ (M64, K)): keep the old first value.
+        return perf.latency_cycle_values(details.get("latencies") or [])
+    return [bounds[1]]
+
+
+def arch_latency(record: InstructionRecord, arch: str) -> float | None:
+    """Latency of the row of *arch*, with the write-only-start pairs skipped."""
+    details = (record.arch_details or {}).get(arch) or {}
+    return _per_arch_value(details, lambda d: _latency_for(d, record.operand_details))
 
 
 def arch_latency_range(record: InstructionRecord, arch: str) -> tuple[float, float] | None:
@@ -728,7 +738,7 @@ def aggregate_perf(
             kind = details.get("source_kind") or "measured"
             if kind not in kinds:
                 continue
-            lat = _per_arch_value(details, lambda d: _latency_for(d, record.operand_details))
+            lat = _per_arch_value(details, _latency_for)
             cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
             if lat is None and cpi is None:
                 continue
@@ -793,7 +803,7 @@ def arch_perf(record: InstructionRecord, arch: str) -> tuple[float | None, float
     details = (record.arch_details or {}).get(arch) or {}
     kind = details.get("source_kind") or "measured"
     iclass = perf.record_iclass(record)
-    lat = _per_arch_value(details, lambda d: _latency_for(d, record.operand_details))
+    lat = _per_arch_value(details, _latency_for)
     cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
     return lat, cpi, kind
 
@@ -920,6 +930,7 @@ def format_annotation(
         uops_frag = ""
         if arch is not None:
             lat, cpi, kind = arch_perf(record, arch)
+            lat = arch_latency(record, arch)
             lat_text = fmt_arch_latency(record, arch, lat)
             tag = arch_perf_tag(arch, lat, cpi, kind)
             uops_val, microcoded_val = _uops_for(
@@ -1114,6 +1125,7 @@ def _annotate_instruction(
 
     if opts.arch is not None:
         lat_val, cpi_val, _ = arch_perf(record, opts.arch)
+        lat_val = arch_latency(record, opts.arch)
         archs_used: list[str] = [opts.arch] if (opts.arch in (record.arch_details or {})) else []
     else:
         lat_val, cpi_val = summary.latency, summary.cpi

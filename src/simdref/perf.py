@@ -143,7 +143,8 @@ def latency_bounds(
 
     A pair that starts at a write-only operand (``w`` without ``r`` in
     *operands*) carries no input dependency, often a stored ``0``, so the
-    pick skips it unless no other pair has data. ``high`` is the largest
+    pick skips it. When no read-start pair has data, the function returns
+    ``None`` and the caller keeps its own value. ``high`` is the largest
     value over the remaining pairs, memory and address paths included: the
     figure uops.info and llvm-mca give for the instruction. ``low`` is the
     smallest lower bound when a pair stores a ``min-max`` range, else
@@ -155,7 +156,7 @@ def latency_bounds(
     }
     kept = [lat for lat in latencies if str(lat.get("start_op")) not in write_only]
     spans: list[tuple[str, str]] = []
-    for value in latency_cycle_values(kept) or latency_cycle_values(latencies):
+    for value in latency_cycle_values(kept):
         low, _, high = str(value).partition("-")
         high = high or low
         if _is_numeric(low) and _is_numeric(high):

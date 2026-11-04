@@ -1137,6 +1137,7 @@ def _print_non_interactive_summary(
     """
     from simdref.annotate import (
         aggregate_perf,
+        arch_latency,
         arch_perf,
         arch_perf_tag,
         collect_ports,
@@ -1186,6 +1187,7 @@ def _print_non_interactive_summary(
                 if core is None:
                     continue
                 lat, cpi, kind = arch_perf(rec, core)
+                lat = arch_latency(rec, core)
                 ports = collect_ports(rec, arch=core, archs_used=[core])
                 per_arch.append(
                     {
@@ -1224,6 +1226,7 @@ def _print_non_interactive_summary(
             typer.echo(f"  {rec.summary.strip()}")
         if canonical_arch is not None:
             lat, cpi, kind = arch_perf(rec, canonical_arch)
+            lat = arch_latency(rec, canonical_arch)
             ports = collect_ports(rec, arch=canonical_arch, archs_used=[canonical_arch])
             ports_str = ",".join(ports) if ports else "-"
             tag = arch_perf_tag(canonical_arch, lat, cpi, kind)
