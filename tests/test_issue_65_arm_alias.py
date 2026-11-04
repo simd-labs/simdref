@@ -16,6 +16,7 @@ import pytest
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.asm_identity import _refine_subset, _tool_path, identify_lines
 from simdref.models import Catalog, SourceVersion
+from simdref.perf_sources.merge import PerfRow, merge_perf_rows
 from simdref.storage import build_sqlite
 
 FIXTURE = Path(__file__).parent / "fixtures" / "issue_65" / "arm_alias_nodes.json"
@@ -83,6 +84,40 @@ def test_target_rows_unchanged(rows):
     named = {row.mnemonic for row in rows} - {row.mnemonic for row in stripped}
     assert named == set(ALIASES)
     assert [r for r in rows if r.mnemonic not in ALIASES] == stripped
+
+
+def test_alias_rows_carry_their_target_timing():
+    # An alias is the same encoding as its target, so its rows must keep the
+    # target's timing: a perf row on the target lands on the alias rows too.
+    rows = parse_arm_instruction_payload(FIXTURE.read_text())
+    targets = {
+        "SMSTART": "MSR",
+        "SMSTOP": "MSR",
+        "GCSSS1": "SYS",
+        "GCSPOPM": "SYSL",
+        "GCSSS2": "SYSL",
+    }
+    for target_mnemonic in sorted(set(targets.values())):
+        merge_perf_rows(
+            rows,
+            [
+                PerfRow(
+                    mnemonic=target_mnemonic,
+                    core=f"T-{target_mnemonic}",
+                    source="llvm-mca",
+                    source_kind="modeled",
+                    source_version="t",
+                    architecture="arm",
+                    latency="7",
+                    cpi="1",
+                )
+            ],
+        )
+    for alias_name, target_mnemonic in targets.items():
+        (target,) = _by_mnemonic(rows, target_mnemonic)
+        (alias,) = _by_mnemonic(rows, alias_name)
+        assert alias.arch_details, alias_name
+        assert alias.arch_details == target.arch_details, alias_name
 
 
 needs_mc = pytest.mark.skipif(

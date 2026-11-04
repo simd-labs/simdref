@@ -850,7 +850,9 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
         node_type = str(node.get("_type", ""))
         if node_type.endswith("Instruction"):
             # Alias children get their own named rows first (issue #65).
+            start = len(records)
             _alias_children(node, group_path, operations, seen_keys, records)
+            alias_rows = records[start:]
             enc = _encodeset_mask_match(node.get("encoding"))
             if enc is None:
                 enc_bits = enc_mask = enc_match = 0
@@ -906,11 +908,16 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                             enc_match=enc_match | cond,
                         )
                     )
+                # shortcut: a B.cond alias keeps no aliasof link (the family
+                # names no single target row), upgrade if the data gains one
                 return
             key = (mnemonic, form.casefold())
             seen_enc = seen_keys.get(key)
             if seen_enc is not None:
                 if seen_enc == (enc_mask, enc_match):
+                    # The earlier same-key row is the aliases' target too.
+                    for alias_row in alias_rows:
+                        alias_row.metadata["aliasof"] = form
                     return
                 # Sibling encodings of one rendered form stay separate rows;
                 # their keys are never merged (spec K4).
@@ -934,6 +941,10 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                     enc_match=enc_match,
                 )
             )
+            # The alias row is the same encoding as this target row, so the
+            # perf merge gives it the target's timing through this link.
+            for alias_row in alias_rows:
+                alias_row.metadata["aliasof"] = form
             return
         if node_type.endswith("InstructionAlias"):
             # Alias nodes outside their target instruction carry no target
