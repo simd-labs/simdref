@@ -30,6 +30,10 @@ def _normalize_isa(value: Any) -> list[str]:
     return []
 
 
+# The unified-db bundle writes this when the upstream YAML has no text.
+_NO_SYNOPSIS = "No synopsis available."
+
+
 def _string(value: Any) -> str:
     return str(value or "").strip()
 
@@ -370,16 +374,15 @@ def parse_riscv_instruction_payload(text: str) -> list[InstructionRecord]:
         if item.get("extension"):
             metadata.setdefault("extension", _string(item.get("extension")))
         description = _instruction_semantics(item, url, docs_pages)
+        summary_text = _string(
+            item.get("summary") or item.get("brief") or item.get("description_text")
+        )
+        if summary_text == _NO_SYNOPSIS:
+            summary_text = ""
         record = InstructionRecord(
             mnemonic=mnemonic,
             form=_instruction_form(item, mnemonic),
-            summary=_string(
-                item.get("summary")
-                or item.get("brief")
-                or item.get("description_text")
-                or f"{mnemonic} instruction."
-            ).rstrip(".")
-            + ".",
+            summary=f"{summary_text.rstrip('.')}." if summary_text else "",
             architecture="riscv",
             isa=_normalize_isa(
                 item.get("isa")

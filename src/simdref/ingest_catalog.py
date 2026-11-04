@@ -1482,6 +1482,29 @@ def link_records(intrinsics: list[IntrinsicRecord], instructions: list[Instructi
         intrinsic.instruction_refs = resolved_refs
 
 
+def _backfill_amx_tile_summaries(
+    intrinsics: list[IntrinsicRecord], instructions: list[InstructionRecord]
+) -> None:
+    """Take the Intel data.js description for AMX tile rows the uops.info XML
+    ships without summary text (TDPBF16PS has one, TDPFP16PS does not).
+
+    Must run after link_records: the rows find their text through the linked
+    intrinsics.
+    """
+    by_name = {intrinsic.name: intrinsic for intrinsic in intrinsics}
+    for record in instructions:
+        if record.architecture != "x86" or not record.mnemonic.upper().startswith("TDP"):
+            continue
+        if record.metadata.get("uops_summary"):
+            continue
+        for name in record.linked_intrinsics:
+            intrinsic = by_name.get(name)
+            text = intrinsic.description.strip() if intrinsic else ""
+            if text:
+                record.summary = text if text.endswith(".") else f"{text}."
+                break
+
+
 def _attach_intel_guide_notes(intrinsics: Any) -> None:
     """Copy the round and SAE guide note text onto intrinsics that cite it.
 
@@ -1608,6 +1631,7 @@ def build_catalog(
     emit("Linking intrinsics to instructions")
     link_records(intrinsics, instructions)
     emit("Linked intrinsics and instructions")
+    _backfill_amx_tile_summaries(intrinsics, instructions)
     _attach_intel_guide_notes(intrinsics)
 
     perf_sources_version = list(_ingest_perf_sources(instructions, status=emit))
