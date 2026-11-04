@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `simdref build`, run `pip install 'simdref[ingest]'`.
 - All dependencies moved to their latest release.
 
+### Fixed
+
+- `isa annotate` recognizes objdump lines that carry no byte column when
+  the mnemonic is only hex letters, for example `fadd` and `addb`.
+- `isa annotate` reads an objdump address of only hex letters, for
+  example `b:` and `c:`, as an address, not as a label.
+- `pip install 'simdref[ingest]'` resolves on PyPy. PyMuPDF installs on
+  CPython only, and pdfplumber covers PDF ingest on PyPy.
+
 ## [0.0.15], 2026-10-31
 
 ### Fixed

@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
+
+import pytest
+
 from simdref.annotate import (
     AnnotateOptions,
     LineKind,
+    _parse_objdump_instr,
     aggregate_perf,
     annotate_stream,
     format_annotation,
@@ -84,6 +90,108 @@ def test_parse_asm_line_objdump_address_with_hex_letter_prefix():
 def test_parse_asm_line_objdump_symbol_header_not_instruction():
     parsed = parse_asm_line("0000000000003d80 <main>:", track_positions=True)
     assert parsed.kind != LineKind.INSTRUCTION
+
+
+# Issue #61 repro lines: a mnemonic of only hex letters ("fadd", "addb")
+# and an address of only hex letters ("b:", "c:"). Each tuple is one objdump
+# line with real tabs, its address, mnemonic, operands and byte column.
+_HEXLETTER_REPROS = [
+    ("   9:\tfadd   %st(1),%st", 0x9, "fadd", "%st(1),%st", None),
+    ("   b:\taddb   $0x1,(%rax)", 0xB, "addb", "$0x1,(%rax)", None),
+    ("       4:     \tfadd\td0, d1, d2", 0x4, "fadd", "d0, d1, d2", None),
+    ("   b:\t80 00 01             \taddb   $0x1,(%rax)", 0xB, "addb", "$0x1,(%rax)", "80 00 01"),
+    ("   c:\tc3                   \tret", 0xC, "ret", "", "c3"),
+]
+
+
+@pytest.mark.parametrize(("line", "addr", "mnem", "ops", "bytehex"), _HEXLETTER_REPROS)
+def test_objdump_hexletter_repro_line(monkeypatch, line, addr, mnem, ops, bytehex):
+    from simdref import annotate as _annotate
+
+    obj = _parse_objdump_instr(line)
+    assert obj is not None, line
+    assert obj[0] == addr
+    assert obj[2] == bytehex
+    parsed = parse_asm_line(line)
+    assert parsed.kind == LineKind.INSTRUCTION, line
+    assert parsed.mnemonic == mnem
+    assert parsed.operands == ops
+    assert parsed.address == addr
+
+    rec = _make_record(
+        mnemonic=mnem, summary="Repro record.", arch_details={"SKX": _arch_entry("3", "0.5")}
+    )
+    monkeypatch.setattr(_annotate, "lookup", _fake_lookup_factory({mnem.lower(): [rec]}))
+    conn = sqlite3.connect(":memory:")
+    out = "".join(annotate_stream(iter([line + "\n"]), opts=AnnotateOptions(fmt="json"), conn=conn))
+    data = json.loads(out)
+    assert len(data) == 1, line
+    assert data[0]["mnemonic"] == mnem
+    assert data[0]["address"] == f"0x{addr:x}"
+
+
+def test_objdump_hexletter_address_keeps_labels():
+    # A real label stays a label even when its name is all hex letters.
+    for line in ("loop:", ".L2:", "main:", "add:", "b:"):
+        parsed = parse_asm_line(line)
+        assert parsed.kind != LineKind.INSTRUCTION, line
+        assert parsed.mnemonic == "", line
+    for line in ("loop:", "main:", "add:", "b:"):
+        assert parse_asm_line(line).kind == LineKind.LABEL, line
+
+
+def test_objdump_multi_digit_address_controls_still_parse():
+    # Same bytes and mnemonics with a multi-digit address: worked before,
+    # must keep working.
+    for line, mnem in (
+        ("  1b:\t80 00 01             \taddb   $0x1,(%rax)", "addb"),
+        ("  11:\tc3                   \tret", "ret"),
+    ):
+        parsed = parse_asm_line(line)
+        assert parsed.kind == LineKind.INSTRUCTION, line
+        assert parsed.mnemonic == mnem
+
+
+# GNU objdump wraps long encodings onto byte-only continuation lines
+# ("    423a:\tff ff 03 " with a real TAB). They carry no mnemonic and
+# must yield no record (review F1).
+_BYTE_CONTINUATION_LINES = [
+    "    423a:\tff ff 03 ",
+    "    423a:\tff ff 03",
+]
+
+
+@pytest.mark.parametrize("line", _BYTE_CONTINUATION_LINES)
+def test_objdump_byte_continuation_yields_no_record(monkeypatch, line):
+    from simdref import annotate as _annotate
+
+    assert _parse_objdump_instr(line) is None, line
+    parsed = parse_asm_line(line)
+    assert parsed.kind != LineKind.INSTRUCTION, line
+    rec = _make_record(mnemonic="ff", summary="Byte run, not a mnemonic.")
+    monkeypatch.setattr(_annotate, "lookup", _fake_lookup_factory({"ff": [rec]}))
+    out = "".join(
+        annotate_stream(
+            iter([line + "\n"]), opts=AnnotateOptions(fmt="json"), conn=sqlite3.connect(":memory:")
+        )
+    )
+    assert json.loads(out) == [], line
+
+
+# An indented label with a hex-letter name and a same-line instruction stays
+# a label: objdump always TABs the mnemonic off the address column
+# (review F2).
+_SAMELINE_LABEL_LINES = [
+    "\tadd: ret",
+    "\tbeef: nop",
+    "\tdead: fadd %st(1),%st",
+]
+
+
+@pytest.mark.parametrize("line", _SAMELINE_LABEL_LINES)
+def test_objdump_indented_hexletter_sameline_label_stays_label(line):
+    assert _parse_objdump_instr(line) is None, line
+    assert parse_asm_line(line).kind == LineKind.LABEL, line
 
 
 def test_aggregate_perf_modes():
