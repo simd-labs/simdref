@@ -452,6 +452,92 @@ def _encodeset_mask_match(encoding: Any) -> tuple[int, int, int] | None:
     return 32, mask, match
 
 
+def _encodeset_fields(encoding: Any) -> dict[str, tuple[int, int]]:
+    """Named encodeset fields as name -> (lsb, width) ranges."""
+    fields: dict[str, tuple[int, int]] = {}
+    if not isinstance(encoding, dict):
+        return fields
+    for entry in encoding.get("values") or []:
+        rng = entry.get("range") or {}
+        name = entry.get("name")
+        start, width = rng.get("start"), rng.get("width")
+        if name and isinstance(start, int) and isinstance(width, int):
+            fields[str(name)] = (start, width)
+    return fields
+
+
+def _alias_condition_bits(condition: Any, fields: dict[str, tuple[int, int]]) -> tuple[int, int]:
+    """(mask, match) bits an alias condition fixes on named encodeset fields.
+
+    Only == / IN conjuncts outside any negation give constant bits. OR, NOT
+    and identifier compares constrain no bit (a MOV alias fixes Zn equal to
+    Zd, which no constant mask can hold).
+    """
+    constraints: list[tuple[str, list[str]]] = []
+
+    def collect(node: Any) -> None:
+        if not isinstance(node, dict) or node.get("_type") != "AST.BinaryOp":
+            return
+        op = node.get("op")
+        if op == "&&":
+            collect(node.get("left"))
+            collect(node.get("right"))
+            return
+        left, right = node.get("left"), node.get("right")
+        if not (isinstance(left, dict) and left.get("_type") == "AST.Identifier"):
+            return
+        if op == "==":
+            members = [right]
+        elif op == "IN" and isinstance(right, dict) and right.get("_type") == "AST.Set":
+            members = right.get("values") or []
+        else:
+            return
+        literals: list[str] = []
+        for member in members:
+            literal = str(member.get("value") or "").strip("'") if isinstance(member, dict) else ""
+            if not literal:
+                return
+            literals.append(literal)
+        constraints.append((str(left.get("value")), literals))
+
+    collect(condition)
+    mask = match = 0
+    for name, literals in constraints:
+        rng = fields.get(name)
+        if rng is None or any(len(value) != rng[1] for value in literals):
+            continue
+        start, width = rng
+        for index in range(width):
+            chars = {value[width - 1 - index] for value in literals}
+            if len(chars) != 1 or not chars <= {"0", "1"}:
+                continue
+            mask |= 1 << (start + index)
+            if chars == {"1"}:
+                match |= 1 << (start + index)
+    return mask, match
+
+
+def _alias_feature_tags(condition: Any) -> list[str]:
+    """Uppercased feature names from IsFeatureImplemented guards, e.g. SME."""
+    tags: set[str] = set()
+
+    def collect(node: Any) -> None:
+        if isinstance(node, dict):
+            if node.get("_type") == "AST.Function" and node.get("name") == "IsFeatureImplemented":
+                for arg in node.get("arguments") or []:
+                    name = str(arg.get("value") or "") if isinstance(arg, dict) else ""
+                    if name.startswith("FEAT_"):
+                        tags.add(name[5:].upper())
+            for value in node.values():
+                collect(value)
+        elif isinstance(node, list):
+            for value in node:
+                collect(value)
+
+    collect(condition)
+    return sorted(tags)
+
+
 _RULE_PLACEHOLDER: dict[str, str] = {
     # Scalar
     "Xd": "x0",
@@ -646,6 +732,102 @@ def _aarchmrs_title(node: dict[str, Any], operations: dict[str, Any]) -> str:
     return ""
 
 
+def _alias_children(
+    node: dict[str, Any],
+    group_path: list[str],
+    operations: dict[str, Any],
+    seen_keys: dict[tuple[str, str], tuple[int, int]],
+    records: list[InstructionRecord],
+) -> None:
+    """One named row per alias child of an instruction node (issue #65).
+
+    Each row carries the alias's own assembly template, the target's title
+    and isa tags, and the feature tags of its own condition. Its encoding
+    is the target's pattern plus the field values the alias condition
+    fixes, so it strictly covers the target's pattern and byte identity
+    picks the alias row
+    (asm_identity._refine_subset drops the covered target). Aliases no
+    constant mask separates from their target or a sibling keep no encoding
+    and stay text rows.
+    """
+    aliases = [
+        child
+        for child in node.get("children", []) or []
+        if isinstance(child, dict) and str(child.get("_type", "")).endswith("InstructionAlias")
+    ]
+    if not aliases:
+        return
+    target_enc = _encodeset_mask_match(node.get("encoding"))
+    fields = _encodeset_fields(node.get("encoding"))
+    encodings: list[tuple[int, int]] = []
+    for alias in aliases:
+        dmask, dmatch = _alias_condition_bits(alias.get("condition"), fields)
+        enc = (0, 0)
+        if target_enc is not None:
+            bits, tmask, tmatch = target_enc
+            mask, match = tmask | dmask, (tmatch & tmask) | (dmatch & dmask)
+            # A condition contradicting the target pattern is bad data; such
+            # an alias keeps no encoding instead of a wrong one.
+            if (match & tmask) == (tmatch & tmask) and (mask, match) != (tmask, tmatch):
+                enc = (mask, match)
+        encodings.append(enc)
+    shared = {enc for enc, count in Counter(encodings).items() if enc != (0, 0) and count > 1}
+    isa = _infer_aarchmrs_isa(group_path)
+    target_title = _aarchmrs_title(node, operations)
+    for alias, enc in zip(aliases, encodings):
+        mask, match = (0, 0) if enc in shared else enc
+        assembly = alias.get("assembly")
+        rendered = _render_assembly(assembly) if isinstance(assembly, dict) else ""
+        if not rendered:
+            continue
+        head, _, tail = rendered.partition(" ")
+        mnemonic_match = re.match(r"[A-Z][A-Z0-9]*", head.strip().upper())
+        if not mnemonic_match:
+            continue
+        mnemonic = mnemonic_match.group(0)
+        operand_form = tail.strip()
+        form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
+        row_isa = list(isa)
+        for tag in _alias_feature_tags(alias.get("condition")):
+            if tag not in row_isa:
+                row_isa.append(tag)
+        # The target's title when the data has one; else the alias's own name,
+        # because a generated "Msr is an Arm instruction." would name the target.
+        summary = target_title or _generated_summary(mnemonic, row_isa)
+        if not summary.endswith("."):
+            summary += "."
+        key = (mnemonic, form.casefold())
+        seen_enc = seen_keys.get(key)
+        if seen_enc is not None:
+            if seen_enc == (mask, match):
+                continue
+            # Sibling encodings of one rendered form stay separate rows;
+            # their keys are never merged (spec K4).
+            form = f"{form} [{str(alias.get('name') or '').strip()}]"
+            key = (mnemonic, form.casefold())
+        seen_keys[key] = (mask, match)
+        metadata = {
+            "operation_id": str(alias.get("operation_id") or "").strip(),
+            "instruction_set": group_path[0] if group_path else "A64",
+            "group": group_path[-1] if group_path else "",
+        }
+        metadata = {k: v for k, v in metadata.items() if v}
+        records.append(
+            InstructionRecord(
+                mnemonic=mnemonic,
+                form=form,
+                summary=summary,
+                architecture="arm",
+                isa=row_isa,
+                metadata=metadata,
+                source="arm-a64",
+                enc_bits=32 if mask else 0,
+                enc_mask=mask,
+                enc_match=match,
+            )
+        )
+
+
 def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
     if not isinstance(payload, dict):
         return []
@@ -667,6 +849,8 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
     def walk(node: dict[str, Any], group_path: list[str]) -> None:
         node_type = str(node.get("_type", ""))
         if node_type.endswith("Instruction"):
+            # Alias children get their own named rows first (issue #65).
+            _alias_children(node, group_path, operations, seen_keys, records)
             enc = _encodeset_mask_match(node.get("encoding"))
             if enc is None:
                 enc_bits = enc_mask = enc_match = 0
@@ -752,7 +936,8 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             )
             return
         if node_type.endswith("InstructionAlias"):
-            # Skip aliases — they resolve to another instruction we already parse.
+            # Alias nodes outside their target instruction carry no target
+            # context; the tree nests them under the target (issue #65).
             return
         name = str(node.get("name") or "").strip()
         next_path = group_path + [name] if name else group_path
