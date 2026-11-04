@@ -3,8 +3,13 @@
 Fixtures are copied byte-exact from the vendored uops.info XML, the Intel
 Intrinsics Guide data.js and the RISC-V docs page."""
 
+import contextlib
+import dataclasses
+import importlib.util
+import io
 import json
 import unittest
+from pathlib import Path
 
 from simdref.ingest_catalog import link_records, parse_intel_payload, parse_uops_xml
 from simdref.riscv import parse_riscv_instruction_payload
@@ -48,6 +53,76 @@ class RiscvSentinelTests(unittest.TestCase):
         payload = {"format": "riscv-unified-db-v1", "instructions": [item]}
         record = parse_riscv_instruction_payload(json.dumps(payload))[0]
         self.assertEqual(record.summary, "AES encrypt.")
+
+
+def _load_validator():
+    path = Path(__file__).resolve().parents[1] / "tools" / "validate_sources.py"
+    spec = importlib.util.spec_from_file_location("validate_sources_issue_65", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run_riscv_validator(item, parse=None):
+    module = _load_validator()
+    text = json.dumps({"format": "riscv-unified-db-v1", "instructions": [item]})
+    module.fetch_riscv_unified_db_data = lambda: (text, None)
+    if parse is not None:
+        module.parse_riscv_instruction_payload = parse
+    with contextlib.redirect_stdout(buffer := io.StringIO()):
+        _checked, failures = module.validate_riscv_instructions()
+    return failures, buffer.getvalue()
+
+
+class RiscvValidatorTests(unittest.TestCase):
+    def test_sourced_empty_summary_passes(self):
+        item = json.loads(AES32ESI_ITEM)
+        for synopsis in ("No synopsis available.", "", None):
+            with self.subTest(synopsis=synopsis):
+                if synopsis is None:
+                    del item["summary"]
+                else:
+                    item["summary"] = synopsis
+                failures, out = _run_riscv_validator(item)
+                self.assertEqual(failures, 0, out)
+
+    def test_lost_source_text_still_fails(self):
+        item = json.loads(AES32ESI_ITEM)
+        item["summary"] = "AES encrypt"
+
+        def parse_and_drop_text(text):
+            return [
+                dataclasses.replace(r, summary="") for r in parse_riscv_instruction_payload(text)
+            ]
+
+        failures, out = _run_riscv_validator(item, parse=parse_and_drop_text)
+        self.assertEqual(failures, 1, out)
+        self.assertIn("empty summary for aes32esi", out)
+
+
+class EmptySummaryReaderTests(unittest.TestCase):
+    def test_llm_markdown_prints_no_separator_for_empty_summary(self):
+        from simdref.cli import _llm_format_markdown
+
+        row = {"intrinsic": ["__riscv_vaadd_vv_i8m1"], "isa": ["V"], "summary": ""}
+        md = _llm_format_markdown({"query": "vaadd.vv", "mode": "search", "results": [row]})
+        line = md.splitlines()[-1]
+        self.assertEqual(line, "- **__riscv_vaadd_vv_i8m1** `V`")
+        row["summary"] = "Adds."
+        md = _llm_format_markdown({"query": "vaadd.vv", "mode": "search", "results": [row]})
+        self.assertEqual(md.splitlines()[-1], "- **__riscv_vaadd_vv_i8m1** `V` — Adds.")
+
+    def test_search_subtitle_is_empty_for_empty_summary(self):
+        from simdref.search import search_records
+
+        record = _riscv(AES32ESI_ITEM, with_docs=False)
+        self.assertEqual(record.summary, "")
+        # A summary of only whitespace must also read as empty.
+        padded = dataclasses.replace(record, summary="  ")
+        for rec in (record, padded):
+            with self.subTest(summary=rec.summary):
+                hits = search_records([], [rec], "aes32esi")
+                self.assertEqual([h.subtitle for h in hits], [""])
 
 
 class X86TextTests(unittest.TestCase):
