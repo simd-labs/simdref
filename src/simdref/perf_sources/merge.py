@@ -40,6 +40,15 @@ def _entry_rank(entry: dict[str, Any]) -> int | None:
     return _SOURCE_RANK.get(entry.get("source") or SOURCE_UOPS_INFO)
 
 
+# A ZA tile ("<ZAT...><HV>.S[W1, #0]") or ZA array ("<ZDA>.S",
+# "Z3.S[<WV>, #0...]") operand. No perf source measures ZA forms.
+_ZA_OPERAND = re.compile(r"<ZAT|<ZAN|<ZAD|<ZDA|\[<WV>|\[W1")
+
+
+def _has_za_operand(form: str) -> bool:
+    return _ZA_OPERAND.search(form) is not None
+
+
 @dataclass(frozen=True)
 class PerfRow:
     """A single perf observation produced by a perf_sources ingester.
@@ -176,13 +185,15 @@ def merge_perf_rows(
     Matching rule: a row attaches to every record with the same architecture
     and mnemonic. If ``row.form`` is non-empty, only records with the
     matching form are updated (case-insensitive). Otherwise the row applies
-    to every variant of the mnemonic (``applies_to="mnemonic"``).
+    to every variant of the mnemonic (``applies_to="mnemonic"``), except ZA
+    tile and ZA array forms, which no source measures.
 
     ``overwrite=False`` (default) keeps one value per ``arch_details[core]``
     slot: an incoming row replaces the existing entry only when its source
     ranks higher in :data:`SOURCE_PRIORITY`. Slots whose source is unknown
     to the priority table are never displaced, so passes that predate the
-    table keep their data.
+    table keep their data. A slot with empty ``latencies`` is not blocking:
+    a lower-priority row fills its latency without displacing the slot.
 
     Returns the number of ``arch_details[core]`` entries newly written.
     """
@@ -247,11 +258,15 @@ def merge_perf_rows(
                 matched = [
                     r for r in targets if not form_key or r.form.strip().casefold() == form_key
                 ]
+                if not form_key:
+                    # Mnemonic rows spread over every form except ZA forms:
+                    # no source measures ZA tiles or ZA arrays (#65 M11).
+                    matched = [r for r in matched if not _has_za_operand(r.form)]
             # Plain form rows keep the mnemonic-level spread when the form
             # text matches nothing (intel-guide and friends name iforms).
             # An AMD class row the classes do not match attaches nowhere.
             if not matched and form_key and not row.form_classes:
-                matched = targets  # fallback when the bytes cannot decide
+                matched = [r for r in targets if not _has_za_operand(r.form)]
         entry = row.as_arch_details_entry()
         new_rank = _SOURCE_RANK.get(row.source)
         for record in matched:
@@ -259,6 +274,11 @@ def merge_perf_rows(
             if existing is not None and not overwrite:
                 old_rank = _entry_rank(existing)
                 if new_rank is None or old_rank is None or new_rank >= old_rank:
+                    # An empty latency slot must not block a lower source
+                    # from filling latency (#65 M12); other fields stay.
+                    if entry.get("latencies") and not existing.get("latencies"):
+                        existing["latencies"] = entry["latencies"]
+                        written += 1
                     continue
             record.arch_details[row.core] = entry
             written += 1

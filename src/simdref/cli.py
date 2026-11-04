@@ -93,6 +93,7 @@ from simdref.storage import (
     DEFAULT_MAN_DIR,
     SQLITE_PATH,
     WEB_DIR,
+    _unpack_payload,
     _write_atomic,
     build_sqlite,
     load_catalog,
@@ -997,6 +998,21 @@ def _payload_source_kinds(arch_details) -> list[str]:
     return kinds
 
 
+def _arch_has_perf_rows(arch: str) -> bool:
+    """True when any instruction row carries a perf slot for *arch*."""
+    from simdref.perf_sources.cores import core_architecture
+
+    family = core_architecture(arch) or ""
+    family = {"aarch64": "arm"}.get(family, family)
+    with open_db(SQLITE_PATH) as conn:
+        rows = conn.execute(
+            "SELECT payload FROM instructions_data WHERE architecture = ?", (family,)
+        )
+        return any(
+            arch in (_unpack_payload(row["payload"]).get("arch_details") or {}) for row in rows
+        )
+
+
 # ---------------------------------------------------------------------------
 # Search results
 # ---------------------------------------------------------------------------
@@ -1341,6 +1357,11 @@ def annotate(
             )
             raise typer.Exit(code=1)
         arch = canonical
+        if not _arch_has_perf_rows(arch):
+            err_console.print(
+                f"[bold yellow]warning:[/bold yellow] no timing data for {arch} in this catalog",
+                style="yellow",
+            )
 
     input_is_stdin = str(input_path) == "-"
     if input_is_stdin:
