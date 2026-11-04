@@ -64,6 +64,12 @@ _OBJDUMP_INSTR_RE = re.compile(
     r"(?P<bytes>(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2}){0,9})\s+\t)?"
     r"(?P<rest>\S.*?)\s*$"
 )
+# A tail of only hex byte groups is a wrapped encoding's byte-only
+# continuation line ("    423a:\tff ff 03 "), never a mnemonic (issue #61).
+_BYTE_GROUP_TAIL_RE = re.compile(
+    r"\s*(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2})"
+    r"(?:\s+(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}))*\s*"
+)
 # objdump -S injects "file:line" comment lines before the instruction block.
 _OBJDUMP_SRC_RE = re.compile(r"^\s*(?P<file>[^ \t/][^:]*):(?P<line>\d+)\s*$")
 
@@ -125,6 +131,14 @@ def _parse_objdump_instr(line: str) -> tuple[int, str, str | None] | None:
         return None
     obj_m = _OBJDUMP_INSTR_RE.match(line)
     if not obj_m:
+        return None
+    # objdump always TABs the mnemonic off the address/bytes column; a plain
+    # space after the colon is a label with a same-line instruction
+    # ("\tadd: ret"), and a byte-group-only tail is a continuation line.
+    colon = obj_m.end("addr") + 1
+    if "\t" not in line[colon : obj_m.start("rest")]:
+        return None
+    if _BYTE_GROUP_TAIL_RE.fullmatch(line[colon:]):
         return None
     try:
         addr = int(obj_m.group("addr"), 16)

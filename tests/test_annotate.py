@@ -152,6 +152,48 @@ def test_objdump_multi_digit_address_controls_still_parse():
         assert parsed.mnemonic == mnem
 
 
+# GNU objdump wraps long encodings onto byte-only continuation lines
+# ("    423a:\tff ff 03 " with a real TAB). They carry no mnemonic and
+# must yield no record (review F1).
+_BYTE_CONTINUATION_LINES = [
+    "    423a:\tff ff 03 ",
+    "    423a:\tff ff 03",
+]
+
+
+@pytest.mark.parametrize("line", _BYTE_CONTINUATION_LINES)
+def test_objdump_byte_continuation_yields_no_record(monkeypatch, line):
+    from simdref import annotate as _annotate
+
+    assert _parse_objdump_instr(line) is None, line
+    parsed = parse_asm_line(line)
+    assert parsed.kind != LineKind.INSTRUCTION, line
+    rec = _make_record(mnemonic="ff", summary="Byte run, not a mnemonic.")
+    monkeypatch.setattr(_annotate, "lookup", _fake_lookup_factory({"ff": [rec]}))
+    out = "".join(
+        annotate_stream(
+            iter([line + "\n"]), opts=AnnotateOptions(fmt="json"), conn=sqlite3.connect(":memory:")
+        )
+    )
+    assert json.loads(out) == [], line
+
+
+# An indented label with a hex-letter name and a same-line instruction stays
+# a label: objdump always TABs the mnemonic off the address column
+# (review F2).
+_SAMELINE_LABEL_LINES = [
+    "\tadd: ret",
+    "\tbeef: nop",
+    "\tdead: fadd %st(1),%st",
+]
+
+
+@pytest.mark.parametrize("line", _SAMELINE_LABEL_LINES)
+def test_objdump_indented_hexletter_sameline_label_stays_label(line):
+    assert _parse_objdump_instr(line) is None, line
+    assert parse_asm_line(line).kind == LineKind.LABEL, line
+
+
 def test_aggregate_perf_modes():
     rec = _make_record(
         arch_details={
