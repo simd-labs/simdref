@@ -9,12 +9,14 @@ candidate source fails (no bundled-fixture fallback).
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import subprocess
 import sys
 import tarfile
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -475,3 +477,78 @@ def test_now_iso_is_utc_iso_format():
     parsed = datetime.fromisoformat(stamp)
     assert parsed.tzinfo is not None
     assert parsed.utcoffset().total_seconds() == 0
+
+
+def _load_vendor_script():
+    path = src._REPO_ROOT / "tools" / "vendor_riscv_sources.py"
+    spec = importlib.util.spec_from_file_location("vendor_riscv_sources", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _no_bundle(tmp_path, monkeypatch):
+    bundle = tmp_path / "vendor" / "riscv" / "rvv_intrinsics_bundle.json"
+    monkeypatch.setattr(src, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(src, "LOCAL_RISCV_RVV_INTRINSICS_JSONS", [bundle])
+    return bundle
+
+
+def test_rvv_missing_vendor_script_names_the_fix(tmp_path, monkeypatch):
+    bundle = _no_bundle(tmp_path, monkeypatch)  # tmp_path has no tools/ directory
+    with pytest.raises(src.SourceUnavailableError) as err:
+        src.fetch_riscv_rvv_intrinsics_data()
+    assert str(bundle) in str(err.value)
+    assert "python tools/vendor_riscv_sources.py" in str(err.value)
+    assert "source checkout" in str(err.value)
+
+
+def test_rvv_vendor_script_failure_includes_stderr_tail(tmp_path, monkeypatch):
+    _no_bundle(tmp_path, monkeypatch)
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools" / "vendor_riscv_sources.py").write_text("")
+    stderr = "\n".join(f"line{i}" for i in range(30))
+
+    def fake_run(cmd, **kwargs):
+        raise subprocess.CalledProcessError(2, cmd, stderr=stderr)
+
+    monkeypatch.setattr(src.subprocess, "run", fake_run)
+    with pytest.raises(src.SourceUnavailableError) as err:
+        src.fetch_riscv_rvv_intrinsics_data()
+    message = str(err.value)
+    assert "line29" in message and "line10" in message  # last 20 lines
+    assert "line9\n" not in message + "\n"
+
+
+def test_vendor_script_without_roots_clones_into_a_temp_dir(tmp_path, monkeypatch):
+    vendor = _load_vendor_script()
+    seen = []
+
+    def fake_ensure(root, url, ref=None):
+        seen.append((root, root.parent.is_dir()))
+
+    monkeypatch.setattr(vendor, "ensure_git_repo", fake_ensure)
+    monkeypatch.setattr(vendor, "git_rev", lambda _repo: "0" * 40)
+    monkeypatch.setattr(vendor, "collect_base_instructions", lambda _root: {})
+    monkeypatch.setattr(vendor, "build_intrinsics_bundle", lambda *_a: ([], {}))
+    monkeypatch.setattr(sys, "argv", ["vendor_riscv_sources.py", "--out-dir", str(tmp_path)])
+    vendor.main()
+    assert len(seen) == 2
+    for root, parent_existed in seen:
+        assert parent_existed  # the temp dir existed during the run
+        assert root.parent != Path("/tmp")  # no fixed shared path such as /tmp/riscv-unified-db
+        assert not root.parent.exists()  # and it was removed on exit
+    assert seen[0][0].parent == seen[1][0].parent
+
+
+def test_vendor_script_rejects_explicit_root_at_the_wrong_commit(tmp_path, monkeypatch):
+    vendor = _load_vendor_script()
+    root = tmp_path / "udb"
+    (root / ".git").mkdir(parents=True)  # a stale clone that the old code skipped
+    monkeypatch.setattr(vendor.subprocess, "check_call", lambda *_a, **_k: 0)
+    pin = "a" * 40
+    monkeypatch.setattr(vendor, "git_rev", lambda _repo: "b" * 40)
+    with pytest.raises(SystemExit, match="pinned commit"):
+        vendor.ensure_git_repo(root, "https://example.invalid/udb", pin)
+    monkeypatch.setattr(vendor, "git_rev", lambda _repo: pin)
+    vendor.ensure_git_repo(root, "https://example.invalid/udb", pin)

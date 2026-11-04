@@ -604,6 +604,13 @@ def fetch_riscv_unified_db_data() -> tuple[str, SourceVersion]:
 def _build_rvv_bundle_locally() -> None:
     """Run tools/vendor_riscv_sources.py to clone upstream and write the vendor/riscv bundles."""
     script = _REPO_ROOT / "tools" / "vendor_riscv_sources.py"
+    bundle = _REPO_ROOT / "vendor" / "riscv" / "rvv_intrinsics_bundle.json"
+    if not script.exists():
+        # The wheel ships no tools/ directory, so an installed simdref cannot build the bundle.
+        raise SourceUnavailableError(
+            f"RISC-V RVV intrinsics bundle is missing at {bundle}. "
+            "Make it from a source checkout with 'python tools/vendor_riscv_sources.py'."
+        )
     try:
         subprocess.run(
             [sys.executable, str(script)],
@@ -613,9 +620,13 @@ def _build_rvv_bundle_locally() -> None:
             text=True,
         )
     except (subprocess.SubprocessError, OSError) as exc:
+        stderr = getattr(exc, "stderr", None) or ""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        tail = "\n".join(stderr.splitlines()[-20:])
         raise SourceUnavailableError(
             "RISC-V RVV intrinsics data is unreachable: "
-            f"tools/vendor_riscv_sources.py failed: {exc}"
+            f"tools/vendor_riscv_sources.py failed: {exc}\n{tail}"
         ) from exc
 
 
