@@ -1,0 +1,100 @@
+
+arm.o:	file format elf32-littlearm
+
+Disassembly of section .text:
+
+00000000 <sw>:
+       0:      	cmp	r0, #9
+       4:      	movhi	r0, #0
+       8:      	bxhi	lr
+       c:      	add	r2, pc, #4
+      10:      	ldr	r0, [r2, r0, lsl #2]
+      14:      	add	pc, r2, r0
+      18: 28 00 00 00  	.word	0x00000028
+      1c: 64 00 00 00  	.word	0x00000064
+      20: 4c 00 00 00  	.word	0x0000004c
+      24: 54 00 00 00  	.word	0x00000054
+      28: 30 00 00 00  	.word	0x00000030
+      2c: 6c 00 00 00  	.word	0x0000006c
+      30: 74 00 00 00  	.word	0x00000074
+      34: 5c 00 00 00  	.word	0x0000005c
+      38: 7c 00 00 00  	.word	0x0000007c
+      3c: 38 00 00 00  	.word	0x00000038
+      40:      	add	r0, r1, #1
+      44:      	bx	lr
+      48:      	lsl	r0, r1, #2
+      4c:      	bx	lr
+      50:      	movw	r0, #0x5556
+      54:      	movt	r0, #0x5555
+      58:      	smmul	r0, r1, r0
+      5c:      	add	r0, r0, r0, lsr #31
+      60:      	bx	lr
+      64:      	sub	r0, r1, #7
+      68:      	bx	lr
+      6c:      	eor	r0, r1, #5
+      70:      	bx	lr
+      74:      	and	r0, r1, #3
+      78:      	bx	lr
+      7c:      	add	r0, r1, r1, lsl #1
+      80:      	bx	lr
+      84:      	asr	r0, r1, #1
+      88:      	bx	lr
+      8c:      	orr	r0, r1, #9
+      90:      	bx	lr
+      94:      	rsb	r0, r1, #0
+      98:      	bx	lr
+
+0000009c <big>:
+      9c:      	movw	r0, #0x7788
+      a0:      	movw	r1, #0x3344
+      a4:      	movt	r0, #0x5566
+      a8:      	movt	r1, #0x1122
+      ac:      	bx	lr
+
+000000b0 <fadd3>:
+      b0:      	vadd.f64	d16, d0, d1
+      b4:      	vadd.f64	d0, d16, d2
+      b8:      	bx	lr
+
+000000bc <bytes8>:
+      bc:      	ldrb	r1, [r0]
+      c0:      	add	r1, r1, #1
+      c4:      	strb	r1, [r0]
+      c8:      	movw	r1, #0x3344
+      cc:      	movt	r1, #0x1122
+      d0:      	ldrb	r1, [r0, r1]!
+      d4:      	add	r1, r1, #2
+      d8:      	strb	r1, [r0]
+      dc:      	bx	lr
+
+000000e0 <loop>:
+      e0:      	cmp	r2, #1
+      e4:      	bxlt	lr
+      e8:      	vldr	s0, [r0]
+      ec:      	subs	r2, r2, #1
+      f0:      	vldmia	r1!, {s2}
+      f4:      	vadd.f32	s0, s0, s0
+      f8:      	vadd.f32	s0, s0, s2
+      fc:      	vstmia	r0!, {s0}
+     100:      	bne	0xe8 <loop+0x8>         @ imm = #-0x20
+     104:      	bx	lr
+
+00000108 <dat>:
+     108:      	nop
+     10c: 78 56 34 12  	.word	0x12345678
+     110: ef be ad de  	.word	0xdeadbeef
+     114:      	nop
+     118:      	bx	lr
+
+0000011c <lit>:
+     11c:      	ldr	r0, [pc]                @ 0x124 <lit+0x8>
+     120:      	b	0x128 <lit+0xc>         @ imm = #0x0
+     124: 0d f0 fe ca  	.word	0xcafef00d
+     128:      	bx	lr
+
+0000012c <ldr2>:
+     12c:      	mov	r1, #4096
+     130:      	ldr	r1, [r0, r1]
+     134:      	ldr	r0, [r0, #0x4]
+     138:      	add	r0, r0, r1
+     13c:      	bx	lr

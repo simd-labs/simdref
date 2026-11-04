@@ -1,0 +1,97 @@
+
+riscv64.o:	file format elf64-littleriscv
+
+Disassembly of section .text:
+
+<sw>:
+ 4625                  	li	a2, 0x9
+ 00a66063              	bltu	a2, a0, 0x2 <sw+0x2>
+
+<.Lpcrel_hi0>:
+ 00000617              	auipc	a2, 0x0
+ 050a                  	slli	a0, a0, 0x2
+ 00060613              	mv	a2, a2
+ 9532                  	add	a0, a0, a2
+ 4108                  	lw	a0, 0x0(a0)
+ 9532                  	add	a0, a0, a2
+ 8502                  	jr	a0
+ 0015851b              	addiw	a0, a1, 0x1
+ 8082                  	ret
+ 0025951b              	slliw	a0, a1, 0x2
+ 8082                  	ret
+ 55555537              	lui	a0, 0x55555
+ 55650513              	addi	a0, a0, 0x556
+ 02a58533              	mul	a0, a1, a0
+ 03f55593              	srli	a1, a0, 0x3f
+ 9101                  	srli	a0, a0, 0x20
+ 9d2d                  	addw	a0, a0, a1
+ 8082                  	ret
+ ff95851b              	addiw	a0, a1, -0x7
+ 8082                  	ret
+ 0055c513              	xori	a0, a1, 0x5
+ 8082                  	ret
+ 0035f513              	andi	a0, a1, 0x3
+ 8082                  	ret
+ 00159513              	slli	a0, a1, 0x1
+ 9d2d                  	addw	a0, a0, a1
+ 8082                  	ret
+ 4015d513              	srai	a0, a1, 0x1
+ 8082                  	ret
+ 0095e513              	ori	a0, a1, 0x9
+ 8082                  	ret
+ 4501                  	li	a0, 0x0
+ 8082                  	ret
+ 40b0053b              	negw	a0, a1
+ 8082                  	ret
+
+<big>:
+ 00000517              	auipc	a0, 0x0
+ 00053503              	ld	a0, 0x0(a0)
+ 8082                  	ret
+
+<fadd3>:
+ 02b577d3              	fadd.d	fa5, fa0, fa1
+ 02c7f553              	fadd.d	fa0, fa5, fa2
+ 8082                  	ret
+
+<bytes8>:
+ 112235b7              	lui	a1, 0x11223
+ 00054603              	lbu	a2, 0x0(a0)
+ 0605                  	addi	a2, a2, 0x1
+ 00c50023              	sb	a2, 0x0(a0)
+ 952e                  	add	a0, a0, a1
+ 34454583              	lbu	a1, 0x344(a0)
+ 0589                  	addi	a1, a1, 0x2
+ 34b50223              	sb	a1, 0x344(a0)
+ 8082                  	ret
+
+<loop>:
+ 00c05063              	blez	a2, 0x9a <loop>
+ 400006b7              	lui	a3, 0x40000
+ f00687d3              	fmv.w.x	fa5, a3
+ 060a                  	slli	a2, a2, 0x2
+ 962e                  	add	a2, a2, a1
+ 00052707              	flw	fa4, 0x0(a0)
+ 0005a687              	flw	fa3, 0x0(a1)
+ 68f77743              	fmadd.s	fa4, fa4, fa5, fa3
+ 0591                  	addi	a1, a1, 0x4
+ 00e52027              	fsw	fa4, 0x0(a0)
+ 0511                  	addi	a0, a0, 0x4
+ fec596e3              	bne	a1, a2, 0xaa <loop+0x10>
+ 8082                  	ret
+
+<dat>:
+ 0001                  	nop
+      c6: 78 56 34 12  	.word	0x12345678
+ 0001                  	nop
+      cc: 01 00        	.short	0x0001
+ 0001                  	nop
+ 8082                  	ret
+
+<mixed>:
+ 00150613              	addi	a2, a0, 0x1
+ 15f5                  	addi	a1, a1, -0x3
+ 02c585b3              	mul	a1, a1, a2
+ 8509                  	srai	a0, a0, 0x2
+ 952e                  	add	a0, a0, a1
+ 8082                  	ret

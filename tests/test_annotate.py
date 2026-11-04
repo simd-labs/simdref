@@ -185,7 +185,8 @@ def test_objdump_byte_continuation_yields_no_record(monkeypatch, line):
 # real tabs, its address, mnemonic, operands and byte column.
 _BYTECOL_REPROS = [
     ("       0: 4770         \tbx\tlr", 0x0, "bx", "lr", "4770"),
-    ("       4: f8d0 c000    \tldr.w\tr12, [r0]", 0x4, "ldr.w", "r12, [r0]", "f8d0 c000"),
+    # A Thumb-2 pair is two little-endian halfwords: the bytes are d0 f8 00 c0.
+    ("       4: f8d0 c000    \tldr.w\tr12, [r0]", 0x4, "ldr.w", "r12, [r0]", "d0 f8 00 c0"),
     (
         "       0: 48 b8 88 77 66 55 44 33 22 11\tmovabsq\t"
         "$0x1122334455667788, %rax # imm = 0x1122334455667788",
