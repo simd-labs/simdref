@@ -54,7 +54,9 @@ def test_zen4_vpcompressd_memory_keeps_measured_cpi(monkeypatch):
     # Issue #57 repro: the ZEN4 row drops the measured 72.50 and the 144 uops.
     rec = _records()["VPCOMPRESSD (M512, K, ZMM)"]
     row = _annotate(monkeypatch, rec, "vpcompressd ZMMWORD PTR [rsi+rcx*4]{k1},zmm0", "ZEN4")
-    assert row["latency"] == 52.0
+    # simdref#65: the pair from the write-only store target is skipped, so
+    # the zmm-to-memory pair (40) is the latency.
+    assert row["latency"] == 40.0
     assert row["cpi"] == 72.5
     assert row["ports"] == ["1*FP01+1*FP12+2*FP23+18*FP45"]
     assert "cpi=72.50" in row["annotation"]

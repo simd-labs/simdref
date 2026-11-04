@@ -688,7 +688,7 @@ def measurement_rows(item) -> list[dict]:
         measurement = details.get("measurement") or {}
         if measurement:
             row = {"uarch": arch, **measurement}
-            lat, cpi = perf_row_values(details)
+            lat, cpi = perf_row_values(details, item.operand_details)
             if lat != "-":
                 row["latency"] = lat
             if cpi != "-" and "TP_loop" not in row:

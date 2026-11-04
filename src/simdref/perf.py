@@ -136,6 +136,38 @@ def latency_cycle_values(latencies: list[dict[str, Any]]) -> list[str]:
     return values
 
 
+def latency_bounds(
+    details: dict[str, Any], operands: list[dict[str, Any]] | None = None
+) -> tuple[str, str] | None:
+    """Whole-instruction latency of one row as ``(low, high)`` cycle strings.
+
+    A pair that starts at a write-only operand (``w`` without ``r`` in
+    *operands*) carries no input dependency, often a stored ``0``, so the
+    pick skips it unless no other pair has data. ``high`` is the largest
+    value over the remaining pairs, memory and address paths included: the
+    figure uops.info and llvm-mca give for the instruction. ``low`` is the
+    smallest lower bound when a pair stores a ``min-max`` range, else
+    ``high``. Returns ``None`` when no pair has a numeric value.
+    """
+    latencies = details.get("latencies") or []
+    write_only = {
+        str(op.get("idx")) for op in operands or [] if op.get("w") == "1" and op.get("r") != "1"
+    }
+    kept = [lat for lat in latencies if str(lat.get("start_op")) not in write_only]
+    spans: list[tuple[str, str]] = []
+    for value in latency_cycle_values(kept) or latency_cycle_values(latencies):
+        low, _, high = str(value).partition("-")
+        high = high or low
+        if _is_numeric(low) and _is_numeric(high):
+            spans.append((low, high))
+    if not spans:
+        return None
+    high_max = max((high for _, high in spans), key=float)
+    if any(low != high for low, high in spans):
+        return min((low for low, _ in spans), key=float), high_max
+    return high_max, high_max
+
+
 def best_numeric(values: list[str]) -> str:
     """Return the smallest numeric string from *values*, or ``"-"`` if empty.
 
@@ -320,17 +352,23 @@ def variant_perf_summary_labeled(
     return best_latency_labeled(arch_details), best_cpi_labeled(arch_details, iclass=iclass)
 
 
-def perf_row_values(details: dict[str, Any]) -> tuple[str, str]:
+def perf_row_values(details: dict[str, Any], operands=None) -> tuple[str, str]:
     """Return the displayed ``(LAT, CPI)`` for one ``arch_details`` entry.
 
     This function is the only place that picks the displayed values of a
     perf row.
 
-    - LAT is the minimum latency over the operand pairs of the row.
+    - LAT is :func:`latency_bounds` over the operand pairs of the row:
+      ``"MIN-MAX"`` when a pair stores a range, else the largest value.
+      *operands* is the record's ``operand_details``.
     - CPI is the rule the CLI uses today: ``TP_loop`` when present, else
       ``TP``, else ``"-"``. ``TP_unrolled`` and ``TP_ports`` are not picked.
     """
-    lat = best_numeric(latency_cycle_values(details.get("latencies") or []))
+    bounds = latency_bounds(details, operands)
+    if bounds is None:
+        lat = best_numeric(latency_cycle_values(details.get("latencies") or []))
+    else:
+        lat = bounds[1] if bounds[0] == bounds[1] else f"{bounds[0]}-{bounds[1]}"
     measurement = details.get("measurement") or {}
     cpi = measurement.get("TP_loop") or measurement.get("TP") or "-"
     return lat, cpi

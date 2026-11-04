@@ -844,7 +844,9 @@ def _llm_result_payload(
             "lat": lat,
             "cpi": cpi,
             "source_kinds": _payload_source_kinds(item.arch_details),
-            "timing": _llm_timing(item.arch_details, perf.record_iclass(item)),
+            "timing": _llm_timing(
+                item.arch_details, perf.record_iclass(item), item.operand_details
+            ),
         }
     return {
         "query": result.title,
@@ -885,7 +887,10 @@ def _intrinsic_timing(conn, intrinsic, cache: dict[str, object] | None = None) -
     """Per-core timing for an intrinsic, merged over its linked instruction forms."""
     linked = linked_instruction_records(None, intrinsic, conn, cache=cache)
     return _merge_timing(
-        [_llm_timing(record.arch_details, perf.record_iclass(record)) for record in linked]
+        [
+            _llm_timing(record.arch_details, perf.record_iclass(record), record.operand_details)
+            for record in linked
+        ]
     )
 
 
@@ -910,11 +915,11 @@ def _llm_instruction_payload(item) -> dict:
         "cpi": cpi,
         "summary": item.summary,
         "source_kinds": _payload_source_kinds(item.arch_details),
-        "timing": _llm_timing(item.arch_details, perf.record_iclass(item)),
+        "timing": _llm_timing(item.arch_details, perf.record_iclass(item), item.operand_details),
     }
 
 
-def _llm_timing(arch_details, iclass: str | None = None) -> dict[str, dict]:
+def _llm_timing(arch_details, iclass: str | None = None, operands=None) -> dict[str, dict]:
     """Return ``{core: {lat, cpi, ports, uops, source_kind}}`` for one instruction.
 
     Latency and CPI are microarchitecture properties, so the payload keys
@@ -934,7 +939,7 @@ def _llm_timing(arch_details, iclass: str | None = None) -> dict[str, dict]:
         details = arch_details.get(core)
         if not isinstance(details, dict):
             continue
-        lat = _per_arch_value(details, _latency_for)
+        lat = _per_arch_value(details, lambda d: _latency_for(d, operands))
         cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
         if lat is None and cpi is None:
             continue
@@ -1136,6 +1141,7 @@ def _print_non_interactive_summary(
         arch_perf_tag,
         collect_ports,
         _fmt_num,
+        fmt_arch_latency,
     )
     from simdref.perf_sources.cores import canonical_core_id, supported_core_ids
 
@@ -1221,7 +1227,8 @@ def _print_non_interactive_summary(
             ports = collect_ports(rec, arch=canonical_arch, archs_used=[canonical_arch])
             ports_str = ",".join(ports) if ports else "-"
             tag = arch_perf_tag(canonical_arch, lat, cpi, kind)
-            typer.echo(f"  {tag}: lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)} ports={ports_str}")
+            lat_text = fmt_arch_latency(rec, canonical_arch, lat)
+            typer.echo(f"  {tag}: lat={lat_text}c cpi={_fmt_num(cpi)} ports={ports_str}")
         else:
             summary = aggregate_perf(rec, mode="avg", include_modeled=False)
             ports = collect_ports(rec, arch=None, archs_used=summary.archs_used)

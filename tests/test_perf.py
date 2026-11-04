@@ -97,7 +97,8 @@ class PerfTests(unittest.TestCase):
         self.assertEqual(best_latency_labeled(arch_details).value, "13-15")
         lat, _ = variant_perf_summary(arch_details)
         self.assertEqual(lat, "13-15")
-        self.assertEqual(_per_arch_value(details, _latency_for), 13.0)
+        # simdref#65: the float view is the upper bound of the stored range.
+        self.assertEqual(_per_arch_value(details, _latency_for), 15.0)
 
     def test_best_numeric_picks_smallest(self):
         self.assertEqual(best_numeric(["5", "3", "7"]), "3")
