@@ -124,6 +124,55 @@ def test_m2_sext_w_compressed_bytes_skip_rv32_only_c_jal(tmp_path):
 
 
 @needs_tools
+def test_rvc_xlen_tie_picks_the_listing_decode(tmp_path):
+    # A 16-bit word decodes to one instruction per xlen (c.jal versus
+    # c.addiw on 0x2001, the Zcf float forms against c.ld/c.sd): the row is
+    # the decode whose printed mnemonic is the line's own, and 2501 sext.w
+    # keeps its rv64 c.addiw.
+    db = _db(
+        [
+            _rv_row("c.addiw", 0xE003, 0x2001),
+            _rv_row("c.jal", 0xE003, 0x2001),
+            _rv_row("c.flw", 0xE003, 0x6000),
+            _rv_row("c.ld", 0xE003, 0x6000),
+            _rv_row("c.fsw", 0xE003, 0xE000),
+            _rv_row("c.sd", 0xE003, 0xE000),
+            _rv_row("c.flwsp", 0xE003, 0x6002),
+            _rv_row("c.ldsp", 0xE003, 0x6002),
+            _rv_row("c.fswsp", 0xE003, 0xE002),
+            _rv_row("c.sdsp", 0xE003, 0xE002),
+        ],
+        tmp_path,
+    )
+    items = [
+        ("jal f1", "37fd"),
+        ("flw fa5,0(a1)", "619c"),
+        ("fsw fa5,0(a0)", "e11c"),
+        ("flw ft0,0(sp)", "6002"),
+        ("fsw ft0,0(sp)", "e002"),
+        ("sext.w a0,a0", "2501"),
+    ]
+    assert _got(identify_lines(items, catalog_path=db)) == [
+        "riscv:c.jal",
+        "riscv:c.flw",
+        "riscv:c.fsw",
+        "riscv:c.flwsp",
+        "riscv:c.fswsp",
+        "riscv:c.addiw",
+    ]
+
+
+@needs_tools
+def test_no_operand_opcode_keeps_its_name():
+    # An operand-less MCInst closes its bracket on the opcode line; the
+    # capture must not keep it ("FENCE_I>" never names a row).
+    from simdref.asm_identity import _probe_lines
+
+    probed = _probe_lines(["fence.i", "c.ebreak"], "riscv64", "att", LLVM_MC)
+    assert [entry["opcode"] for entry in probed] == ["FENCE_I", "C_EBREAK"]
+
+
+@needs_tools
 @pytest.mark.parametrize(
     "line",
     [
