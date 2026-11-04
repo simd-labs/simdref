@@ -43,7 +43,7 @@ _ARCH_CFG: dict[str, dict] = {
     },
     "aarch64": {
         "triple": "aarch64-unknown-linux-gnu",
-        "mattr": "+sve,+sve2,+sve2p1,+sme,+sme2,+sme2p1",
+        "mattr": "+sve,+sve2,+sve2p1,+sme,+sme2,+sme2p1,+lse,+gcs,+aes",
     },
     "arm": {"triple": "armv7-unknown-linux-gnueabihf", "mattr": "+neon"},
     "riscv32": {
@@ -52,7 +52,7 @@ _ARCH_CFG: dict[str, dict] = {
     },
     "riscv64": {
         "triple": "riscv64-unknown-linux-gnu",
-        "mattr": "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs",
+        "mattr": "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs,+zvbb,+zvkb,+zvkned,+zfh",
     },
 }
 _X86_SYNTAX_FLAG = {"att": "-x86-asm-syntax=att", "intel": "-x86-asm-syntax=intel"}
@@ -613,12 +613,15 @@ def _agen_facts(d: dict) -> tuple[str, str, int]:
     return base, idx, d["displen"] * 8
 
 
-def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
+def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False, text: str = "") -> list[Row]:
     """Narrow an iform pool with the uops.info variant attributes stored on
     each row against the XED-decoded facts. Data tables on both sides.
 
     ``imm_unknown``: a fixup placeholder covers the immediate (audit A1), so
-    the immzero split cannot narrow and the caller treats its rows as a tie."""
+    the immzero split cannot narrow and the caller treats its rows as a tie.
+    ``text`` is the source line: the iform and the attributes leave M32_1toN
+    and plain memory rows tied, so the ``{1toN}`` spelling splits them. An
+    empty text cannot split them."""
     cur = list(pool)
 
     def filt(stage_ok, pred):
@@ -657,6 +660,10 @@ def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
         any("zeroing" in row.split_attrs for row in cur),
         lambda a: a.get("zeroing", "1" if d["zero"] else "0") == ("1" if d["zero"] else "0"),
     )
+    if text and len(cur) > 1:
+        picked = [row for row in cur if ("_1to" in row.key) == ("{1to" in text)]
+        if picked:
+            cur = picked
     return cur
 
 
@@ -854,6 +861,11 @@ def identify(
     return results
 
 
+# The catalog has no xlen field, so RV32-only rows (C.JAL, the Zcf loads and
+# stores) are named here. shortcut: upgrade when the ingest keeps definedBy xlen.
+_RV32_ONLY_KEYS = frozenset({"c.jal", "c.flw", "c.fsw", "c.flwsp", "c.fswsp"})
+
+
 def _rv_tiebreak(rows: list[Row], opcode: str) -> list[Row]:
     """Name the row by llvm-mc's own MCInst opcode (upstream data, review F3).
 
@@ -910,6 +922,8 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
                 if entry4[0] == len(raw) * 8 and ((word ^ entry4[2]) & entry4[1] & ~covered) == 0
             ]
             rows = [row for _bits, _mask, _match, row in entries]
+            if doc_base == "RV64":
+                rows = [row for row in rows if row.key.casefold() not in _RV32_ONLY_KEYS]
             if len(rows) > 1:
                 rows = _rv_tiebreak(rows, entry.get("opcode") or "")
             checks = [(mask, row) for _bits, mask, _match, row in entries]
@@ -970,6 +984,9 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
             result.candidates = [row.db_key for row in rows]
 
 
+_ENDBR_BYTES = {"f30f1efa": "ENDBR64", "f30f1efb": "ENDBR32"}
+
+
 def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
     pending = []
     for entry, result in zip(probed, results):
@@ -985,7 +1002,7 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
     if not pending:
         return
     hexes = [_bytes_to_words(entry.get("bytes")).hex() for entry, _result in pending]
-    for (entry, result), facts in zip(pending, _xed_facts(hexes, xed)):
+    for (entry, result), facts, hexed in zip(pending, _xed_facts(hexes, xed), hexes):
         # A fixup placeholder covers the immediate value (audit A1): the
         # pick must not read it, and a row carrying an immzero claim about
         # it would be a guess either way.
@@ -993,12 +1010,17 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
         if "error" in facts:
             result.reason = f"no catalog row (XED {facts['error']})"
             continue
-        pool = catalog.iform_pools.get(facts["iform"], [])
+        # XED decodes ENDBR32/64 as the NOP iform NOP_GPRv_GPRv_0F1E, which no uops.info row carries
+        pool = catalog.iform_pools.get(_ENDBR_BYTES.get(hexed, facts["iform"]), [])
         if not pool:
             result.reason = f"no catalog row (iform {facts['iform']} absent)"
             continue
         try:
-            rows = _x86_pick(pool, facts, imm_unknown=covered) if len(pool) > 1 else pool
+            rows = (
+                _x86_pick(pool, facts, imm_unknown=covered, text=entry.get("text") or "")
+                if len(pool) > 1
+                else pool
+            )
         except ValueError as err:
             result.reason = f"no catalog row ({err})"
             continue
@@ -1098,7 +1120,8 @@ def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
         if len(families) == 1:
             out.append(next(iter(families)))
         elif families:
-            out.append(majority)
+            # the batch majority names the line's family only when the line's own assemblers accept it
+            out.append(majority if majority in families else None)
         else:
             out.append(None)
     return out, majority
@@ -1284,7 +1307,7 @@ def identify_lines(
         if len(families) == 1:
             family = next(iter(families))
         elif families:
-            family = majority
+            family = majority if majority in families else None
         if family is None:
             # no per-line answer: the caller's old document vote says which
             # family's assembler to try (no keep mask; every line is tried)
@@ -1312,8 +1335,8 @@ def identify_lines(
                 chosen, entry = ("x86", "att"), _bytes_entry(byte_hex)
             elif probed[other][index].get("status") == "OK":
                 chosen, entry = other, probed[other][index]
-        elif chosen is None and byte_hex:
-            chosen, entry = ("x86", "att"), _bytes_entry(byte_hex)
+        # A line no assembler accepts gets no byte identity: its byte column is
+        # no evidence for x86 (an ARM32 "bx lr" bytes decode as x86 LOOP).
         if chosen is None or entry is None or entry.get("status") != "OK":
             error = (
                 probed[("x86", "intel")][index].get("error")
