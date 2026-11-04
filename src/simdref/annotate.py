@@ -1078,9 +1078,6 @@ def _annotate_instruction(
         include_modeled=opts.include_modeled,
         perf_summary=summary,
     )
-    if not annotation:
-        return parsed.raw, None
-
     if opts.arch is not None:
         lat_val, cpi_val, _ = arch_perf(record, opts.arch)
         archs_used: list[str] = [opts.arch] if (opts.arch in (record.arch_details or {})) else []
@@ -1121,6 +1118,10 @@ def _annotate_instruction(
     json_record["architecture"] = record.architecture
     json_record["isa"] = record.isa
 
+    if not annotation:
+        # An identified row keeps its record without text; the line stays
+        # bare, no dangling "# " marker.
+        return parsed.raw, json_record
     if opts.block:
         block_line = f"{parsed.indent}# {annotation}"
         return f"{block_line}\n{parsed.raw}", json_record
