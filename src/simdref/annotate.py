@@ -54,14 +54,22 @@ _INSTR_RE = re.compile(
 )
 _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
 # objdump -d line shape: optional whitespace, hex VA, ':', hex bytes, mnemonic ops.
-# A byte column is either one 4- or 8-digit instruction-word token (ARM/RISC-V:
-# "a9bf7bfd", the word value) or a run of 2-digit memory-order byte tokens
-# (x86: "48 8b 45 f8"). objdump pads the byte column with spaces and ends it
-# on a TAB before the mnemonic; requiring that TAB keeps a hex-letter mnemonic
-# with no byte column ("fadd", "addb") out of the byte run (issue #61).
+# A byte column is one or more hex tokens: 2-digit memory-order bytes (x86:
+# "48 8b 45 f8") or 4-/8-digit instruction words (ARM/RISC-V: "a9bf7bfd", the
+# word value; Thumb-2 prints halfword pairs, "f8d0 c000"). Tokens join on one
+# space and the column ends on a TAB before the mnemonic. A one-token column
+# needs padding before that TAB so a hex-letter mnemonic with no byte column
+# ("fadd", "addb") stays out of the byte run (issue #61); a multi-token run
+# cannot be a mnemonic and needs no padding, because llvm-objdump pads the
+# x86 column to a fixed width that a 10-byte encoding fills exactly (issue
+# #65).
 _OBJDUMP_INSTR_RE = re.compile(
     r"^\s*(?P<addr>[0-9a-fA-F]+):\s+"
-    r"(?P<bytes>(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2}){0,9})\s+\t)?"
+    r"(?P<bytes>"
+    r"[0-9a-fA-F]{2}(?: [0-9a-fA-F]{2}){1,14}\s*\t"
+    r"|(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4})(?: (?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4})){1,3}\s*\t"
+    r"|(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2})\s+\t"
+    r")?"
     r"(?P<rest>\S.*?)\s*$"
 )
 # A tail of only hex byte groups is a wrapped encoding's byte-only
