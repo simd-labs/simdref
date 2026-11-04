@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Generate vendored RISC-V source bundles from official upstream clones."""
+"""Generate vendored RISC-V source bundles from official upstream clones.
+
+Clones the upstream repos when they are missing, then writes the bundles.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 from collections import defaultdict
@@ -15,6 +19,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_UDB_ROOT = Path("/tmp/riscv-unified-db")
 DEFAULT_RVV_ROOT = Path("/tmp/riscv-rvv-intrinsic-doc")
 DEFAULT_OUT_DIR = REPO_ROOT / "vendor" / "riscv"
+# Same pinned commit .github/workflows/ci.yml uses; override with RISCV_UDB_COMMIT.
+DEFAULT_UDB_COMMIT = "798d6a54d709a1584e7fa81bd8cc4ec7b7803a42"
 RVV_PROJECT_URL = "https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc"
 UDB_PROJECT_URL = "https://github.com/riscv/riscv-unified-db"
 V_DOC_URL = "https://docs.riscv.org/reference/isa/unpriv/v-st-ext.html"
@@ -44,6 +50,22 @@ LOAD_STORE_RE = re.compile(
 
 def git_rev(repo: Path) -> str:
     return subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+
+
+def ensure_git_repo(root: Path, url: str, ref: str | None = None) -> None:
+    """Clone url into root (or fetch the pinned ref), unless a clone already exists there."""
+    if (root / ".git").exists():
+        return
+    try:
+        if ref is None:
+            subprocess.check_call(["git", "clone", "--depth", "1", url, str(root)])
+        else:
+            root.mkdir(parents=True, exist_ok=True)
+            subprocess.check_call(["git", "-C", str(root), "init", "-q"])
+            subprocess.check_call(["git", "-C", str(root), "fetch", "-q", "--depth", "1", url, ref])
+            subprocess.check_call(["git", "-C", str(root), "checkout", "-q", "FETCH_HEAD"])
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"failed to clone {url} into {root}: {exc}")
 
 
 def extract_yaml_scalar(text: str, key: str) -> str:
@@ -394,6 +416,10 @@ def main() -> None:
     parser.add_argument("--rvv-root", type=Path, default=DEFAULT_RVV_ROOT)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args()
+
+    udb_commit = os.environ.get("RISCV_UDB_COMMIT") or DEFAULT_UDB_COMMIT
+    ensure_git_repo(args.udb_root, UDB_PROJECT_URL, udb_commit)
+    ensure_git_repo(args.rvv_root, RVV_PROJECT_URL)
 
     if not args.udb_root.exists():
         raise SystemExit(f"missing unified-db clone at {args.udb_root}")

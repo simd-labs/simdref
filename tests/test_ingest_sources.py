@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
+import sys
 import tarfile
 import zipfile
 
@@ -83,19 +85,11 @@ def _isolate_network(monkeypatch, *, raise_on_urls=(), responses=None):
     monkeypatch.setattr(src.httpx, "Client", _BlockedClient)
 
 
-def test_riscv_rvv_candidate_fallback(monkeypatch):
-    urls = src.RISCV_RVV_INTRINSICS_CANDIDATE_URLS
-    assert len(urls) >= 2
-    payload = '{"intrinsics": []}'
-    _isolate_network(
-        monkeypatch,
-        raise_on_urls=(urls[0],),
-        responses={urls[1]: payload},
-    )
-    text, version = src.fetch_riscv_rvv_intrinsics_data()
-    assert text == payload
-    assert version.url == urls[1]
-    assert version.version == "live"
+def test_riscv_rvv_candidate_urls_removed():
+    # The dead static intrinsics.json URLs are gone: the vendor script is
+    # now the only source path for RVV data (see #65 item N1).
+    assert not hasattr(src, "RISCV_RVV_INTRINSICS_CANDIDATE_URLS")
+    assert (src._REPO_ROOT / "tools" / "vendor_riscv_sources.py").exists()
 
 
 def test_riscv_unified_db_candidate_fallback(monkeypatch):
@@ -166,12 +160,38 @@ def test_intel_cache_ignored_when_network_works(tmp_path, monkeypatch):
 
 
 def test_rvv_all_sources_unreachable_raises(monkeypatch):
-    _isolate_network(
-        monkeypatch,
-        raise_on_urls=tuple(src.RISCV_RVV_INTRINSICS_CANDIDATE_URLS),
-    )
+    _isolate_network(monkeypatch)
+
+    # The fallback vendor script fails too, so the fetcher must still raise.
+    def fake_run(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(returncode=1, cmd=[sys.executable, "vendor"])
+
+    monkeypatch.setattr(src.subprocess, "run", fake_run)
     with pytest.raises(src.SourceUnavailableError):
         src.fetch_riscv_rvv_intrinsics_data()
+
+
+def test_rvv_fallback_builds_bundle_via_vendor_script(tmp_path, monkeypatch):
+    bundle_path = tmp_path / "vendor" / "riscv" / "rvv_intrinsics_bundle.json"
+    monkeypatch.setattr(src, "LOCAL_RISCV_RVV_INTRINSICS_JSONS", [bundle_path])
+
+    payload = '{"intrinsics": []}'
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        bundle_path.parent.mkdir(parents=True, exist_ok=True)
+        bundle_path.write_text(payload)
+        return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+    monkeypatch.setattr(src.subprocess, "run", fake_run)
+
+    text, version = src.fetch_riscv_rvv_intrinsics_data()
+    assert text == payload
+    assert version.version.startswith("local-json:")
+    # The vendor script must have been run once, with the current interpreter.
+    assert len(calls) == 1
+    assert calls[0] == [sys.executable, str(src._REPO_ROOT / "tools" / "vendor_riscv_sources.py")]
 
 
 def test_unified_db_all_sources_unreachable_raises(monkeypatch):

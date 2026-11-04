@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import io
 import re
+import subprocess
+import sys
 import tarfile
 import zipfile
 from collections.abc import Callable
@@ -53,11 +55,9 @@ RISCV_UNIFIED_DB_CANDIDATE_URLS = [
     "https://raw.githubusercontent.com/riscv-software-src/riscv-unified-db/main/generated/instructions.json",
     "https://raw.githubusercontent.com/riscv-software-src/riscv-unified-db/main/artifacts/instructions.json",
 ]
-RISCV_RVV_INTRINSICS_CANDIDATE_URLS = [
-    "https://raw.githubusercontent.com/riscv-non-isa/riscv-rvv-intrinsic-doc/main/auto-generated/intrinsics.json",
-    "https://raw.githubusercontent.com/riscv-non-isa/riscv-rvv-intrinsic-doc/main/generated/intrinsics.json",
-    "https://raw.githubusercontent.com/riscv-non-isa/riscv-rvv-intrinsic-doc/main/intrinsics.json",
-]
+# The dead static intrinsics.json URLs are gone: upstream no longer ships one.
+# tools/vendor_riscv_sources.py clones the upstream repos and generates the
+# bundle, and is the single source of truth for RVV data (see #65 item N1).
 ARM_ACLE_NEON_DB_PATH = "tools/intrinsic_db/advsimd.csv"
 ARM_ACLE_NEON_CLASSIFICATION_PATH = "tools/intrinsic_db/advsimd_classification.csv"
 ARM_ACLE_MAIN_MD_PATH = "main/acle.md"
@@ -601,19 +601,32 @@ def fetch_riscv_unified_db_data() -> tuple[str, SourceVersion]:
     raise SourceUnavailableError("RISC-V unified-db data is unreachable.")
 
 
+def _build_rvv_bundle_locally() -> None:
+    """Run tools/vendor_riscv_sources.py to clone upstream and write the vendor/riscv bundles."""
+    script = _REPO_ROOT / "tools" / "vendor_riscv_sources.py"
+    try:
+        subprocess.run(
+            [sys.executable, str(script)],
+            check=True,
+            timeout=600,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise SourceUnavailableError(
+            "RISC-V RVV intrinsics data is unreachable: "
+            f"tools/vendor_riscv_sources.py failed: {exc}"
+        ) from exc
+
+
 def fetch_riscv_rvv_intrinsics_data() -> tuple[str, SourceVersion]:
     local = _read_local_text(LOCAL_RISCV_RVV_INTRINSICS_JSONS, "rvv-intrinsic-doc", "local-json")
     if local is not None:
         return local
-    for url in RISCV_RVV_INTRINSICS_CANDIDATE_URLS:
-        try:
-            text = _fetch_text(url)
-            return text, SourceVersion(
-                source="rvv-intrinsic-doc",
-                version="live",
-                fetched_at=now_iso(),
-                url=url,
-            )
-        except Exception:
-            pass
+    # No local bundle: the dead static URLs are gone, so build it by running
+    # the same vendor step CI uses (clones upstream, writes vendor/riscv).
+    _build_rvv_bundle_locally()
+    local = _read_local_text(LOCAL_RISCV_RVV_INTRINSICS_JSONS, "rvv-intrinsic-doc", "local-json")
+    if local is not None:
+        return local
     raise SourceUnavailableError("RISC-V RVV intrinsics data is unreachable.")
