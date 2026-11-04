@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plain install covers queries, the LSP and `isa update`. For
   `simdref build`, run `pip install 'simdref[ingest]'`.
 - All dependencies moved to their latest release.
+- The first-run catalog download prints a progress line on stderr
+  every 5 seconds when stderr is not a terminal (pipes, CI, editor
+  self-install).
 
 ### Fixed
 
