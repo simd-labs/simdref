@@ -56,11 +56,12 @@ _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
 # objdump -d line shape: optional whitespace, hex VA, ':', hex bytes, mnemonic ops.
 # A byte column is either one 4- or 8-digit instruction-word token (ARM/RISC-V:
 # "a9bf7bfd", the word value) or a run of 2-digit memory-order byte tokens
-# (x86: "48 8b 45 f8"). A mnemonic may be all hex digits ("add", "fadd"), so
-# only 2-digit tokens may extend the run.
+# (x86: "48 8b 45 f8"). objdump pads the byte column with spaces and ends it
+# on a TAB before the mnemonic; requiring that TAB keeps a hex-letter mnemonic
+# with no byte column ("fadd", "addb") out of the byte run (issue #61).
 _OBJDUMP_INSTR_RE = re.compile(
     r"^\s*(?P<addr>[0-9a-fA-F]+):\s+"
-    r"(?P<bytes>(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2}){0,9})\s+)?"
+    r"(?P<bytes>(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2}){0,9})\s+\t)?"
     r"(?P<rest>\S.*?)\s*$"
 )
 # objdump -S injects "file:line" comment lines before the instruction block.
@@ -174,12 +175,11 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
         # source keywords ("return", "if", "for", ...) as mnemonics.
         return AsmLine(LineKind.COMMENT, stripped)
 
-    if _LABEL_RE.match(stripped):
-        return AsmLine(LineKind.LABEL, stripped)
-
     # objdump-style input (workflow §1d: `objdump -d ... > file.s`) is a
     # first-class input even without --track-positions: strip the leading
     # "  <hexaddr>:\t" (and any raw bytes column) so the mnemonic parses.
+    # This runs before the label check: a hex-letter address ("b:", "c:")
+    # otherwise reads as a label name (issue #61).
     obj = _parse_objdump_instr(stripped)
     if obj is not None:
         address, rest, _bytehex = obj
@@ -195,6 +195,9 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
                 trailing_comment=comment.strip(),
                 address=address,
             )
+
+    if _LABEL_RE.match(stripped):
+        return AsmLine(LineKind.LABEL, stripped)
 
     head, comment = _split_comment(stripped)
     m = _INSTR_RE.match(head)

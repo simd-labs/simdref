@@ -1242,7 +1242,7 @@ dependencies = [
 [package.optional-dependencies]
 ingest = [
     { name = "pdfplumber" },
-    { name = "pymupdf" },
+    { name = "pymupdf", marker = "platform_python_implementation == 'CPython'" },
 ]
 
 [package.metadata]
@@ -1251,7 +1251,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1,<1" },
     { name = "msgpack", specifier = ">=1.2.4,<2" },
     { name = "pdfplumber", marker = "extra == 'ingest'", specifier = ">=0.11.10,<1" },
-    { name = "pymupdf", marker = "extra == 'ingest'", specifier = ">=2.1,<3" },
+    { name = "pymupdf", marker = "platform_python_implementation == 'CPython' and extra == 'ingest'", specifier = ">=2.1,<3" },
     { name = "pyyaml", specifier = ">=6.0.3,<7" },
     { name = "rapidfuzz", specifier = ">=3.14.6,<4" },
     { name = "rich", specifier = ">=15.0.0,<16" },
