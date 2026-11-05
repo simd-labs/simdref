@@ -13,6 +13,7 @@ from pathlib import Path
 from simdref.display import instruction_markdown, web_deep_link
 from simdref.perf import best_cpi, best_latency, record_iclass
 from simdref.queries import linked_instruction_records
+from simdref.regtable import reg_has, reg_rows, reg_width
 from simdref.search import search_records
 from simdref.storage import (
     SQLITE_PATH,
@@ -135,32 +136,172 @@ _INTEL_SIZE_RE = re.compile(
     rf"({'|'.join(_INTEL_SIZE_BITS)})\s+(?:ptr\s+)?(?:[a-z]{{2,}}:\s*)?\[", re.IGNORECASE
 )
 _ACCUMULATOR = {"al": "r8", "ax": "r16", "eax": "r32", "rax": "r64"}
-# x86 numbers only r8-r15; r0-r7 are ARM registers.
-_GPR_PATTERNS = (
-    (64, r"r(ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5])"),
-    (32, r"e(ax|bx|cx|dx|si|di|bp|sp)|r(8|9|1[0-5])d"),
-    (16, r"(ax|bx|cx|dx|si|di|bp|sp)|r(8|9|1[0-5])w"),
-    (8, r"[a-d][lh]|(si|di|bp|sp)l|r(8|9|1[0-5])b"),
-)
 _STRING_OP_RE = re.compile(r"(movs|cmps|scas|lods|stos|ins|outs)[bwdq]", re.IGNORECASE)
 _X86_VECTOR_WIDTHS = {"xmm": "v128", "ymm": "v256", "zmm": "v512"}
-_X86_VECTOR_RE = re.compile(r"(?:[xyz]mm(?:[12]?[0-9]|3[01])|k[0-7]|mm[0-7])\Z")
-_A64_ARRANGEMENT_RE = re.compile(r"[bdhqsvz](?:[0-9]|[12][0-9]|3[01])\.[0-9]*[bhsdq]\Z")
-_A64_SCALAR_RE = re.compile(r"(?:x(?:[0-9]|[12][0-9]|30)|w(?:[0-9]|[12][0-9]|30)|xzr|wzr)\Z")
-_A64_SCALAR_FP_RE = re.compile(r"[bhsdq](?:[0-9]|[12][0-9]|3[01])\Z")
-# A bare v register is a vector spelling ARM and RISC-V share.
-_A64_VECTOR_BARE_RE = re.compile(r"v(?:[0-9]|[12][0-9]|3[01])\Z")
-# SVE predicate register with an optional /z or /m qualifier ("p0/z").
-_A64_PRED_RE = re.compile(r"p(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
+
 # A single SME ZA tile element ("za0h.b[w12, 0]"), never a multi-tile range
 # ("za0h.b[w12, 0:1]") or a vector-length-grouped array ("za.b[w8, 0, vgx2]").
 _A64_ZA_TILE_RE = re.compile(r"za\d+[vh]?\.[bhsd]\[\s*w\d+\s*,\s*#?\d+\s*\]", re.IGNORECASE)
-# Operand spellings only AArch64 uses: a vector lane ("v1.d[1]"), a predicate
-# with an arrangement ("p0.b"), a predicate counter ("pn8.b"), or a ZA tile.
-_A64_ONLY_RE = re.compile(
-    r"[zv](?:3[01]|[12]?\d)\.\d*[bhsdq]\[\d+\]|pn?(?:1[0-5]|[0-9])\.[bhsdq]|\{?\s*za",
-    re.IGNORECASE,
-)
+# Register spellings come from the generated regtable: names, classes,
+# widths and families from the pinned LLVM's register data. The edge-case
+# rules stay in code: sp/bp/si/di are x86 only with a '%' prefix (the
+# callers below), x86 number registers stop at r8-r15 (r0-r7 are ARM
+# registers, r16-r31 are APX names this matcher does not class), and rip is
+# an address operand, not a general register.
+
+
+def _x86_gpr_width(name: str) -> int | None:
+    """Width of an x86 general-register spelling, or None."""
+    tail = name[1:]
+    if name.startswith("r") and tail[:1].isdigit():
+        index = 0
+        while tail[index : index + 1].isdigit():
+            index += 1
+        if tail[index:] not in ("", "d", "w", "b") or not 8 <= int(tail[:index]) <= 15:
+            return None
+    if name == "rip":
+        return None
+    return reg_width(name, "gpr", "x86")
+
+
+def _x86_vector(name: str) -> bool:
+    """True for an x86 vector, mask or MMX spelling (xmm/ymm/zmm/k/mm)."""
+    return any(
+        klass in ("vec", "k", "mm") and family == "x86" for klass, _width, family in reg_rows(name)
+    )
+
+
+def _element(tail: str) -> str | None:
+    """The element letter of an arrangement tail ("4h" -> "h"), or None."""
+    index = 0
+    while tail[index : index + 1].isdigit():
+        index += 1
+    return tail[index] if index + 1 == len(tail) and tail[index] in "bhsdq" else None
+
+
+def _is_arrangement(name: str) -> bool:
+    """True for an arranged register spelling ("z0.4h", "q0.16b")."""
+    head, dot, tail = name.partition(".")
+    return (
+        bool(dot)
+        and _element(tail) is not None
+        and any(
+            klass in ("fp", "z", "v") and family == "a64"
+            for klass, _width, family in reg_rows(head)
+        )
+    )
+
+
+def _is_a64_scalar(name: str) -> bool:
+    """True for an AArch64 general register (x0-x30, w0-w30, xzr, wzr)."""
+    return reg_has(name, "xw", "a64")
+
+
+def _is_a64_fp(name: str) -> bool:
+    """True for an AArch64 scalar FP register (b0-q31)."""
+    return reg_has(name, "fp", "a64")
+
+
+def _is_bare_v(name: str) -> bool:
+    """True for a bare vector spelling ("v3"); ARM and RISC-V share it."""
+    return any(klass == "v" for klass, _width, _family in reg_rows(name))
+
+
+def _is_pred(name: str) -> bool:
+    """True for an SVE predicate spelling with its qualifier ("p0/z")."""
+    base, slash, qual = name.partition("/")
+    return (not slash or qual in ("z", "m")) and reg_has(base, "p", "a64")
+
+
+def _is_png(name: str) -> bool:
+    """True for an SME predicate counter with its qualifier ("pn8/z")."""
+    base, slash, qual = name.partition("/")
+    return (not slash or qual in ("z", "m")) and reg_has(base, "pn", "a64")
+
+
+def _is_arm32_scalar(name: str) -> bool:
+    """True for an ARM32 scalar spelling (r0-r15, ip, pc)."""
+    return reg_has(name, "arm", "arm32")
+
+
+def _is_rv_scalar(name: str) -> bool:
+    """True for an RISC-V ABI scalar spelling.
+
+    s0-s11 also name AArch64 scalar FP registers; sp and fp are shared ARM
+    spellings and only take the weak votes below.
+    """
+    return name not in ("sp", "fp") and reg_has(name, "rvabi", "riscv")
+
+
+def _reg_number(text: str, limit: int) -> str:
+    """The register-number prefix of text: canonical 0 to limit, or ''."""
+    digits = ""
+    while text[len(digits) : len(digits) + 1].isdigit():
+        digits += text[len(digits)]
+    canonical = digits == "0" or not digits.startswith("0")
+    return digits if digits and len(digits) <= 2 and canonical and int(digits) <= limit else ""
+
+
+def _z_range_numbers(member: str) -> list[int]:
+    """The z-register indices of a Z-range member ("z0.b-z3.b").
+
+    Scans like the old end pattern: a spelled z register with an element can
+    start anywhere in the member.
+    """
+    numbers = []
+    index = 0
+    while index < len(member):
+        if member[index] == "z":
+            tail = member[index + 1 :]
+            number = _reg_number(tail, 31)
+            if number and tail[len(number) : len(number) + 1] == ".":
+                rest = tail[len(number) + 1 :]
+                digits = ""
+                while rest[len(digits) : len(digits) + 1].isdigit():
+                    digits += rest[len(digits)]
+                if rest[len(digits) : len(digits) + 1] in ("b", "h", "s", "d", "q"):
+                    numbers.append(int(number))
+                    index += len(number) + len(digits) + 3
+                    continue
+        index += 1
+    return numbers
+
+
+def _is_a64_only_operand(name: str) -> bool:
+    """True for an operand spelling only AArch64 uses: a vector lane
+    ("v1.d[1]"), a predicate with an arrangement ("p0.b", "pn8.b"), or a
+    ZA tile operand. Matches a prefix, like the parser's operand scan.
+    """
+    if name.removeprefix("{").lstrip().startswith("za"):
+        return True
+    head, dot, tail = name.partition(".")
+    number = _reg_number(head[1:], 31) if head[:1] in ("z", "v") else ""
+    if dot and number and head[1:] == number:
+        digits = ""
+        while tail[len(digits) : len(digits) + 1].isdigit():
+            digits += tail[len(digits)]
+        rest = tail[len(digits) :]
+        if rest[:1] in ("b", "h", "s", "d", "q") and rest[1:].startswith("["):
+            inner = rest[2:]
+            end = 0
+            while inner[end : end + 1].isdigit():
+                end += 1
+            if end and inner[end : end + 1] == "]":
+                return True
+    if name[:1] == "p":
+        rest = name[1:]
+        number = _reg_number(rest.removeprefix("n"), 15)
+        if number and rest.removeprefix("n")[len(number) : len(number) + 2] in (
+            ".b",
+            ".h",
+            ".s",
+            ".d",
+            ".q",
+        ):
+            return True
+    return False
+
+
 # shortcut: this vote still picks a wrong row for `ptest p0, p1.b` (x86 PTEST),
 # `ptrue p0.b` (predicate-counter PTRUE) and `rev p0.b, p0.b` (GPR REV),
 # upgrade when the planned llvm-mc lookup replaces this vote.
@@ -191,12 +332,6 @@ def _logical_immediate(value: int, bits: int) -> bool:
     return False
 
 
-# SME predicate-as-counter register with an optional qualifier ("pn8/z").
-_A64_PNG_RE = re.compile(r"pn(?:1[0-5]|[0-9])(?:/[zm])?\Z", re.IGNORECASE)
-# The register spelled at either end of a Z-range member ("z0.b-z3.b").
-_A64_RANGE_END_RE = re.compile(r"z(?:3[01]|[12]?\d)\.\d*[bhsdq]", re.IGNORECASE)
-
-
 def _brace_list_class(inner: str) -> str | None:
     """The class of a whole-brace register list, by its shape, or None.
 
@@ -213,11 +348,10 @@ def _brace_list_class(inner: str) -> str | None:
     if count == 1:
         member = members[0]
         if "-" in member:
-            ends = _A64_RANGE_END_RE.findall(member)
-            if len(ends) == 2:
-                numbers = [int(re.match(r"z(\d+)", end, re.IGNORECASE).group(1)) for end in ends]
+            numbers = _z_range_numbers(member)
+            if len(numbers) == 2:
                 count = numbers[1] - numbers[0] + 1
-        elif _A64_ARRANGEMENT_RE.fullmatch(member):
+        elif _is_arrangement(member):
             return _av_class(member)
     return f"av{count}" if count in (2, 4) else "av"
 
@@ -232,18 +366,19 @@ def _av_class(arrangement: str) -> str:
     """
     if not arrangement.casefold().startswith("z"):
         return "av"
-    element = re.search(r"\.(\d*)([bhsdq])", arrangement, re.IGNORECASE)
-    return f"av{element.group(2).casefold()}" if element else "av"
+    index = arrangement.find(".")
+    while index != -1:
+        rest = arrangement[index + 1 :]
+        digits = 0
+        while rest[digits : digits + 1].isdigit():
+            digits += 1
+        letter = rest[digits : digits + 1]
+        if letter in ("b", "h", "s", "d", "q"):
+            return f"av{letter}"
+        index = arrangement.find(".", index + 1)
+    return "av"
 
 
-_ARM32_SCALAR_RE = re.compile(r"(?:r(?:[0-9]|1[0-5])|ip|pc)\Z")
-# ARM has "sp" and "fp"; RISC-V shares both spellings and adds these scalar aliases.
-_RISCV_SCALARS = frozenset(
-    {f"a{i}" for i in range(8)}
-    | {f"s{i}" for i in range(12)}
-    | {f"t{i}" for i in range(7)}
-    | {"zero", "ra", "gp", "tp"}
-)
 # Shift/extend keywords that modify the last register operand. As a trailing
 # ", <kw> ..." piece they belong to that operand, not to a new one.
 _ASM_SHIFT_KEYWORDS = frozenset(
@@ -387,39 +522,39 @@ def _classify_line(
         op = raw.strip()
         name = op.lstrip("*").lstrip("%").casefold()
         prefixed = op.lstrip("*").startswith("%")
-        reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
+        reg = _x86_gpr_width(name)
         if op.startswith("$"):
             strong.add("x86")
-        elif _X86_VECTOR_RE.fullmatch(name):
+        elif _x86_vector(name):
             strong.add("x86")
         elif prefixed and reg:
             strong.add("x86")
         elif (bare := re.fullmatch(r"\{([^}]*)\}", op)) and (
-            _A64_ARRANGEMENT_RE.fullmatch(
+            _is_arrangement(
                 re.split(r"[,\-]", bare.group(1).strip().casefold(), maxsplit=1)[0].strip()
             )
             or bare.group(1).strip().casefold().startswith("za")
         ):
             # An SVE register list ("{z0.b}"), range or ZA tile list votes AArch64.
             strong.add("arm")
-        elif _A64_PNG_RE.fullmatch(name):
+        elif _is_png(name):
             strong.add("arm")
         elif not name or "(" in op or "[" in op or "{" in op:
             continue
-        elif _A64_ARRANGEMENT_RE.fullmatch(name) or _A64_SCALAR_RE.fullmatch(name) or name == "wsp":
+        elif _is_arrangement(name) or _is_a64_scalar(name) or name == "wsp":
             strong.add("arm")
-        elif _ARM32_SCALAR_RE.fullmatch(name):
+        elif _is_arm32_scalar(name):
             strong.add("arm")
-        elif _A64_SCALAR_FP_RE.fullmatch(name):
+        elif _is_a64_fp(name):
             # s0-s11 are also RISC-V saved registers: a weak vote there, and
             # the mnemonic's catalog rows arbitrate between arm and riscv.
-            if name in _RISCV_SCALARS:
+            if _is_rv_scalar(name):
                 weak.update(("arm", "riscv"))
             else:
                 strong.add("arm")
-        elif name in _RISCV_SCALARS:
+        elif _is_rv_scalar(name):
             strong.add("riscv")
-        elif _A64_VECTOR_BARE_RE.fullmatch(name):
+        elif _is_bare_v(name):
             weak.update(("arm", "riscv"))
         elif name in ("sp", "fp"):
             weak.update(("arm", "riscv"))
@@ -487,9 +622,9 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         if list_match:
             # The class of a brace list is decided by its shape.
             return _brace_list_class(list_match.group(1).strip())
-        if _A64_PNG_RE.fullmatch(name):
+        if _is_png(name):
             return "png"
-        if _A64_PRED_RE.fullmatch(name):
+        if _is_pred(name):
             return "pred"
     if "{" in op:
         op = re.sub(r"\{[^}]*\}", "", op).strip()
@@ -501,12 +636,12 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
         if "[" in op and "arm" in arch:
             return _a64_address_class(op)
         return "m"
-    reg = next((w for w, pattern in _GPR_PATTERNS if re.fullmatch(pattern, name)), None)
+    reg = _x86_gpr_width(name)
     # In AT&T a bare "sp" is the ARM stack pointer or a symbol, never the r16.
     if reg and (intel or op.lstrip("*").startswith("%") or name not in ("sp", "bp", "si", "di")):
         if intel or arch.isdisjoint({"arm", "riscv"}):
             return f"r{reg}"
-    if _X86_VECTOR_RE.fullmatch(name):
+    if _x86_vector(name):
         if name[0] == "k":
             return "k"
         if name[0] == "m":
@@ -515,19 +650,19 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if not intel and op.startswith("*"):
         return "m"
     if "arm" in arch:
-        if _A64_ARRANGEMENT_RE.fullmatch(name):
+        if _is_arrangement(name):
             return _av_class(name)
-        if _A64_VECTOR_BARE_RE.fullmatch(name):
+        if _is_bare_v(name):
             return "av"
-        if _A64_SCALAR_FP_RE.fullmatch(name):
+        if _is_a64_fp(name):
             return name[0]
-        if _A64_SCALAR_RE.fullmatch(name):
+        if _is_a64_scalar(name):
             return {"xzr": "xzr", "wzr": "wzr"}.get(name, name[0])
         if name in ("sp", "wsp", "fp", "lr"):
             return {"sp": "sp", "wsp": "wsp"}.get(name, "x")
-        if _ARM32_SCALAR_RE.fullmatch(name):
+        if _is_arm32_scalar(name):
             return "ar"
-    if "riscv" in arch and (name in _RISCV_SCALARS or _A64_VECTOR_BARE_RE.fullmatch(name)):
+    if "riscv" in arch and (_is_rv_scalar(name) or _is_bare_v(name)):
         return "rv"
     if "x86" in arch or not arch:
         return "rel" if intel else "m"
@@ -833,9 +968,7 @@ def _zreg(classes: list) -> str:
 def _a64_gpr_bits(name: str) -> int | None:
     """The width of a general-register spelling (sp, fp, lr included), or None."""
     bits = {"sp": 64, "fp": 64, "lr": 64, "xzr": 64, "wsp": 32, "wzr": 32}
-    return bits.get(name) or (
-        (64, 32)[name.startswith("w")] if _A64_SCALAR_RE.fullmatch(name) else None
-    )
+    return bits.get(name) or ((64, 32)[name.startswith("w")] if _is_a64_scalar(name) else None)
 
 
 def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
@@ -856,20 +989,20 @@ def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
         return None
     parts, _marks = _split_asm_operands(operands)
     names = [piece.strip().lstrip("*").casefold() for piece in parts]
-    if any(_ARM32_SCALAR_RE.fullmatch(name) for name in names):
+    if any(_is_arm32_scalar(name) for name in names):
         return None
     mnemonic = mnemonic.casefold()
     if mnemonic not in ("mov", "cmp", "cmn", "tst"):
         return None
-    if "arm" not in arch and not any(_A64_ONLY_RE.match(name) for name in names):
+    if "arm" not in arch and not any(_is_a64_only_operand(name) for name in names):
         return None
     if mnemonic == "mov":
         # MOVA: one ZA tile element, a governing predicate, one Z register.
         if (
             len(parts) == 3
             and any(_A64_ZA_TILE_RE.fullmatch(name) for name in names)
-            and any(_A64_PRED_RE.fullmatch(name) for name in names)
-            and any(_A64_ARRANGEMENT_RE.fullmatch(name) for name in names)
+            and any(_is_pred(name) for name in names)
+            and any(_is_arrangement(name) for name in names)
         ):
             return ("mova", lambda classes: classes)
         if len(parts) == 2:
