@@ -266,3 +266,23 @@ def test_b6_identify_lines_gives_the_foreign_line_no_x86_row(tmp_path):
     db = _db([_x86_row("ADD (R16, R16, I16)", iform)], tmp_path)
     items = [(text, None) for text in X86_BATCH] + [("add x0, x1, x2", "20 00 02 8b")]
     assert not _got(identify_lines(items, catalog_path=db))[-1].startswith("x86:")
+
+
+def test_rv32_decode_mattr_guard_terminates(tmp_path):
+    # A tool error that names an extension absent from the -mattr list must
+    # not spin the shrink loop: the guard breaks when no token drops.
+    import time
+
+    import simdref.asm_identity as ai
+
+    fake = tmp_path / "fake-llvm-mc"
+    fake.write_text(
+        "#!/bin/sh\necho \"error: 'Znotanext' is only supported for 'rv64'\" >&2\nexit 0\n"
+    )
+    fake.chmod(0o755)
+    ai._RV32_MATTR_CACHE.clear()
+    start = time.monotonic()
+    result = ai._rv32_decode_mattr(str(fake))
+    elapsed = time.monotonic() - start
+    assert elapsed < 1.0, f"shrink loop spun for {elapsed:.2f}s"
+    assert result == ai._ARCH_CFG["riscv64"]["mattr"]

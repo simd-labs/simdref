@@ -68,11 +68,25 @@ _ERR_RE = re.compile(r"^<stdin>:(\d+):(\d+): (?:error|warning): (.*)$", re.M)
 # The encoding comment llvm-mc appends ends its echo line. Requiring the end
 # keeps a string echo (".ascii \" # encoding: [0x90]\"") from faking bytes.
 _ENC_RE = re.compile(r"encoding: \[([^\]]*)\]\s*$")
-# The MCInst dump is a comment continuation line. Requiring the line start
-# keeps a string echo from faking the opcode (RV tie-break input). The name
-# stops at whitespace or the closing bracket: an operand-less MCInst closes
-# on its opcode line ("# <MCInst #1 FENCE_I>").
-_INST_RE = re.compile(r"^\s*# <MCInst #\d+ ([^\s>]+)")
+
+
+def _mcinst_opcode(line: str) -> str | None:
+    """The MCInst opcode on an llvm-mc -show-inst comment line, else None.
+
+    The stripped line must start with the marker, so a string echo cannot
+    fake an opcode (RV tie-break input). The name stops at whitespace or the
+    closing bracket: an operand-less MCInst closes on its opcode line
+    ("# <MCInst #1 FENCE_I>").
+    """
+    s = line.strip()
+    if not s.startswith("# <MCInst #"):
+        return None
+    fields = s[len("# <MCInst #") :].split()
+    if len(fields) > 1 and fields[0].isdigit():
+        return fields[1].rstrip(">") or None
+    return None
+
+
 _CONT_RE = re.compile(r"^\s+(#|//|@|;)")
 _LABEL_RE = re.compile(r"^[\w.$]+:")
 
@@ -182,9 +196,9 @@ def _parse_echo_blocks(listing: str) -> list[tuple[str, str | None, str | None, 
             blocks.append([line.rstrip(), None, None, mode])
         block = blocks[-1]
         if block[1] is None:
-            match = _INST_RE.search(line)
-            if match:
-                block[1] = match.group(1)
+            opcode = _mcinst_opcode(line)
+            if opcode is not None:
+                block[1] = opcode
         if block[2] is None:
             match = _ENC_RE.search(line)
             if match:
@@ -872,7 +886,18 @@ def identify(
 # whose printed mnemonic equals the line's own text mnemonic (objdump prints
 # the expanded or alias name too: jal, flw, sext.w). Both or neither match
 # keeps the rv64 result (the current default).
-_RV64_ONLY_RE = re.compile(r"'([^']+)' is only supported for 'rv64'")
+def _rv64_only_ext(line: str) -> str | None:
+    """The extension name in an "'X' is only supported for 'rv64'" error line.
+
+    Returns None for any other line. The name sits after the last single quote
+    before the fixed tail, so a prefix like "error: ..." is ignored.
+    """
+    head, sep, _tail = line.partition("' is only supported for 'rv64'")
+    if not sep:
+        return None
+    return head.rpartition("'")[2] or None
+
+
 _RV32_MATTR_CACHE: dict[tuple[str, str], str] = {}
 
 
@@ -900,14 +925,19 @@ def _rv32_decode_mattr(llvm_mc: str) -> str:
                 text=True,
             )
             drop = {
-                match.group(1).casefold()
+                name.casefold()
                 for line in run.stderr.splitlines()
-                for match in [_RV64_ONLY_RE.search(line)]
-                if match
+                for name in [_rv64_only_ext(line)]
+                if name
             }
             if not drop:
                 break
-            tokens = [token for token in tokens if token.lstrip("+").casefold() not in drop]
+            remaining = [token for token in tokens if token.lstrip("+").casefold() not in drop]
+            # guard: the tool names an extension absent from the token list,
+            # so nothing shrank; break here or the loop spins forever
+            if len(remaining) == len(tokens):
+                break
+            tokens = remaining
         cached = _RV32_MATTR_CACHE[(llvm_mc, base)] = ",".join(tokens)
     return cached
 
@@ -920,9 +950,9 @@ def _parse_disasm(listing: str) -> dict[bytes, tuple[str, str]]:
     found: dict[bytes, tuple[str, str]] = {}
     raw = None
     for line in listing.splitlines():
-        match = _INST_RE.search(line)
-        if match is not None and raw is not None:
-            found[raw] = (found[raw][0], match.group(1))
+        opcode = _mcinst_opcode(line)
+        if opcode is not None and raw is not None:
+            found[raw] = (found[raw][0], opcode)
             continue
         if not line.strip() or _CONT_RE.match(line):
             continue
