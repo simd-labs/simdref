@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import html
 import io
 import re
 import subprocess
 import sys
 import tarfile
+import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -100,6 +103,16 @@ LOCAL_ARM_A64_ARCHIVES = [
     _REPO_ROOT / "vendor" / "arm" / "aarchmrs_bsd.tar.gz",
     _REPO_ROOT / "vendor" / "arm" / "aarchmrs-bsd.tar.gz",
 ]
+# A64 ISA XML release (Exploration Tools). The XML <desc><brief> paragraphs
+# are the one-line summaries for rows with no sourced text (issue #65 m1).
+ARM_A64_XML_URL = (
+    "https://developer.arm.com/-/cdn-downloads/permalink/Exploration-Tools-A64-ISA/"
+    "ISA_A64/ISA_A64_xml_A_profile-2026-06.tar.gz"
+)
+ARM_A64_XML_SIZE = 34182920
+ARM_A64_XML_SHA256 = "63a01a1696483bbe2edfef9e0f0cd053d6c1c619ec0587876cb7a60bb344f354"
+ARM_A64_XML_CACHE = _REPO_ROOT / "vendor" / "arm" / Path(ARM_A64_XML_URL).name
+LOCAL_ARM_A64_XML_ARCHIVES = [ARM_A64_XML_CACHE]
 LOCAL_RISCV_UNIFIED_DB_JSONS = [
     _REPO_ROOT / "vendor" / "riscv" / "unified_db_bundle.json",
     _REPO_ROOT / "vendor" / "riscv" / "unified_db_instructions.json",
@@ -497,6 +510,136 @@ def refresh_local_arm_a64_archive(
     return target
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def refresh_local_arm_a64_xml_archive(
+    on_progress: Callable[[int, int | None], None] | None = None,
+) -> Path:
+    """Download the pinned A64 ISA XML release into ``vendor/arm/``.
+
+    The cached file must match the pinned size and sha256; a download that
+    fails either check is deleted and raises so the cache never keeps a
+    partial or a swapped file.
+    """
+    target = ARM_A64_XML_CACHE
+    if target.exists() and target.stat().st_size == ARM_A64_XML_SIZE:
+        if _sha256(target) == ARM_A64_XML_SHA256:
+            return target
+    tmp = target.with_suffix(target.suffix + ".part")
+    with httpx.Client(follow_redirects=True, timeout=600.0) as client:
+        with client.stream("GET", ARM_A64_XML_URL) as response:
+            response.raise_for_status()
+            total_header = response.headers.get("Content-Length")
+            total = int(total_header) if total_header and total_header.isdigit() else None
+            target.parent.mkdir(parents=True, exist_ok=True)
+            downloaded = 0
+            with tmp.open("wb") as fh:
+                for chunk in response.iter_bytes(chunk_size=1 << 20):
+                    fh.write(chunk)
+                    downloaded += len(chunk)
+                    if on_progress is not None:
+                        on_progress(downloaded, total)
+    if tmp.stat().st_size != ARM_A64_XML_SIZE or _sha256(tmp) != ARM_A64_XML_SHA256:
+        tmp.unlink(missing_ok=True)
+        raise SourceUnavailableError("A64 ISA XML download failed the pinned size or sha256 check.")
+    tmp.replace(target)
+    return target
+
+
+def a64xml_briefs_from_xml(text: str) -> dict[str, str]:
+    """``<desc><brief>`` text of one A64 ISA XML file, keyed by its names.
+
+    Keys are the instruction id, the title and heading without the ``-- A64``
+    suffix, and every ``docvar mnemonic`` value, uppercased and with the XML's
+    entity spelling kept (``CBB&lt;cc&gt;`` -> ``CBB&LT;CC&GT;``) so the map
+    reproduces the release's own alias names.
+    """
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        # The release directory also holds .dtd and .css members that are
+        # not standalone XML; they carry no briefs.
+        return {}
+    if root.tag != "instructionsection":
+        return {}
+    para = root.find("./desc/brief/para")
+    if para is None:
+        return {}
+    brief = " ".join("".join(para.itertext()).split())
+    if not brief:
+        return {}
+    title = (root.get("title") or "").strip()
+    if title.endswith("A64"):
+        head = title[: -len("A64")].rstrip()
+        if head.endswith("--"):
+            title = head[:-2].rstrip()
+    names = [
+        root.get("id") or "",
+        title,
+        (root.findtext("heading") or "").strip(),
+    ]
+    names += [
+        docvar.get("value") or ""
+        for docvar in root.iter("docvar")
+        if docvar.get("key") == "mnemonic"
+    ]
+    keys = {html.escape(name, quote=False).upper() for name in names if name.strip()}
+    return dict.fromkeys(keys, html.escape(brief, quote=False))
+
+
+def parse_a64xml_briefs(archive: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """A64 ISA XML briefs keyed by file name and, unambiguous ones, by name.
+
+    Only the release directory the pinned URL names is read, so a later
+    release never mixes its files in. Returns ``(by_file, by_name)``.
+    ``by_file`` keys each brief by its XML file name, uppercased; a row's
+    ``operation_id`` joins here. ``by_name`` keys a name only when every XML
+    file naming it gives the same brief. A name several files describe
+    differently carries no entry, so no lookup ever falls back to file order.
+    """
+    release = Path(ARM_A64_XML_URL).name.removesuffix(".tar.gz")
+    prefix = f"{release}/"
+    by_file: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    conflicts: set[str] = set()
+    with tarfile.open(archive, "r:*") as tf:
+        names = sorted(
+            member.name
+            for member in tf.getmembers()
+            if member.name.startswith(prefix) and "/" not in member.name[len(prefix) :]
+        )
+        for name in names:
+            fh = tf.extractfile(name)
+            if fh is None:
+                continue
+            briefs = a64xml_briefs_from_xml(fh.read().decode("utf-8"))
+            if not briefs:
+                continue
+            # One file, one brief; every key of the file maps to it.
+            brief = next(iter(briefs.values()))
+            by_file.setdefault(name[len(prefix) :].removesuffix(".xml").upper(), brief)
+            for key in briefs:
+                if key in conflicts:
+                    continue
+                if by_name.setdefault(key, brief) != brief:
+                    del by_name[key]
+                    conflicts.add(key)
+    return by_file, by_name
+
+
+def read_local_arm_a64_xml_briefs() -> tuple[dict[str, str], dict[str, str]]:
+    for archive in LOCAL_ARM_A64_XML_ARCHIVES:
+        if archive.exists():
+            return parse_a64xml_briefs(archive)
+    return {}, {}
+
+
 def refresh_local_arm_intrinsics_bundle(
     on_progress: Callable[[int, int], None] | None = None,
 ) -> list[Path]:
@@ -567,6 +710,11 @@ def fetch_arm_acle_data() -> tuple[str, SourceVersion]:
 
 
 def fetch_arm_a64_data() -> tuple[str, SourceVersion]:
+    try:
+        # Best effort: rows without sourced text take the A64 XML briefs.
+        refresh_local_arm_a64_xml_archive()
+    except Exception:
+        pass
     local = _read_local_text(LOCAL_ARM_A64_JSONS, "arm-a64", "local-json")
     if local is not None:
         return local

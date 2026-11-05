@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from simdref.ingest_sources import read_local_arm_a64_xml_briefs
 from simdref.models import InstructionRecord
 
 
@@ -115,6 +116,27 @@ def _acle_instruction_summaries() -> dict[str, str]:
     return {}
 
 
+@lru_cache(maxsize=1)
+def _a64xml_summaries() -> tuple[dict[str, str], dict[str, str]]:
+    """A64 ISA XML ``<desc><brief>`` one-liners by file name and by name."""
+    by_file, by_name = read_local_arm_a64_xml_briefs()
+    return (
+        {key: html.unescape(text) for key, text in by_file.items()},
+        {key: html.unescape(text) for key, text in by_name.items()},
+    )
+
+
+def _a64xml_brief(mnemonic: str, operation_id: str = "") -> str:
+    """The brief a row earns: its ``operation_id`` file's, else its name's.
+
+    The name fallback exists only where every XML file naming the mnemonic
+    gives the same brief; conflicting briefs give none, never a file-order
+    pick (issue #65 m1 round 2).
+    """
+    by_file, by_name = _a64xml_summaries()
+    return by_file.get(operation_id.strip().upper()) or by_name.get(mnemonic.strip().upper()) or ""
+
+
 # A64 condition-code spellings for B.cond with their encoded cond field value
 # (Arm ARM cond field, B.cond bits 3:0; llvm-mc -show-inst prints the same
 # value as the Bcc immediate). The hs/lo spellings share the cs/cc values, as
@@ -141,7 +163,7 @@ _CONDITION_CODES: tuple[tuple[str, int], ...] = (
 )
 
 
-def _generated_summary(mnemonic: str, isa: list[str] | None = None) -> str:
+def _generated_summary(mnemonic: str, isa: list[str] | None = None, operation_id: str = "") -> str:
     core = mnemonic.strip().upper()
     if not core:
         return "Arm instruction."
@@ -154,6 +176,9 @@ def _generated_summary(mnemonic: str, isa: list[str] | None = None) -> str:
     title = _AARCHMRS_TITLES.get(core)
     if title:
         return f"{title}."
+    brief = _a64xml_brief(core, operation_id)
+    if brief:
+        return f"{brief}."
     if core.startswith("ADD"):
         return "Add operands."
     if core.startswith("SUB"):
@@ -781,19 +806,24 @@ def _alias_children(
         if not rendered:
             continue
         head, _, tail = rendered.partition(" ")
-        mnemonic_match = re.match(r"[A-Z][A-Z0-9]*", head.strip().upper())
-        if not mnemonic_match:
+        up = head.strip().upper()
+        end = 0
+        while end < len(up) and up[end].isalnum():
+            end += 1
+        if not end or not up[0].isalpha():
             continue
-        mnemonic = mnemonic_match.group(0)
+        mnemonic = up[:end]
         operand_form = tail.strip()
         form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
         row_isa = list(isa)
         for tag in _alias_feature_tags(alias.get("condition")):
             if tag not in row_isa:
                 row_isa.append(tag)
-        # The target's title when the data has one; else the alias's own name,
-        # because a generated "Msr is an Arm instruction." would name the target.
-        summary = target_title or _generated_summary(mnemonic, row_isa)
+        # Sourced text (the target's title) keeps the row byte-identical;
+        # the alias's own A64 XML brief fills only generated text, ranked
+        # after the ACLE line like the walk path (#65 m1 round 2).
+        alias_opid = str(alias.get("operation_id") or "").strip()
+        summary = target_title or _generated_summary(mnemonic, row_isa, alias_opid)
         if not summary.endswith("."):
             summary += "."
         key = (mnemonic, form.casefold())
@@ -807,7 +837,7 @@ def _alias_children(
             key = (mnemonic, form.casefold())
         seen_keys[key] = (mask, match)
         metadata = {
-            "operation_id": str(alias.get("operation_id") or "").strip(),
+            "operation_id": alias_opid,
             "instruction_set": group_path[0] if group_path else "A64",
             "group": group_path[-1] if group_path else "",
         }
@@ -875,8 +905,9 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             isa = _infer_aarchmrs_isa(group_path)
             operand_form = tail.strip()
             form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
+            node_opid = str(node.get("operation_id") or "").strip()
             metadata = {
-                "operation_id": str(node.get("operation_id") or "").strip(),
+                "operation_id": node_opid,
                 "instruction_set": group_path[0] if group_path else "A64",
                 "group": group_path[-1] if group_path else "",
             }
@@ -924,7 +955,9 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 form = f"{form} [{str(node.get('name') or '').strip()}]"
                 key = (mnemonic, form.casefold())
             seen_keys[key] = (enc_mask, enc_match)
-            summary = _aarchmrs_title(node, operations) or _generated_summary(mnemonic, isa)
+            summary = _aarchmrs_title(node, operations) or _generated_summary(
+                mnemonic, isa, node_opid
+            )
             if not summary.endswith("."):
                 summary += "."
             records.append(

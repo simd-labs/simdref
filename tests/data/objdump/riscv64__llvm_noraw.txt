@@ -1,0 +1,97 @@
+
+riscv64.o:	file format elf64-littleriscv
+
+Disassembly of section .text:
+
+0000000000000000 <sw>:
+       0:      	li	a2, 0x9
+       2:      	bltu	a2, a0, 0x2 <sw+0x2>
+
+0000000000000006 <.Lpcrel_hi0>:
+       6:      	auipc	a2, 0x0
+       a:      	slli	a0, a0, 0x2
+       c:      	mv	a2, a2
+      10:      	add	a0, a0, a2
+      12:      	lw	a0, 0x0(a0)
+      14:      	add	a0, a0, a2
+      16:      	jr	a0
+      18:      	addiw	a0, a1, 0x1
+      1c:      	ret
+      1e:      	slliw	a0, a1, 0x2
+      22:      	ret
+      24:      	lui	a0, 0x55555
+      28:      	addi	a0, a0, 0x556
+      2c:      	mul	a0, a1, a0
+      30:      	srli	a1, a0, 0x3f
+      34:      	srli	a0, a0, 0x20
+      36:      	addw	a0, a0, a1
+      38:      	ret
+      3a:      	addiw	a0, a1, -0x7
+      3e:      	ret
+      40:      	xori	a0, a1, 0x5
+      44:      	ret
+      46:      	andi	a0, a1, 0x3
+      4a:      	ret
+      4c:      	slli	a0, a1, 0x1
+      50:      	addw	a0, a0, a1
+      52:      	ret
+      54:      	srai	a0, a1, 0x1
+      58:      	ret
+      5a:      	ori	a0, a1, 0x9
+      5e:      	ret
+      60:      	li	a0, 0x0
+      62:      	ret
+      64:      	negw	a0, a1
+      68:      	ret
+
+000000000000006a <big>:
+      6a:      	auipc	a0, 0x0
+      6e:      	ld	a0, 0x0(a0)
+      72:      	ret
+
+0000000000000074 <fadd3>:
+      74:      	fadd.d	fa5, fa0, fa1
+      78:      	fadd.d	fa0, fa5, fa2
+      7c:      	ret
+
+000000000000007e <bytes8>:
+      7e:      	lui	a1, 0x11223
+      82:      	lbu	a2, 0x0(a0)
+      86:      	addi	a2, a2, 0x1
+      88:      	sb	a2, 0x0(a0)
+      8c:      	add	a0, a0, a1
+      8e:      	lbu	a1, 0x344(a0)
+      92:      	addi	a1, a1, 0x2
+      94:      	sb	a1, 0x344(a0)
+      98:      	ret
+
+000000000000009a <loop>:
+      9a:      	blez	a2, 0x9a <loop>
+      9e:      	lui	a3, 0x40000
+      a2:      	fmv.w.x	fa5, a3
+      a6:      	slli	a2, a2, 0x2
+      a8:      	add	a2, a2, a1
+      aa:      	flw	fa4, 0x0(a0)
+      ae:      	flw	fa3, 0x0(a1)
+      b2:      	fmadd.s	fa4, fa4, fa5, fa3
+      b6:      	addi	a1, a1, 0x4
+      b8:      	fsw	fa4, 0x0(a0)
+      bc:      	addi	a0, a0, 0x4
+      be:      	bne	a1, a2, 0xaa <loop+0x10>
+      c2:      	ret
+
+00000000000000c4 <dat>:
+      c4:      	nop
+      c6: 78 56 34 12  	.word	0x12345678
+      ca:      	nop
+      cc: 01 00	.short	0x0001
+      ce:      	nop
+      d0:      	ret
+
+00000000000000d2 <mixed>:
+      d2:      	addi	a2, a0, 0x1
+      d6:      	addi	a1, a1, -0x3
+      d8:      	mul	a1, a1, a2
+      dc:      	srai	a0, a0, 0x2
+      de:      	add	a0, a0, a1
+      e0:      	ret

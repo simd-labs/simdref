@@ -1,0 +1,279 @@
+<?xml version="1.0" ?><?xml-stylesheet type="text/xsl" encoding="UTF-8" href="iform.xsl" version="1.0"?><!DOCTYPE instructionsection  PUBLIC '-//ARM//DTD instructionsection //EN'  'iform-p.dtd'><!-- Copyright (c) 2010-2026 Arm Limited or its affiliates. All rights reserved. --><!-- This document is Non-Confidential. This document may only be used and distributed in accordance with the terms of the agreement entered into by Arm and the party that Arm delivered this document to. --><instructionsection id="STFMAXNM" title="STFMAXNM, STFMAXNML -- A64" type="instruction">
+  <docvars>
+    <docvar key="instr-class" value="advsimd"/>
+    <docvar key="isa" value="A64"/>
+  </docvars>
+  <heading>STFMAXNM, STFMAXNML</heading>
+  <desc>
+    <brief>
+      <para>Atomic floating-point maximum number, without return</para>
+    </brief>
+    <authored>
+      <para>This instruction atomically loads a 16-bit, 32-bit, or 64-bit value from memory,
+calculates the floating-point maximum number with the value held in a register,
+and stores the result back to memory.</para>
+      <list type="unordered">
+        <listitem>
+          <content>
+            <instruction>STFMAXNML</instruction> stores
+  to memory with release semantics.</content>
+        </listitem>
+        <listitem>
+          <content>
+            <instruction>STFMAXNM</instruction> has no release semantics.</content>
+        </listitem>
+      </list>
+      <para>This instruction:</para>
+      <list type="unordered">
+        <listitem>
+          <content>Disables alternative floating-point behaviors, as if <register_link id="AArch64-fpcr.xml" state="AArch64">FPCR</register_link>.AH
+  is 0.</content>
+        </listitem>
+        <listitem>
+          <content>Generates only the default NaN, as if <register_link id="AArch64-fpcr.xml" state="AArch64">FPCR</register_link>.DN
+  is 1.</content>
+        </listitem>
+        <listitem>
+          <content>Does not modify the cumulative <register_link id="AArch64-fpsr.xml" state="AArch64">FPSR</register_link>
+  exception bits (IDC, IXC, UFC, OFC, DZC, and IOC).</content>
+        </listitem>
+        <listitem>
+          <content>Disables trapped floating-point exceptions, as if the
+  <register_link id="AArch64-fpcr.xml" state="AArch64">FPCR</register_link> trap enable bits
+  (IDE, IXE, UFE, OFE, DZE, and IOE) are all zero.</content>
+        </listitem>
+      </list>
+      <para>For more information about memory ordering semantics, see <xref linkend="ARMARM_BEIHCHEF">Load-Acquire, Store-Release</xref>.</para>
+      <para>For information about addressing modes, see
+<xref linkend="ARMARM_CHDIIIBB">Load/Store addressing modes</xref>.</para>
+    </authored>
+  </desc>
+  <alias_list howmany="0"/>
+  <classes>
+    <iclass name="Floating-point" oneof="1" id="iclass_floating_point" no_encodings="6" isa="A64">
+      <docvars>
+        <docvar key="instr-class" value="advsimd"/>
+        <docvar key="isa" value="A64"/>
+      </docvars>
+      <iclassintro count="6"/>
+      <arch_variants>
+        <arch_variant feature="FEAT_LSFE" name="v9Ap6"/>
+      </arch_variants>
+      <regdiagram form="32" psname="A64.ldst.memop.STFMAXNM_16" tworows="1">
+        <box hibit="31" width="2" name="size" usename="1">
+          <c colspan="2"/>
+        </box>
+        <box hibit="29" width="3" settings="3">
+          <c>1</c>
+          <c>1</c>
+          <c>1</c>
+        </box>
+        <box hibit="26" name="VR" usename="1" settings="1" psbits="x">
+          <c>1</c>
+        </box>
+        <box hibit="25" width="2" settings="2">
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="23" name="A" usename="1" settings="1" psbits="x">
+          <c>0</c>
+        </box>
+        <box hibit="22" width="1" name="R" usename="1">
+          <c colspan="1"/>
+        </box>
+        <box hibit="21" width="1" settings="1">
+          <c>1</c>
+        </box>
+        <box hibit="20" width="5" name="Rs" usename="1">
+          <c colspan="5"/>
+        </box>
+        <box hibit="15" name="o3" usename="1" settings="1" psbits="x">
+          <c>1</c>
+        </box>
+        <box hibit="14" width="3" name="opc" usename="1" settings="3" psbits="xxx">
+          <c>1</c>
+          <c>1</c>
+          <c>0</c>
+        </box>
+        <box hibit="11" width="2" settings="2">
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="9" width="5" name="Rn" usename="1">
+          <c colspan="5"/>
+        </box>
+        <box hibit="4" width="5" name="Rt" usename="1" settings="5" psbits="xxxxx">
+          <c>1</c>
+          <c>1</c>
+          <c>1</c>
+          <c>1</c>
+          <c>1</c>
+        </box>
+      </regdiagram>
+      <encoding name="STFMAXNM_16" oneofinclass="6" oneof="6" label="Half-precision no memory ordering" bitdiffs="size == 01 &amp;&amp; R == 0">
+        <docvars>
+          <docvar key="instr-class" value="advsimd"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="reg-type" value="16-reg"/>
+          <docvar key="mnemonic" value="STFMAXNM"/>
+        </docvars>
+        <box hibit="31" width="2" name="size">
+          <c>0</c>
+          <c>1</c>
+        </box>
+        <box hibit="22" width="1" name="R">
+          <c>0</c>
+        </box>
+        <asmtemplate><text>STFMAXNM  </text><a hover="Is the 16-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field." link="fpfar_hs">&lt;Hs&gt;</a><text>, [</text><a hover="Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field." link="XnSP_option">&lt;Xn|SP&gt;</a><text>]</text></asmtemplate>
+      </encoding>
+      <encoding name="STFMAXNML_16" oneofinclass="6" oneof="6" label="Half-precision release" bitdiffs="size == 01 &amp;&amp; R == 1">
+        <docvars>
+          <docvar key="instr-class" value="advsimd"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="reg-type" value="16-reg"/>
+          <docvar key="mnemonic" value="STFMAXNML"/>
+        </docvars>
+        <box hibit="31" width="2" name="size">
+          <c>0</c>
+          <c>1</c>
+        </box>
+        <box hibit="22" width="1" name="R">
+          <c>1</c>
+        </box>
+        <asmtemplate><text>STFMAXNML  </text><a hover="Is the 16-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field." link="fpfar_hs">&lt;Hs&gt;</a><text>, [</text><a hover="Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field." link="XnSP_option">&lt;Xn|SP&gt;</a><text>]</text></asmtemplate>
+      </encoding>
+      <encoding name="STFMAXNM_32" oneofinclass="6" oneof="6" label="Single-precision no memory ordering" bitdiffs="size == 10 &amp;&amp; R == 0">
+        <docvars>
+          <docvar key="instr-class" value="advsimd"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="reg-type" value="32-reg"/>
+          <docvar key="mnemonic" value="STFMAXNM"/>
+        </docvars>
+        <box hibit="31" width="2" name="size">
+          <c>1</c>
+          <c>0</c>
+        </box>
+        <box hibit="22" width="1" name="R">
+          <c>0</c>
+        </box>
+        <asmtemplate><text>STFMAXNM  </text><a hover="Is the 32-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field." link="fpfar_ss">&lt;Ss&gt;</a><text>, [</text><a hover="Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field." link="XnSP_option">&lt;Xn|SP&gt;</a><text>]</text></asmtemplate>
+      </encoding>
+      <encoding name="STFMAXNML_32" oneofinclass="6" oneof="6" label="Single-precision release" bitdiffs="size == 10 &amp;&amp; R == 1">
+        <docvars>
+          <docvar key="instr-class" value="advsimd"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="reg-type" value="32-reg"/>
+          <docvar key="mnemonic" value="STFMAXNML"/>
+        </docvars>
+        <box hibit="31" width="2" name="size">
+          <c>1</c>
+          <c>0</c>
+        </box>
+        <box hibit="22" width="1" name="R">
+          <c>1</c>
+        </box>
+        <asmtemplate><text>STFMAXNML  </text><a hover="Is the 32-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field." link="fpfar_ss">&lt;Ss&gt;</a><text>, [</text><a hover="Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field." link="XnSP_option">&lt;Xn|SP&gt;</a><text>]</text></asmtemplate>
+      </encoding>
+      <encoding name="STFMAXNM_64" oneofinclass="6" oneof="6" label="Double-precision no memory ordering" bitdiffs="size == 11 &amp;&amp; R == 0">
+        <docvars>
+          <docvar key="instr-class" value="advsimd"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="reg-type" value="64-reg"/>
+          <docvar key="mnemonic" value="STFMAXNM"/>
+        </docvars>
+        <box hibit="31" width="2" name="size">
+          <c>1</c>
+          <c>1</c>
+        </box>
+        <box hibit="22" width="1" name="R">
+          <c>0</c>
+        </box>
+        <asmtemplate><text>STFMAXNM  </text><a hover="Is the 64-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field." link="fpfar_ds">&lt;Ds&gt;</a><text>, [</text><a hover="Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field." link="XnSP_option">&lt;Xn|SP&gt;</a><text>]</text></asmtemplate>
+      </encoding>
+      <encoding name="STFMAXNML_64" oneofinclass="6" oneof="6" label="Double-precision release" bitdiffs="size == 11 &amp;&amp; R == 1">
+        <docvars>
+          <docvar key="instr-class" value="advsimd"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="reg-type" value="64-reg"/>
+          <docvar key="mnemonic" value="STFMAXNML"/>
+        </docvars>
+        <box hibit="31" width="2" name="size">
+          <c>1</c>
+          <c>1</c>
+        </box>
+        <box hibit="22" width="1" name="R">
+          <c>1</c>
+        </box>
+        <asmtemplate><text>STFMAXNML  </text><a hover="Is the 64-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field." link="fpfar_ds">&lt;Ds&gt;</a><text>, [</text><a hover="Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field." link="XnSP_option">&lt;Xn|SP&gt;</a><text>]</text></asmtemplate>
+      </encoding>
+      <ps_section howmany="1">
+        <ps name="A64.ldst.memop.STFMAXNM_16" sections="1" secttype="noheading">
+          <pstext mayhavelinks="1" section="Decode" rep_section="decode">if !IsFeatureImplemented(FEAT_LSFE) then <a link="func_EndOfDecode_1" file="shared_pseudocode.xml">EndOfDecode</a>(<a link="enum_Decode_UNDEF" file="shared_pseudocode.xml">Decode_UNDEF</a>); end;
+
+let s : integer = UInt(Rs);
+let n : integer = UInt(Rn);
+
+let datasize : integer{} = 8 &lt;&lt; UInt(size);
+let acquire : boolean = FALSE;
+let release : boolean = R == '1';
+let tagchecked : boolean = n != 31;</pstext></ps>
+      </ps_section>
+    </iclass>
+  </classes>
+  <explanations scope="all">
+    <explanation enclist="STFMAXNM_16, STFMAXNML_16" symboldefcount="1">
+      <symbol link="fpfar_hs">&lt;Hs&gt;</symbol>
+      <account encodedin="Rs">
+        <intro>
+          <para>Is the 16-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="STFMAXNM_16, STFMAXNML_16, STFMAXNM_32, STFMAXNML_32, STFMAXNM_64, STFMAXNML_64" symboldefcount="1">
+      <symbol link="XnSP_option">&lt;Xn|SP&gt;</symbol>
+      <account encodedin="Rn">
+        <intro>
+          <para>Is the 64-bit name of the general-purpose base register or stack pointer, encoded in the &quot;Rn&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="STFMAXNM_32, STFMAXNML_32" symboldefcount="1">
+      <symbol link="fpfar_ss">&lt;Ss&gt;</symbol>
+      <account encodedin="Rs">
+        <intro>
+          <para>Is the 32-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="STFMAXNM_64, STFMAXNML_64" symboldefcount="1">
+      <symbol link="fpfar_ds">&lt;Ds&gt;</symbol>
+      <account encodedin="Rs">
+        <intro>
+          <para>Is the 64-bit name of the SIMD&amp;FP register holding the data value to be operated on with the contents of the memory location, encoded in the &quot;Rs&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+  </explanations>
+  <ps_section howmany="1">
+    <ps name="A64.ldst.memop.STFMAXNM_16" sections="1" secttype="Operation">
+      <pstext mayhavelinks="1" section="Execute" rep_section="execute"><a link="func_AArch64_CheckFPEnabled_0" file="shared_pseudocode.xml">AArch64_CheckFPEnabled</a>();
+var address : bits(64);
+var value : bits(datasize);
+var data : bits(datasize);
+let accdesc : <a link="type_AccessDescriptor" file="shared_pseudocode.xml">AccessDescriptor</a> = <a link="func_CreateAccDescFPAtomicOp_4" file="shared_pseudocode.xml">CreateAccDescFPAtomicOp</a>(<a link="enum_MemAtomicOp_FPMAXNM" file="shared_pseudocode.xml">MemAtomicOp_FPMAXNM</a>, acquire,
+                                                            release, tagchecked);
+
+value = <a link="accessor_V_2" file="shared_pseudocode.xml">V</a>{datasize}(s);
+if n == 31 then
+    <a link="func_CheckSPAlignment_0" file="shared_pseudocode.xml">CheckSPAlignment</a>();
+    address = <a link="accessor_SP_1" file="shared_pseudocode.xml">SP</a>{64}();
+else
+    address = <a link="accessor_X_2" file="shared_pseudocode.xml">X</a>{64}(n);
+end;
+
+let comparevalue : bits(datasize) = ARBITRARY : bits(datasize); // Irrelevant when not executing CAS
+data = <a link="func_MemAtomic_5" file="shared_pseudocode.xml">MemAtomic</a>{datasize}(address, comparevalue, value, accdesc);</pstext></ps>
+  </ps_section>
+  <timestamp>2026-06-24 17:12:09</timestamp>
+  <commit_id>2026-06_rel</commit_id>
+</instructionsection>

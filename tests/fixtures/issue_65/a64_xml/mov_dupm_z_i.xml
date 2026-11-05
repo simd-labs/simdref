@@ -1,0 +1,148 @@
+<?xml version="1.0" ?><?xml-stylesheet type="text/xsl" encoding="UTF-8" href="iform.xsl" version="1.0"?><!DOCTYPE instructionsection  PUBLIC '-//ARM//DTD instructionsection //EN'  'iform-p.dtd'><!-- Copyright (c) 2010-2026 Arm Limited or its affiliates. All rights reserved. --><!-- This document is Non-Confidential. This document may only be used and distributed in accordance with the terms of the agreement entered into by Arm and the party that Arm delivered this document to. --><instructionsection id="mov_dupm_z_i" title="MOV -- A64" type="alias">
+  <docvars>
+    <docvar key="alias_mnemonic" value="MOV"/>
+    <docvar key="instr-class" value="sve"/>
+    <docvar key="isa" value="A64"/>
+    <docvar key="mnemonic" value="DUPM"/>
+  </docvars>
+  <heading>MOV</heading>
+  <desc>
+    <brief>
+      <para>Move logical bitmask immediate to vector (unpredicated)</para>
+    </brief>
+    <authored>
+      <para>This instruction unconditionally broadcasts the logical bitmask immediate into each element of the
+destination vector. This instruction is unpredicated.
+The immediate is a 64-bit value consisting of a single run of ones or zeros
+repeating every 2, 4, 8, 16, 32, or 64 bits.</para>
+    </authored>
+    <predicated>False</predicated>
+  </desc>
+  <aliasto refiform="dupm_z_i.xml" iformid="dupm_z_i">DUPM</aliasto>
+  <classes>
+    <iclass name="SVE" oneof="1" id="iclass_sve" no_encodings="1" isa="A64">
+      <docvars>
+        <docvar key="instr-class" value="sve"/>
+        <docvar key="isa" value="A64"/>
+        <docvar key="mnemonic" value="DUPM"/>
+      </docvars>
+      <iclassintro count="1"/>
+      <arch_variants>
+        <arch_variant feature="FEAT_SVE || FEAT_SME" name="(v8Ap2 &amp;&amp; PROFILE_A) || (v9Ap2 &amp;&amp; PROFILE_A)"/>
+      </arch_variants>
+      <regdiagram form="32" psname="A64.sve.sve_maskimm.sve_int_dup_mask_imm.dupm_z_i_.mov_z_m_">
+        <box hibit="31" width="3" settings="3">
+          <c>0</c>
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="28" width="4" settings="4">
+          <c>0</c>
+          <c>0</c>
+          <c>1</c>
+          <c>0</c>
+        </box>
+        <box hibit="24" width="1" settings="1">
+          <c>1</c>
+        </box>
+        <box hibit="23" width="2" settings="2">
+          <c>1</c>
+          <c>1</c>
+        </box>
+        <box hibit="21" width="2" settings="2">
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="19" width="2" settings="2">
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="17" width="13" name="imm13" usename="1">
+          <c colspan="13"/>
+        </box>
+        <box hibit="4" width="5" name="Zd" usename="1">
+          <c colspan="5"/>
+        </box>
+      </regdiagram>
+      <encoding name="mov_z_m__dupm_z_i_" oneofinclass="1" oneof="1" label="">
+        <docvars>
+          <docvar key="instr-class" value="sve"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="mnemonic" value="DUPM"/>
+          <docvar key="alias_mnemonic" value="MOV"/>
+        </docvars>
+        <asmtemplate><text>MOV  </text><a hover="Is the name of the destination scalable vector register, encoded in the &quot;Zd&quot; field." link="Zd">&lt;Zd&gt;</a><text>.</text><a hover="Is the size specifier, " link="T__34">&lt;T&gt;</a><text>, #</text><a hover="Is a 64, 32, 16, or 8-bit bitmask consisting of replicated 2, 4, 8, 16, 32, or 64-bit fields, each field containing a rotated run of nonzero bits, encoded in the &quot;imm13&quot; field." link="const">&lt;const&gt;</a></asmtemplate>
+        <equivalent_to>
+          <asmtemplate><a href="dupm_z_i.xml#dupm_z_i_">DUPM</a><text>  </text><a hover="Is the name of the destination scalable vector register, encoded in the &quot;Zd&quot; field." href="dupm_z_i.xml#Zd">&lt;Zd&gt;</a><text>.</text><a hover="Is the size specifier, " href="dupm_z_i.xml#T__34">&lt;T&gt;</a><text>, #</text><a hover="Is a 64, 32, 16, or 8-bit bitmask consisting of replicated 2, 4, 8, 16, 32, or 64-bit fields, each field containing a rotated run of nonzero bits, encoded in the &quot;imm13&quot; field." href="dupm_z_i.xml#const">&lt;const&gt;</a></asmtemplate>
+          <aliascond>SVEMoveMaskPreferred(imm13)</aliascond>
+        </equivalent_to>
+      </encoding>
+    </iclass>
+  </classes>
+  <explanations scope="all">
+    <explanation enclist="mov_z_m__dupm_z_i_" symboldefcount="1">
+      <symbol link="Zd">&lt;Zd&gt;</symbol>
+      <account encodedin="Zd">
+        <intro>
+          <para>Is the name of the destination scalable vector register, encoded in the &quot;Zd&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="mov_z_m__dupm_z_i_" symboldefcount="1">
+      <symbol link="T__34">&lt;T&gt;</symbol>
+      <definition encodedin="imm13">
+        <intro>Is the size specifier, </intro>
+        <table class="valuetable">
+          <tgroup cols="2">
+            <thead>
+              <row>
+                <entry class="bitfield">imm13</entry>
+                <entry class="symbol">&lt;T&gt;</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry class="bitfield">0xxxxxx0xxxxx</entry>
+                <entry class="symbol">S</entry>
+              </row>
+              <row>
+                <entry class="bitfield">0xxxxxx10xxxx</entry>
+                <entry class="symbol">H</entry>
+              </row>
+              <row>
+                <entry class="bitfield">0xxxxxx110xxx</entry>
+                <entry class="symbol">B</entry>
+              </row>
+              <row>
+                <entry class="bitfield">0xxxxxx1110xx</entry>
+                <entry class="symbol">B</entry>
+              </row>
+              <row>
+                <entry class="bitfield">0xxxxxx11110x</entry>
+                <entry class="symbol">B</entry>
+              </row>
+              <row>
+                <entry class="bitfield">0xxxxxx11111x</entry>
+                <entry class="symbol">RESERVED</entry>
+              </row>
+              <row>
+                <entry class="bitfield">1xxxxxxxxxxxx</entry>
+                <entry class="symbol">D</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </definition>
+    </explanation>
+    <explanation enclist="mov_z_m__dupm_z_i_" symboldefcount="1">
+      <symbol link="const">&lt;const&gt;</symbol>
+      <account encodedin="imm13">
+        <intro>
+          <para>Is a 64, 32, 16, or 8-bit bitmask consisting of replicated 2, 4, 8, 16, 32, or 64-bit fields, each field containing a rotated run of nonzero bits, encoded in the &quot;imm13&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+  </explanations>
+  <timestamp>2026-06-24 17:12:09</timestamp>
+  <commit_id>2026-06_rel</commit_id>
+</instructionsection>

@@ -1,0 +1,93 @@
+
+thumb.o:	file format elf32-littlearm
+
+Disassembly of section .text:
+
+<sw>:
+ 2809                  	cmp	r0, #0x9
+ bf84                  	itt	hi
+ 2000                  	movhi	r0, #0x0
+ 4770                  	bxhi	lr
+ e8df f000             	tbb	[pc, r0]
+       c: 05 1a 12 14  	.word	0x14121a05
+      10: 07 1d 1f 17  	.word	0x171f1d07
+      14: 22 09        	.short	0x0922
+ 1c48                  	adds	r0, r1, #0x1
+ 4770                  	bx	lr
+ 0088                  	lsls	r0, r1, #0x2
+ 4770                  	bx	lr
+ f245 5056             	movw	r0, #0x5556
+ f2c5 5055             	movt	r0, #0x5555
+ fb51 f000             	smmul	r0, r1, r0
+ eb00 70d0             	add.w	r0, r0, r0, lsr #31
+ 4770                  	bx	lr
+ 1fc8                  	subs	r0, r1, #0x7
+ 4770                  	bx	lr
+ f081 0005             	eor	r0, r1, #0x5
+ 4770                  	bx	lr
+ f001 0003             	and	r0, r1, #0x3
+ 4770                  	bx	lr
+ eb01 0041             	add.w	r0, r1, r1, lsl #1
+ 4770                  	bx	lr
+ 1048                  	asrs	r0, r1, #0x1
+ 4770                  	bx	lr
+ f041 0009             	orr	r0, r1, #0x9
+ 4770                  	bx	lr
+ 4248                  	rsbs	r0, r1, #0
+ 4770                  	bx	lr
+
+<big>:
+ f247 7088             	movw	r0, #0x7788
+ f243 3144             	movw	r1, #0x3344
+ f2c5 5066             	movt	r0, #0x5566
+ f2c1 1122             	movt	r1, #0x1122
+ 4770                  	bx	lr
+
+<fadd3>:
+ ee70 0b01             	vadd.f64	d16, d0, d1
+ ee30 0b82             	vadd.f64	d0, d16, d2
+ 4770                  	bx	lr
+
+<bytes8>:
+ 7801                  	ldrb	r1, [r0]
+ 3101                  	adds	r1, #0x1
+ 7001                  	strb	r1, [r0]
+ f243 3144             	movw	r1, #0x3344
+ f2c1 1122             	movt	r1, #0x1122
+ 5c42                  	ldrb	r2, [r0, r1]
+ 3202                  	adds	r2, #0x2
+ 5442                  	strb	r2, [r0, r1]
+ 4770                  	bx	lr
+
+<loop>:
+ 2a01                  	cmp	r2, #0x1
+ bfb8                  	it	lt
+ 4770                  	bxlt	lr
+ ed90 0a00             	vldr	s0, [r0]
+ 3a01                  	subs	r2, #0x1
+ ecb1 1a01             	vldmia	r1!, {s2}
+ ee30 0a00             	vadd.f32	s0, s0, s0
+ ee30 0a01             	vadd.f32	s0, s0, s2
+ eca0 0a01             	vstmia	r0!, {s0}
+ d1f3                  	bne	0x8c <loop+0x6>         @ imm = #-0x1a
+ 4770                  	bx	lr
+
+<dat>:
+ bf00                  	nop
+      a8: 78 56 34 12  	.word	0x12345678
+      ac: ef be ad de  	.word	0xdeadbeef
+ bf00                  	nop
+ 4770                  	bx	lr
+
+<lit>:
+ 4800                  	ldr	r0, [pc, #0x0]          @ 0xb8 <lit+0x4>
+ e001                  	b	0xbc <lit+0x8>          @ imm = #0x2
+      b8: 0d f0 fe ca  	.word	0xcafef00d
+ 4770                  	bx	lr
+
+<ldr2>:
+ f44f 5180             	mov.w	r1, #0x1000
+ 5841                  	ldr	r1, [r0, r1]
+ 6840                  	ldr	r0, [r0, #0x4]
+ 4408                  	add	r0, r1
+ 4770                  	bx	lr

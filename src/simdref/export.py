@@ -12,6 +12,7 @@ the release artifact a separate web repo consumes (see ``simdref export``):
   index after first paint.
 * **latency-index.json** -- per-instruction lat/cpi keyed by ``db_key``,
   the same values queryable straight from ``catalog.db``.
+* **cores.json** -- llvm -mcpu names and aliases per simdref CPU key.
 * **detail-chunks/{PREFIX}.json** -- full instruction details (operands,
   measurements) loaded on demand when the user selects a result.
 
@@ -50,6 +51,7 @@ from simdref.perf import (
     variant_perf_summary,
 )
 from simdref.pdfrefs import normalize_pdf_refs
+from simdref.perf_sources.cores import CANONICAL_CORES
 from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
 from simdref.storage import derive_arm_arch
 
@@ -69,7 +71,7 @@ def _web_measurements(item) -> list[dict]:
         measurement = details.get("measurement") or {}
         if not measurement:
             continue
-        lat, cpi = perf_row_values(details)
+        lat, cpi = perf_row_values(details, item.operand_details)
         row = {
             "uarch": uarch,
             "ports": measurement.get("ports", "-"),
@@ -216,6 +218,23 @@ def _instr_perf_map(catalog: Catalog) -> dict[str, tuple[str, str]]:
         lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
         perf[item.db_key] = (lat, cpi)
     return perf
+
+
+def cores_index() -> dict[str, dict]:
+    """llvm -mcpu names and aliases per simdref CPU key (``perf_sources.cores``).
+
+    The visualizer maps an llvm ``-mcpu`` name to a measurement row's
+    ``uarch`` key through this file. Aliases are sorted: frozenset order
+    is not stable and the export writes reproducible bytes.
+    """
+    return {
+        core.canonical_id: {
+            "isa": core.architecture,
+            "llvm_cpu": core.llvm_cpu,
+            "aliases": sorted(core.aliases),
+        }
+        for core in CANONICAL_CORES
+    }
 
 
 def latency_index_for_catalog(catalog: Catalog) -> dict[str, dict[str, str]]:
@@ -616,6 +635,7 @@ def export_site_data(catalog: Catalog, out_dir: Path) -> None:
     * ``search-index-instructions.json`` -- instruction search entries
     * ``search-index-intrinsics.json`` -- intrinsic search entries
     * ``latency-index.json`` -- per-instruction lat/cpi, keyed by ``db_key``
+    * ``cores.json`` -- llvm -mcpu names and aliases per simdref CPU key
     * ``search-index-encodings.json`` -- encoding keys for asm line identity
       (omitted when the catalog predates the encoding columns, schema 13)
     * ``filter_spec.json`` -- shared ISA/category facets (web + CLI)
@@ -643,6 +663,8 @@ def export_site_data(catalog: Catalog, out_dir: Path) -> None:
             legacy.unlink()
 
     _write_json(out_dir / "latency-index.json", latency_index_for_catalog(catalog))
+
+    _write_json(out_dir / "cores.json", cores_index())
 
     encodings = _encoding_entries(catalog)
     encodings_path = out_dir / "search-index-encodings.json"

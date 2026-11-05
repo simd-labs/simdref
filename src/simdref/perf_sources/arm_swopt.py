@@ -36,6 +36,7 @@ from pathlib import Path
 
 from simdref.perf_sources.cores import canonical_core_id
 from simdref.perf_sources.merge import SOURCE_ARM_SWOPT, PerfRow
+from simdref.tablecols import mixed_number, row_tail, strip_footnote, word_spans
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_VENDOR_DIR = _REPO_ROOT / "vendor" / "arm_swopt"
@@ -104,12 +105,7 @@ CPUS: tuple[CpuSpec, ...] = (
 _CPU_BY_NAME = {c.cpu: c for c in CPUS}
 
 # A table row ends in: latency, throughput, pipelines and optional notes.
-_ROW = re.compile(
-    r"(?P<lat>\d+(?:\(\d\))?|\d+ to \d+|\d+ \d+/\d+|\d+/\d+|\d+)\s+"
-    r"(?P<tp>\d+(?:\(\d\))?|\d+/\d+|\d+\.\d+|\d+ \d+/\d+|\d+/\d+ to \d+/\d+)\s+"
-    r"(?P<pipe>[A-Z][A-Z0-9]*(?:[ ,]+[A-Z][A-Z0-9]*)*)"
-    r"(?:\s+(?P<notes>[-0-9, ]+))?\s*$"
-)
+# tablecols.row_tail parses that tail.
 _MNEM = re.compile(r"^[A-Z][A-Z0-9]*(?:\(\d\))?(?:\{[A-Z]+\})?$")
 _MNEM_CHAR = re.compile(r"[A-Z0-9{(\]},]")
 _NOISE = re.compile(r"Copyright|Non-Confidential|Page \d|Issue \d|Arm®|PJDOC|^\s*$")
@@ -118,9 +114,7 @@ _SECT = re.compile(r"^\s*3\.\d+ [A-Z]")
 
 
 def _toks(seg: str) -> list[str]:
-    return [
-        t for t in re.split(r"[,\s]+", seg.strip()) if _MNEM.match(t) and (len(t) > 1 or t == "B")
-    ]
+    return [t for t in seg.replace(",", " ").split() if _MNEM.match(t) and (len(t) > 1 or t == "B")]
 
 
 def _snap_a(line: str, col: int) -> int:
@@ -218,9 +212,9 @@ def parse_groups(text: str) -> list[dict]:
         # column is the last word before "Exec" (AArch64, Instructions or
         # "SVE Instruction" depending on the guide and the table).
         if "Exec" in line and re.search(r"AArch|Instruction", line):
-            words = list(re.finditer(r"\S+", line[: line.find("Exec")]))
+            words = word_spans(line[: line.find("Exec")])
             if words:
-                col_a, col_e = words[-1].start(), line.find("Exec")
+                col_a, col_e = words[-1][1], line.find("Exec")
             continue
         if "Latency" in line and "Throughput" in line:
             continue
@@ -231,7 +225,7 @@ def parse_groups(text: str) -> list[dict]:
             in_foot = True
         if in_foot or _NOISE.search(line) or not s:
             continue
-        m = _ROW.search(s)
+        m = row_tail(s)
         if m and col_a is not None and col_e is not None and col_a < col_e:
             a = _snap_a(line, col_a)
             if a >= col_e:
@@ -240,12 +234,13 @@ def parse_groups(text: str) -> list[dict]:
             head, first = _peel(line[:a], _toks(line[a:e]))
             if not head:
                 continue
+            lat, tp, pipe, notes = m
             cur = {
                 "group": head,
-                "latency": m["lat"],
-                "throughput": m["tp"],
-                "pipelines": " ".join(m["pipe"].split()),
-                "notes": (m["notes"] or "").strip(),
+                "latency": lat,
+                "throughput": tp,
+                "pipelines": " ".join(pipe.split()),
+                "notes": notes.strip(),
                 "arch": arch,
                 "mnemonics": first,
             }
@@ -270,16 +265,16 @@ def parse_groups(text: str) -> list[dict]:
 
 def _clean_num(raw: str) -> str:
     # Drop a footnote marker: "4(1)" becomes "4".
-    return re.sub(r"^(\d+)\(\d\)$", r"\1", raw)
+    return strip_footnote(raw)
 
 
 def _cpi(throughput: str) -> str:
     """Invert the throughput (instructions per cycle) to cycles per instruction."""
     raw = _clean_num(throughput)
-    match = re.fullmatch(r"(\d+) (\d+/\d+)", raw)
+    mixed = mixed_number(raw)
     try:
-        if match:
-            ipc = Fraction(int(match.group(1))) + Fraction(match.group(2))
+        if mixed is not None:
+            ipc = mixed
         else:
             ipc = Fraction(raw)
     except ValueError:

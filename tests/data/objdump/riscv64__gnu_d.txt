@@ -1,0 +1,98 @@
+
+riscv64.o:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000000000000 <sw>:
+   0:	4625                	li	a2,9
+   2:	00a66063          	bltu	a2,a0,2 <sw+0x2>
+
+0000000000000006 <.Lpcrel_hi0>:
+   6:	00000617          	auipc	a2,0x0
+   a:	050a                	slli	a0,a0,0x2
+   c:	00060613          	mv	a2,a2
+  10:	9532                	add	a0,a0,a2
+  12:	4108                	lw	a0,0(a0)
+  14:	9532                	add	a0,a0,a2
+  16:	8502                	jr	a0
+  18:	0015851b          	addiw	a0,a1,1
+  1c:	8082                	ret
+  1e:	0025951b          	slliw	a0,a1,0x2
+  22:	8082                	ret
+  24:	55555537          	lui	a0,0x55555
+  28:	55650513          	addi	a0,a0,1366 # 55555556 <mixed+0x55555484>
+  2c:	02a58533          	mul	a0,a1,a0
+  30:	03f55593          	srli	a1,a0,0x3f
+  34:	9101                	srli	a0,a0,0x20
+  36:	9d2d                	addw	a0,a0,a1
+  38:	8082                	ret
+  3a:	ff95851b          	addiw	a0,a1,-7
+  3e:	8082                	ret
+  40:	0055c513          	xori	a0,a1,5
+  44:	8082                	ret
+  46:	0035f513          	andi	a0,a1,3
+  4a:	8082                	ret
+  4c:	00159513          	slli	a0,a1,0x1
+  50:	9d2d                	addw	a0,a0,a1
+  52:	8082                	ret
+  54:	4015d513          	srai	a0,a1,0x1
+  58:	8082                	ret
+  5a:	0095e513          	ori	a0,a1,9
+  5e:	8082                	ret
+  60:	4501                	li	a0,0
+  62:	8082                	ret
+  64:	40b0053b          	negw	a0,a1
+  68:	8082                	ret
+
+000000000000006a <big>:
+  6a:	00000517          	auipc	a0,0x0
+  6e:	00053503          	ld	a0,0(a0) # 6a <big>
+  72:	8082                	ret
+
+0000000000000074 <fadd3>:
+  74:	02b577d3          	fadd.d	fa5,fa0,fa1
+  78:	02c7f553          	fadd.d	fa0,fa5,fa2
+  7c:	8082                	ret
+
+000000000000007e <bytes8>:
+  7e:	112235b7          	lui	a1,0x11223
+  82:	00054603          	lbu	a2,0(a0)
+  86:	0605                	addi	a2,a2,1 # 7 <.Lpcrel_hi0+0x1>
+  88:	00c50023          	sb	a2,0(a0)
+  8c:	952e                	add	a0,a0,a1
+  8e:	34454583          	lbu	a1,836(a0)
+  92:	0589                	addi	a1,a1,2 # 11223002 <mixed+0x11222f30>
+  94:	34b50223          	sb	a1,836(a0)
+  98:	8082                	ret
+
+000000000000009a <loop>:
+  9a:	00c05063          	blez	a2,9a <loop>
+  9e:	400006b7          	lui	a3,0x40000
+  a2:	f00687d3          	fmv.w.x	fa5,a3
+  a6:	060a                	slli	a2,a2,0x2
+  a8:	962e                	add	a2,a2,a1
+  aa:	00052707          	flw	fa4,0(a0)
+  ae:	0005a687          	flw	fa3,0(a1)
+  b2:	68f77743          	fmadd.s	fa4,fa4,fa5,fa3
+  b6:	0591                	addi	a1,a1,4
+  b8:	00e52027          	fsw	fa4,0(a0)
+  bc:	0511                	addi	a0,a0,4
+  be:	fec596e3          	bne	a1,a2,aa <loop+0x10>
+  c2:	8082                	ret
+
+00000000000000c4 <dat>:
+  c4:	0001                	nop
+  c6:	12345678          	.word	0x12345678
+  ca:	0001                	nop
+  cc:	0001                	.short	0x0001
+  ce:	0001                	nop
+  d0:	8082                	ret
+
+00000000000000d2 <mixed>:
+  d2:	00150613          	addi	a2,a0,1
+  d6:	15f5                	addi	a1,a1,-3
+  d8:	02c585b3          	mul	a1,a1,a2
+  dc:	8509                	srai	a0,a0,0x2
+  de:	952e                	add	a0,a0,a1
+  e0:	8082                	ret

@@ -41,6 +41,14 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 - Refresh: follows the Arm architecture revision (yearly).
 - Gaps: offline snapshots use the fixture sample. `SIMDREF_LIVE=1` covers the full spec.
 
+### Arm A64 ISA XML briefs (Exploration Tools)
+
+- URL: <https://developer.arm.com/-/cdn-downloads/permalink/Exploration-Tools-A64-ISA/ISA_A64/ISA_A64_xml_A_profile-2026-06.tar.gz>.
+- Format: tar.gz with one XML file per instruction. The `<desc><brief>` paragraph is the one-line summary for rows with no sourced text.
+- License: Arm Proprietary Notice in `notice.xml` (LES-PRE-20349). Same terms as the Arm Neoverse guides entry below: "No part of this document may be reproduced in any form by any means without the express prior written permission of Arm Limited (“Arm”). No license, express or implied, by estoppel or otherwise to any intellectual property rights is granted by this document unless specifically stated."
+- Refresh: follows the Exploration Tools releases. The build pins size and sha256 in `src/simdref/ingest_sources.py`.
+- Gaps: 18 placeholder rows keep generated text. The release does not name those 16 mnemonics.
+
 ## RISC-V
 
 ### RVV intrinsics

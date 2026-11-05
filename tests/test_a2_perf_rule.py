@@ -2,7 +2,8 @@
 
 The rule lives in :func:`simdref.perf.perf_row_values`:
 
-- LAT is the minimum latency over the operand pairs of the row.
+- LAT is the largest latency over the read-operand pairs of the row
+  (simdref#65), "MIN-MAX" when a pair stores a range.
 - CPI is what the CLI shows today: TP_loop, falling back to TP, else "-".
 
 Every Python surface (CLI table, TUI table, LSP aggregation, web export)
@@ -26,15 +27,15 @@ except ImportError:  # pragma: no cover
 
 
 # One arch row with two operand pairs whose latencies differ; the first
-# listed pair is not the minimum.
+# listed pair is not the maximum.
 def _arch_details() -> dict:
     return {
         "SKL": {
             "source_kind": "measured",
             "measurement": {"TP_loop": "0.50", "uops": "2"},
             "latencies": [
-                {"cycles": "7", "start_op": "1", "target_op": "1"},
                 {"cycles": "3", "start_op": "2", "target_op": "1"},
+                {"cycles": "7", "start_op": "1", "target_op": "1"},
             ],
         }
     }
@@ -52,9 +53,9 @@ def _instruction() -> InstructionRecord:
 
 
 class PerfRowRuleTests(unittest.TestCase):
-    def test_lat_is_min_over_operand_pairs_not_first_listed(self):
+    def test_lat_is_max_over_operand_pairs_not_first_listed(self):
         lat, cpi = perf_row_values(_arch_details()["SKL"])
-        self.assertEqual(lat, "3")
+        self.assertEqual(lat, "7")
         self.assertEqual(cpi, "0.50")
 
     def test_cpi_prefers_tp_loop_over_tp_unrolled(self):
@@ -77,7 +78,7 @@ class SurfaceParityTests(unittest.TestCase):
         from simdref.display import measurement_rows
 
         row = measurement_rows(_instruction())[0]
-        self.assertEqual(row["latency"], "3")
+        self.assertEqual(row["latency"], "7")
         self.assertEqual(row["TP_loop"], "0.50")
 
     @unittest.skipUnless(HAS_TEXTUAL, "textual required")
@@ -91,18 +92,18 @@ class SurfaceParityTests(unittest.TestCase):
         table = panels[0]
         headers = [c.header for c in table.columns]
         row = {h: str(list(c._cells)[0]) for h, c in zip(headers, table.columns)}
-        self.assertEqual(row["LAT"], "3")
+        self.assertEqual(row["LAT"], "7")
         self.assertEqual(row["CPI"], "0.50")
 
     def test_lsp_aggregation_matches_rule(self):
-        # lsp.py displays best_latency / best_cpi over linked variants; on a
-        # single-variant record these must equal the picked row values.
+        # lsp.py displays best_latency / best_cpi over linked variants: the
+        # smallest value over every pair and core, not the per-row pick.
         self.assertEqual(best_latency(_arch_details()), "3")
         self.assertEqual(best_cpi(_arch_details()), "0.50")
 
     def test_web_export_rows_match_rule(self):
         row = _web_measurements(_instruction())[0]
-        self.assertEqual(row["latency"], "3")
+        self.assertEqual(row["latency"], "7")
         self.assertEqual(row["tpLoop"], "0.50")
 
 
