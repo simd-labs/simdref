@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""Generate vendored RISC-V source bundles from official upstream clones."""
+"""Generate vendored RISC-V source bundles from official upstream clones.
+
+Clones the upstream repos into a temporary directory that is removed on exit,
+unless --udb-root or --rvv-root names an existing clone, then writes the bundles.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_UDB_ROOT = Path("/tmp/riscv-unified-db")
-DEFAULT_RVV_ROOT = Path("/tmp/riscv-rvv-intrinsic-doc")
 DEFAULT_OUT_DIR = REPO_ROOT / "vendor" / "riscv"
+# Same pinned commit .github/workflows/ci.yml uses; override with RISCV_UDB_COMMIT.
+DEFAULT_UDB_COMMIT = "798d6a54d709a1584e7fa81bd8cc4ec7b7803a42"
 RVV_PROJECT_URL = "https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc"
 UDB_PROJECT_URL = "https://github.com/riscv/riscv-unified-db"
 V_DOC_URL = "https://docs.riscv.org/reference/isa/unpriv/v-st-ext.html"
@@ -44,6 +50,27 @@ LOAD_STORE_RE = re.compile(
 
 def git_rev(repo: Path) -> str:
     return subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+
+
+def ensure_git_repo(root: Path, url: str, ref: str | None = None) -> None:
+    """Clone url into root. With a pinned ref, always fetch it and fail if HEAD differs.
+
+    An unpinned clone that already exists in root is kept as is.
+    """
+    if ref is None and (root / ".git").exists():
+        return
+    try:
+        if ref is None:
+            subprocess.check_call(["git", "clone", "--depth", "1", url, str(root)])
+        else:
+            root.mkdir(parents=True, exist_ok=True)
+            subprocess.check_call(["git", "-C", str(root), "init", "-q"])
+            subprocess.check_call(["git", "-C", str(root), "fetch", "-q", "--depth", "1", url, ref])
+            subprocess.check_call(["git", "-C", str(root), "checkout", "-q", "FETCH_HEAD"])
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"failed to clone {url} into {root}: {exc}")
+    if ref is not None and (head := git_rev(root)) != ref:
+        raise SystemExit(f"{root} is at {head}, not the pinned commit {ref}")
 
 
 def extract_yaml_scalar(text: str, key: str) -> str:
@@ -390,34 +417,42 @@ def collect_base_instructions(udb_root: Path) -> dict[str, dict[str, object]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--udb-root", type=Path, default=DEFAULT_UDB_ROOT)
-    parser.add_argument("--rvv-root", type=Path, default=DEFAULT_RVV_ROOT)
+    parser.add_argument(
+        "--udb-root", type=Path, help="existing unified-db clone (default: fresh temp clone)"
+    )
+    parser.add_argument(
+        "--rvv-root", type=Path, help="existing rvv-intrinsic-doc clone (default: fresh temp clone)"
+    )
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args()
 
-    if not args.udb_root.exists():
-        raise SystemExit(f"missing unified-db clone at {args.udb_root}")
-    if not args.rvv_root.exists():
-        raise SystemExit(f"missing rvv-intrinsic-doc clone at {args.rvv_root}")
+    # RISCV_UDB_COMMIT must be a full commit sha: HEAD is compared to it as a string.
+    udb_commit = os.environ.get("RISCV_UDB_COMMIT") or DEFAULT_UDB_COMMIT
+    with tempfile.TemporaryDirectory(prefix="riscv-sources-") as tmp:
+        udb_root = args.udb_root or Path(tmp) / "riscv-unified-db"
+        rvv_root = args.rvv_root or Path(tmp) / "riscv-rvv-intrinsic-doc"
+        ensure_git_repo(udb_root, UDB_PROJECT_URL, udb_commit)
+        # Unpinned on purpose: base CI cloned the rvv-intrinsic-doc default branch.
+        ensure_git_repo(rvv_root, RVV_PROJECT_URL)
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+        args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    base_instructions = collect_base_instructions(args.udb_root)
-    intrinsics, variant_requests = build_intrinsics_bundle(args.rvv_root, base_instructions)
-    instructions = synthesize_instruction_records(base_instructions, variant_requests)
+        base_instructions = collect_base_instructions(udb_root)
+        intrinsics, variant_requests = build_intrinsics_bundle(rvv_root, base_instructions)
+        instructions = synthesize_instruction_records(base_instructions, variant_requests)
 
-    instructions_payload = {
-        "format": "riscv-unified-db-v1",
-        "upstream_repo": UDB_PROJECT_URL,
-        "upstream_commit": git_rev(args.udb_root),
-        "instructions": instructions,
-    }
-    intrinsics_payload = {
-        "format": "riscv-rvv-intrinsics-v1",
-        "upstream_repo": RVV_PROJECT_URL,
-        "upstream_commit": git_rev(args.rvv_root),
-        "intrinsics": intrinsics,
-    }
+        instructions_payload = {
+            "format": "riscv-unified-db-v1",
+            "upstream_repo": UDB_PROJECT_URL,
+            "upstream_commit": git_rev(udb_root),
+            "instructions": instructions,
+        }
+        intrinsics_payload = {
+            "format": "riscv-rvv-intrinsics-v1",
+            "upstream_repo": RVV_PROJECT_URL,
+            "upstream_commit": git_rev(rvv_root),
+            "intrinsics": intrinsics,
+        }
 
     (args.out_dir / "unified_db_bundle.json").write_text(
         json.dumps(instructions_payload, indent=2) + "\n"

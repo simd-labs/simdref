@@ -34,6 +34,7 @@ from simdref.ingest_catalog import (
     parse_uops_xml,
     link_records,
 )
+from simdref.riscv import _NO_SYNOPSIS
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
     fetch_arm_acle_data,
@@ -745,7 +746,12 @@ def validate_riscv_instructions() -> tuple[int, int]:
             print(f"FAIL riscv instructions: missing {form}")
             failures += 1
             continue
-        if not record.summary.strip():
+        # Same field chain the parser reads. An empty summary is a parse
+        # failure only when the source item had text to lose.
+        source_summary = _strip(
+            item.get("summary") or item.get("brief") or item.get("description_text")
+        )
+        if not record.summary.strip() and source_summary not in ("", _NO_SYNOPSIS):
             print(f"FAIL riscv instructions: empty summary for {form}")
             failures += 1
     print(

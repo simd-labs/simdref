@@ -11,7 +11,9 @@ catalog row:
   then the subset rule: drop a candidate strictly covered by another.
 - RISC-V: 16/32-bit word -> rows whose YAML ``encoding.match`` pattern
   accepts it (scoped to the document base), then line-mnemonic equality
-  resolves the documented ``c.*`` bit collisions.
+  resolves the documented ``c.*`` bit collisions, and a 16-bit tie the
+  text does not name takes the xlen whose llvm-mc decode prints the
+  line's own mnemonic (c.jal versus c.addiw).
 
 No mnemonic or iform table and no fallback matcher (spec R2): a line ends
 as one row, or with a reason why there is none.
@@ -43,7 +45,7 @@ _ARCH_CFG: dict[str, dict] = {
     },
     "aarch64": {
         "triple": "aarch64-unknown-linux-gnu",
-        "mattr": "+sve,+sve2,+sve2p1,+sme,+sme2,+sme2p1",
+        "mattr": "+sve,+sve2,+sve2p1,+sme,+sme2,+sme2p1,+lse,+gcs,+aes",
     },
     "arm": {"triple": "armv7-unknown-linux-gnueabihf", "mattr": "+neon"},
     "riscv32": {
@@ -52,7 +54,7 @@ _ARCH_CFG: dict[str, dict] = {
     },
     "riscv64": {
         "triple": "riscv64-unknown-linux-gnu",
-        "mattr": "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs",
+        "mattr": "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs,+zvbb,+zvkb,+zvkned,+zfh",
     },
 }
 _X86_SYNTAX_FLAG = {"att": "-x86-asm-syntax=att", "intel": "-x86-asm-syntax=intel"}
@@ -66,9 +68,25 @@ _ERR_RE = re.compile(r"^<stdin>:(\d+):(\d+): (?:error|warning): (.*)$", re.M)
 # The encoding comment llvm-mc appends ends its echo line. Requiring the end
 # keeps a string echo (".ascii \" # encoding: [0x90]\"") from faking bytes.
 _ENC_RE = re.compile(r"encoding: \[([^\]]*)\]\s*$")
-# The MCInst dump is a comment continuation line. Requiring the line start
-# keeps a string echo from faking the opcode (RV tie-break input).
-_INST_RE = re.compile(r"^\s*# <MCInst #\d+ (\S+)")
+
+
+def _mcinst_opcode(line: str) -> str | None:
+    """The MCInst opcode on an llvm-mc -show-inst comment line, else None.
+
+    The stripped line must start with the marker, so a string echo cannot
+    fake an opcode (RV tie-break input). The name stops at whitespace or the
+    closing bracket: an operand-less MCInst closes on its opcode line
+    ("# <MCInst #1 FENCE_I>").
+    """
+    s = line.strip()
+    if not s.startswith("# <MCInst #"):
+        return None
+    fields = s[len("# <MCInst #") :].split()
+    if len(fields) > 1 and fields[0].isdigit():
+        return fields[1].rstrip(">") or None
+    return None
+
+
 _CONT_RE = re.compile(r"^\s+(#|//|@|;)")
 _LABEL_RE = re.compile(r"^[\w.$]+:")
 
@@ -178,9 +196,9 @@ def _parse_echo_blocks(listing: str) -> list[tuple[str, str | None, str | None, 
             blocks.append([line.rstrip(), None, None, mode])
         block = blocks[-1]
         if block[1] is None:
-            match = _INST_RE.search(line)
-            if match:
-                block[1] = match.group(1)
+            opcode = _mcinst_opcode(line)
+            if opcode is not None:
+                block[1] = opcode
         if block[2] is None:
             match = _ENC_RE.search(line)
             if match:
@@ -627,12 +645,15 @@ def _agen_facts(d: dict) -> tuple[str, str, int]:
     return base, idx, d["displen"] * 8
 
 
-def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
+def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False, text: str = "") -> list[Row]:
     """Narrow an iform pool with the uops.info variant attributes stored on
     each row against the XED-decoded facts. Data tables on both sides.
 
     ``imm_unknown``: a fixup placeholder covers the immediate (audit A1), so
-    the immzero split cannot narrow and the caller treats its rows as a tie."""
+    the immzero split cannot narrow and the caller treats its rows as a tie.
+    ``text`` is the source line: the iform and the attributes leave M32_1toN
+    and plain memory rows tied, so the ``{1toN}`` spelling splits them. An
+    empty text cannot split them."""
     cur = list(pool)
 
     def filt(stage_ok, pred):
@@ -671,6 +692,10 @@ def _x86_pick(pool: list[Row], d: dict, imm_unknown: bool = False) -> list[Row]:
         any("zeroing" in row.split_attrs for row in cur),
         lambda a: a.get("zeroing", "1" if d["zero"] else "0") == ("1" if d["zero"] else "0"),
     )
+    if text and len(cur) > 1:
+        picked = [row for row in cur if ("_1to" in row.key) == ("{1to" in text)]
+        if picked:
+            cur = picked
     return cur
 
 
@@ -868,6 +893,186 @@ def identify(
     return results
 
 
+# The catalog has no xlen field (the unified-db definedBy.xlen drops at
+# ingest), so a 16-bit word like 0x2001 ties c.jal (xlen 32) against c.addiw
+# (xlen 64). The xlen comes from the decode itself, never from a row list:
+# decode the bytes with llvm-mc for riscv32 and riscv64 and keep the decode
+# whose printed mnemonic equals the line's own text mnemonic (objdump prints
+# the expanded or alias name too: jal, flw, sext.w). Both or neither match
+# keeps the rv64 result (the current default).
+def _rv64_only_ext(line: str) -> str | None:
+    """The extension name in an "'X' is only supported for 'rv64'" error line.
+
+    Returns None for any other line. The name sits after the last single quote
+    before the fixed tail, so a prefix like "error: ..." is ignored.
+    """
+    head, sep, _tail = line.partition("' is only supported for 'rv64'")
+    if not sep:
+        return None
+    return head.rpartition("'")[2] or None
+
+
+_RV32_MATTR_CACHE: dict[tuple[str, str], str] = {}
+
+
+def _rv32_decode_mattr(llvm_mc: str) -> str:
+    """The riscv32 decode -mattr: the riscv64 one minus rv64-only extensions.
+
+    Derived from llvm-mc's own errors (never hand-listed): the tool rejects
+    an rv64-only extension on the rv32 triple by name. shortcut: an extension
+    named differently in the error keeps its token, upgrade if a tool build
+    rejects it silently."""
+    base = _ARCH_CFG["riscv64"]["mattr"]
+    cached = _RV32_MATTR_CACHE.get((llvm_mc, base))
+    if cached is None:
+        tokens = base.split(",")
+        while True:
+            run = subprocess.run(
+                [
+                    llvm_mc,
+                    f"--triple={_ARCH_CFG['riscv32']['triple']}",
+                    f"-mattr={','.join(tokens)}",
+                    "-show-encoding",
+                ],
+                input="",
+                capture_output=True,
+                text=True,
+            )
+            drop = {
+                name.casefold()
+                for line in run.stderr.splitlines()
+                for name in [_rv64_only_ext(line)]
+                if name
+            }
+            if not drop:
+                break
+            remaining = [token for token in tokens if token.lstrip("+").casefold() not in drop]
+            # guard: the tool names an extension absent from the token list,
+            # so nothing shrank; break here or the loop spins forever
+            if len(remaining) == len(tokens):
+                break
+            tokens = remaining
+        cached = _RV32_MATTR_CACHE[(llvm_mc, base)] = ",".join(tokens)
+    return cached
+
+
+def _parse_disasm(listing: str) -> dict[bytes, tuple[str, str]]:
+    """One (printed mnemonic, MCInst opcode) per decoded word.
+
+    The encoding comment keys every block to its input word, so an invalid
+    word (no block) never shifts the map (spike tie P5)."""
+    found: dict[bytes, tuple[str, str]] = {}
+    raw = None
+    for line in listing.splitlines():
+        opcode = _mcinst_opcode(line)
+        if opcode is not None and raw is not None:
+            found[raw] = (found[raw][0], opcode)
+            continue
+        if not line.strip() or _CONT_RE.match(line):
+            continue
+        enc = _ENC_RE.search(line)
+        raw = _bytes_to_words(enc.group(1)) if enc is not None else None
+        if raw is not None:
+            found.setdefault(raw, (line.split()[0], ""))
+    return found
+
+
+_RV_DECODE_CACHE: dict[tuple[str, int, bytes], tuple[str, str] | None] = {}
+
+
+def _rv_xlen_decodes(
+    raws: list[bytes], llvm_mc: str, xlen: int
+) -> dict[bytes, tuple[str, str] | None]:
+    """Disassemble each 16-bit word at one xlen: (mnemonic, opcode) or None.
+
+    One llvm-mc run covers every word the caller could not decide (the cost
+    gate: only an undecided RVC line pays the decode)."""
+    missing = [raw for raw in dict.fromkeys(raws) if (llvm_mc, xlen, raw) not in _RV_DECODE_CACHE]
+    if missing:
+        mattr = _ARCH_CFG["riscv64"]["mattr"] if xlen == 64 else _rv32_decode_mattr(llvm_mc)
+        hexed = [" ".join(f"0x{byte:02x}" for byte in raw) for raw in missing]
+        run = subprocess.run(
+            [
+                llvm_mc,
+                f"--triple={_ARCH_CFG[f'riscv{xlen}']['triple']}",
+                f"-mattr={mattr}",
+                "-disassemble",
+                "-show-inst",
+                "-show-encoding",
+            ],
+            input="\n".join(hexed) + "\n",
+            capture_output=True,
+            text=True,
+        )
+        found = _parse_disasm(run.stdout)
+        for raw in missing:
+            _RV_DECODE_CACHE[(llvm_mc, xlen, raw)] = found.get(raw)
+    return {raw: _RV_DECODE_CACHE[(llvm_mc, xlen, raw)] for raw in raws}
+
+
+def _rv_named(rows: list[Row], decode: tuple[str, str] | None) -> list[Row]:
+    """The rows the decode's own MCInst opcode names (LR_W_AQ to lr.w.aq)."""
+    if decode is None:
+        return []
+    named = decode[1].casefold().replace("_", ".")
+    return [row for row in rows if row.key.casefold() == named]
+
+
+def _rv_xlen_pick(
+    rows: list[Row], text: str, decodes: tuple[tuple[str, str] | None, ...]
+) -> list[Row]:
+    """Keep the xlen decode whose printed mnemonic is the line's own text.
+
+    ``decodes`` is (riscv32, riscv64). A tie both xlens decode the same way
+    is not an xlen tie and keeps its rows. When both or neither printed
+    mnemonic matches the text the rv64 result stays (the current default,
+    noted in the round-2 evidence); an rv64-invalid word then keeps the twin
+    the rv32 decode does not name."""
+    d32, d64 = decodes
+    if d32 is not None and d64 is not None and d32[0].casefold() == d64[0].casefold():
+        return rows
+    spelling = text.split(None, 1)[0].casefold().rstrip(":")
+    matched = [decode is not None and decode[0].casefold() == spelling for decode in (d32, d64)]
+    if matched[0] != matched[1]:
+        return _rv_named(rows, d32 if matched[0] else d64) or rows
+    picked = _rv_named(rows, d64)
+    named32 = _rv_named(rows, d32)
+    if not picked and named32:
+        picked = [row for row in rows if row not in named32]
+    return picked or rows
+
+
+def _rv_xlen_resolve(probed, results, catalog: _Catalog) -> None:
+    """Settle every undecided 16-bit tie by the xlen rule above (issue #65).
+
+    The decode runs only on the lines whose xlen is undecided: one llvm-mc
+    run per xlen covers the whole document."""
+    pending = [
+        (result, _bytes_to_words(entry.get("bytes")))
+        for entry, result in zip(probed, results)
+        if result.status == "no-row"
+        and result.reason.startswith("ambiguous:")
+        and result.candidates
+    ]
+    pending = [(result, raw) for result, raw in pending if len(raw) == 2]
+    if not pending:
+        return
+    llvm_mc = _tool_path("SIMDREF_LLVM_MC", "llvm-mc")
+    if llvm_mc is None:
+        return
+    raws = [raw for _result, raw in pending]
+    decodes_of = {xlen: _rv_xlen_decodes(raws, llvm_mc, xlen) for xlen in (32, 64)}
+    by_key = {row.db_key: row for row in catalog.rows}
+    for result, raw in pending:
+        rows = [by_key[key] for key in result.candidates if key in by_key]
+        picked = _rv_xlen_pick(rows, result.text, (decodes_of[32][raw], decodes_of[64][raw]))
+        if len(picked) == 1:
+            result.status = "row"
+            result.row = picked[0]
+            result.reason = ""
+            result.candidates = []
+
+
 def _rv_tiebreak(rows: list[Row], opcode: str) -> list[Row]:
     """Name the row by llvm-mc's own MCInst opcode (upstream data, review F3).
 
@@ -1009,6 +1214,12 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
         else:
             result.reason = f"ambiguous: {len(rows)} rows match the encoding"
             result.candidates = [row.db_key for row in rows]
+    if arch.startswith("riscv"):
+        # The 16-bit xlen ties are the only ones left ambiguous here.
+        _rv_xlen_resolve(probed, results, catalog)
+
+
+_ENDBR_BYTES = {"f30f1efa": "ENDBR64", "f30f1efb": "ENDBR32"}
 
 
 def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
@@ -1026,7 +1237,7 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
     if not pending:
         return
     hexes = [_bytes_to_words(entry.get("bytes")).hex() for entry, _result in pending]
-    for (entry, result), facts in zip(pending, _xed_facts(hexes, xed)):
+    for (entry, result), facts, hexed in zip(pending, _xed_facts(hexes, xed), hexes):
         # A fixup placeholder covers the immediate value (audit A1): the
         # pick must not read it, and a row carrying an immzero claim about
         # it would be a guess either way.
@@ -1034,12 +1245,17 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
         if "error" in facts:
             result.reason = f"no catalog row (XED {facts['error']})"
             continue
-        pool = catalog.iform_pools.get(facts["iform"], [])
+        # XED decodes ENDBR32/64 as the NOP iform NOP_GPRv_GPRv_0F1E, which no uops.info row carries
+        pool = catalog.iform_pools.get(_ENDBR_BYTES.get(hexed, facts["iform"]), [])
         if not pool:
             result.reason = f"no catalog row (iform {facts['iform']} absent)"
             continue
         try:
-            rows = _x86_pick(pool, facts, imm_unknown=covered) if len(pool) > 1 else pool
+            rows = (
+                _x86_pick(pool, facts, imm_unknown=covered, text=entry.get("text") or "")
+                if len(pool) > 1
+                else pool
+            )
         except ValueError as err:
             result.reason = f"no catalog row ({err})"
             continue
@@ -1139,7 +1355,8 @@ def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
         if len(families) == 1:
             out.append(next(iter(families)))
         elif families:
-            out.append(majority)
+            # the batch majority names the line's family only when the line's own assemblers accept it
+            out.append(majority if majority in families else None)
         else:
             out.append(None)
     return out, majority
@@ -1325,7 +1542,7 @@ def identify_lines(
         if len(families) == 1:
             family = next(iter(families))
         elif families:
-            family = majority
+            family = majority if majority in families else None
         if family is None:
             # no per-line answer: the caller's old document vote says which
             # family's assembler to try (no keep mask; every line is tried)
@@ -1353,8 +1570,8 @@ def identify_lines(
                 chosen, entry = ("x86", "att"), _bytes_entry(byte_hex)
             elif probed[other][index].get("status") == "OK":
                 chosen, entry = other, probed[other][index]
-        elif chosen is None and byte_hex:
-            chosen, entry = ("x86", "att"), _bytes_entry(byte_hex)
+        # A line no assembler accepts gets no byte identity: its byte column is
+        # no evidence for x86 (an ARM32 "bx lr" bytes decode as x86 LOOP).
         if chosen is None or entry is None or entry.get("status") != "OK":
             error = (
                 probed[("x86", "intel")][index].get("error")

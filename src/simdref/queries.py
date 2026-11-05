@@ -12,6 +12,7 @@ import sqlite3
 from typing import TYPE_CHECKING
 
 from simdref.perf import record_iclass, variant_perf_summary
+from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, source_kind_for
 from simdref.storage import load_instruction_from_db
 
 SOURCE_KINDS: tuple[str, ...] = ("measured", "modeled", "any")
@@ -24,15 +25,22 @@ def filter_arch_details_by_source_kind(
     """Drop ``arch_details`` entries whose provenance does not match.
 
     ``"any"`` (or empty) keeps everything; ``"measured"`` / ``"modeled"``
-    keep only entries whose ``source_kind`` field matches (legacy entries
-    without a ``source_kind`` key are treated as measured).
+    keep entries holding a value of that kind. Each field counts under its
+    own source (a borrowed latency under its ``latency_source`` donor), so
+    a mixed slot matches both kinds. Legacy entries without a
+    ``source_kind`` key are treated as measured.
     """
     if source_kind in ("", "any"):
         return arch_details
     kept: dict[str, dict[str, object]] = {}
     for core, details in arch_details.items():
-        kind = details.get("source_kind") or "measured"
-        if kind == source_kind:
+        kinds = {details.get("source_kind") or "measured"}
+        kinds |= {
+            source_kind_for(details.get(key))
+            for key in _FIELD_SOURCE_KEYS.values()
+            if details.get(key)
+        }
+        if source_kind in kinds:
             kept[core] = details
     return kept
 
