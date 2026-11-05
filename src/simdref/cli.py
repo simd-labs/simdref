@@ -927,6 +927,7 @@ def _llm_timing(arch_details, iclass: str | None = None) -> dict[str, dict]:
     *iclass*, loses its cpi, uops and ports together.
     """
     from simdref.annotate import _cpi_for, _latency_for, _per_arch_value, _ports_for
+    from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
 
     if not isinstance(arch_details, dict):
         return {}
@@ -943,8 +944,12 @@ def _llm_timing(arch_details, iclass: str | None = None) -> dict[str, dict]:
         entry: dict = {
             "lat": lat,
             "cpi": cpi,
-            "source_kind": perf._source_kind(details),
+            "source_kind": slot_kind(details),
         }
+        for field, key in _FIELD_SOURCE_KEYS.items():
+            # A borrowed field keeps its own donor label (#65).
+            if details.get(key) and _has_field(details, field):
+                entry[key] = details[key]
         if ports:
             entry["ports"] = ports
         uops = (details.get("measurement") or {}).get("uops")
@@ -969,13 +974,19 @@ def _merge_timing(per_instruction: list[dict[str, dict]]) -> dict[str, dict]:
             if current is None:
                 merged[core] = dict(entry)
                 continue
-            for field in ("lat", "cpi"):
+            for field, source_key in (("lat", "latency_source"), ("cpi", "cpi_source")):
                 new_value, old_value = entry.get(field), current.get(field)
                 if new_value is not None and (old_value is None or new_value < old_value):
                     current[field] = new_value
-            for field in ("ports", "uops"):
+                    if entry.get(source_key):
+                        current[source_key] = entry[source_key]
+                    else:
+                        current.pop(source_key, None)
+            for field, source_key in (("ports", "ports_source"), ("uops", "uops_source")):
                 if field not in current and entry.get(field) is not None:
                     current[field] = entry[field]
+                    if entry.get(source_key):
+                        current[source_key] = entry[source_key]
     for core, current in merged.items():
         # The winning lat and cpi may come from differently-sourced forms, so a
         # single label would misattribute one of them. Same convention as `aggregate_perf`.
@@ -986,13 +997,15 @@ def _merge_timing(per_instruction: list[dict[str, dict]]) -> dict[str, dict]:
 
 def _payload_source_kinds(arch_details) -> list[str]:
     """Return the distinct provenance kinds present in an instruction's arch_details."""
+    from simdref.perf_sources.merge import slot_kind
+
     if not isinstance(arch_details, dict):
         return []
     kinds: list[str] = []
     for details in arch_details.values():
         if not isinstance(details, dict):
             continue
-        kind = perf._source_kind(details)
+        kind = slot_kind(details)
         if kind not in kinds:
             kinds.append(kind)
     return kinds
@@ -1154,6 +1167,7 @@ def _print_non_interactive_summary(
         _fmt_num,
     )
     from simdref.perf_sources.cores import canonical_core_id, supported_core_ids
+    from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
 
     canonical_arch: str | None = None
     if arch is not None:
@@ -1195,17 +1209,21 @@ def _print_non_interactive_summary(
             for core in iter_archs:
                 if core is None:
                     continue
-                lat, cpi, kind = arch_perf(rec, core)
+                lat, cpi, _ = arch_perf(rec, core)
                 ports = collect_ports(rec, arch=core, archs_used=[core])
-                per_arch.append(
-                    {
-                        "arch": core,
-                        "latency_cycles": lat,
-                        "tput_cpi": cpi,
-                        "source_kind": kind,
-                        "ports": ports,
-                    }
-                )
+                details = (rec.arch_details or {}).get(core) or {}
+                entry = {
+                    "arch": core,
+                    "latency_cycles": lat,
+                    "tput_cpi": cpi,
+                    "source_kind": slot_kind(details),
+                    "ports": ports,
+                }
+                for field, key in _FIELD_SOURCE_KEYS.items():
+                    # A borrowed field keeps its own donor label (#65).
+                    if details.get(key) and _has_field(details, field):
+                        entry[key] = details[key]
+                per_arch.append(entry)
             summary = aggregate_perf(rec, mode="avg", include_modeled=False)
             payload["variants"].append(
                 {
@@ -1635,7 +1653,13 @@ def _llm_filter_records(
 
 
 def _record_has_source_kind(rec: dict, wanted: str) -> bool:
-    """Check whether an llm payload dict carries at least one entry with *wanted* provenance."""
+    """Check whether an llm payload dict carries at least one entry with *wanted* provenance.
+
+    Each field counts under its own source: a slot with a borrowed latency
+    holds both its owner's kind and its donor's (#65).
+    """
+    from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, source_kind_for
+
     slim = rec.get("source_kinds")
     if isinstance(slim, list) and any(k == wanted for k in slim):
         return True
@@ -1643,8 +1667,13 @@ def _record_has_source_kind(rec: dict, wanted: str) -> bool:
     if isinstance(arch_details, dict):
         for details in arch_details.values():
             if isinstance(details, dict):
-                kind = details.get("source_kind") or "measured"
-                if kind == wanted:
+                kinds = {details.get("source_kind") or "measured"}
+                kinds |= {
+                    source_kind_for(details.get(key))
+                    for key in _FIELD_SOURCE_KEYS.values()
+                    if details.get(key)
+                }
+                if wanted in kinds:
                     return True
     for nested_key in ("instruction", "instructions", "results"):
         nested = rec.get(nested_key)

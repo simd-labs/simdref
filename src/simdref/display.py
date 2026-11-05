@@ -27,6 +27,7 @@ from simdref.perf import (
     variant_perf_summary_labeled,
 )
 from simdref.pdfrefs import normalize_pdf_refs, pdf_ref_label
+from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
 from simdref.queries import linked_instruction_records
 
 if TYPE_CHECKING:
@@ -681,7 +682,9 @@ def measurement_rows(item) -> list[dict]:
 
     Each row carries a ``source`` column (``measured`` / ``modeled``) so
     downstream renderers can show provenance without re-reading the
-    ``arch_details`` entry.
+    ``arch_details`` entry. ``source_tool`` labels the row's owner; a
+    borrowed field carries its own ``<field>_source`` label next to its
+    value, so a filled latency never reads as the ports' source (#65).
     """
     rows: list[dict] = []
     for arch, details in item.arch_details.items():
@@ -694,10 +697,13 @@ def measurement_rows(item) -> list[dict]:
             if cpi != "-" and "TP_loop" not in row:
                 # Fall back to TP so the CPI column shows it.
                 row["TP_loop"] = cpi
-            row["source"] = details.get("source_kind") or "measured"
+            row["source"] = slot_kind(details)
             # Per-row source label. Entries without a stored source are
             # uops.info rows, the same default merge._entry_rank uses.
             row["source_tool"] = details.get("source") or "uops.info"
+            for field, key in _FIELD_SOURCE_KEYS.items():
+                if details.get(key) and _has_field(details, field):
+                    row[key] = details[key]
             # The version and citation keys ride along for the footnote;
             # the exclude set keeps them out of the table columns.
             for stored, key in (
@@ -744,13 +750,17 @@ _GENERIC_TABLE_LABEL_MAP = {
     "uarch": "microarch",
     "source_tool": "src",
     "latency": "LAT",
+    "latency_source": "lat src",
     "TP_loop": "CPI",
+    "cpi_source": "cpi src",
     "TP_unrolled": "CPI unroll",
     "TP_ports": "CPI ports",
     "TP": "CPI",
     "TP_no_interiteration": "cycle/instr (no interiteration)",
     "kind": "op",
     "latency_pairs": "LAT per pair",
+    "uops_source": "uops src",
+    "ports_source": "ports src",
 }
 
 
@@ -847,13 +857,18 @@ def provenance_lines(rows: list[dict]) -> list[str]:
     """One ``name version url`` line per distinct perf source in *rows*.
 
     Rows without a ``source_tool`` add no line, so a record that lacks the
-    fields renders no footnote label.
+    fields renders no footnote label. A borrowed field names its donor
+    too, without a version or url of its own.
     """
     parts: dict[str, tuple[str, str]] = {}
     for row in rows:
         name = row.get("source_tool")
         if name and name not in parts:
             parts[name] = (row.get("source_version", ""), row.get("citation_url", ""))
+        for key in _FIELD_SOURCE_KEYS.values():
+            name = row.get(key)
+            if name and name not in parts:
+                parts[name] = ("", "")
     return [
         " ".join(part for part in (name, *versions) if part) for name, versions in parts.items()
     ]
@@ -1000,10 +1015,14 @@ _MEASUREMENT_PREFERRED_ORDER = [
     "uarch",
     "source_tool",
     "latency",
+    "latency_source",
     "TP_loop",
+    "cpi_source",
     "TP_ports",
     "uops",
+    "uops_source",
     "ports",
+    "ports_source",
     "kind",
 ]
 _MEASUREMENT_EXCLUDE_KEYS = {
