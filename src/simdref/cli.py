@@ -226,7 +226,9 @@ RELEASE_TAG = "data-latest"
 
 
 def _release_tag_candidates() -> list[str]:
-    return [f"data-v{__version__}", RELEASE_TAG]
+    # CI sets SIMDREF_RELEASE_TAG=data-latest: data-v<version> predates unreleased main.
+    pinned = os.environ.get("SIMDREF_RELEASE_TAG")
+    return [pinned] if pinned else [f"data-v{__version__}", RELEASE_TAG]
 
 
 def _release_asset_url(tag: str, asset_name: str) -> str:
