@@ -688,6 +688,8 @@ def aggregate_perf(
     include_modeled: bool = False,
 ) -> PerfSummary:
     """Aggregate latency and CPI across ``record``'s measured microarches."""
+    from simdref.perf_sources.merge import field_kind
+
     arch_details = record.arch_details or {}
     iclass = perf.record_iclass(record)
 
@@ -696,17 +698,18 @@ def aggregate_perf(
         cpis: list[float] = []
         archs: list[str] = []
         for core, details in arch_details.items():
-            kind = details.get("source_kind") or "measured"
-            if kind not in kinds:
-                continue
             lat = _per_arch_value(details, _latency_for)
             cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
-            if lat is None and cpi is None:
+            # Each value joins the bucket of its own source: a borrowed
+            # latency counts as its donor's kind, never as the owner's.
+            lat_ok = lat is not None and field_kind(details, "latencies") in kinds
+            cpi_ok = cpi is not None and field_kind(details, "cpi") in kinds
+            if not lat_ok and not cpi_ok:
                 continue
             archs.append(core)
-            if lat is not None:
+            if lat_ok:
                 lats.append(lat)
-            if cpi is not None:
+            if cpi_ok:
                 cpis.append(cpi)
         return lats, cpis, archs
 
@@ -758,15 +761,20 @@ def _fmt_num(x: float | None) -> str:
 def arch_perf(record: InstructionRecord, arch: str) -> tuple[float | None, float | None, str]:
     """Return ``(latency, cpi, source_kind)`` for *arch* on *record*.
 
-    Missing values are ``None`` and ``source_kind`` falls back to
-    ``"measured"`` when the row predates the provenance field.
+    Missing values are ``None``. ``source_kind`` labels the values with
+    their own sources: each field's kind follows its ``<field>_source``
+    donor when it has one, and the label names the owner plus every
+    borrowed field (``"measured (owner uops.info, latency from
+    instlatx64)"``). Rows that predate the provenance fields fall back to
+    ``"measured"``.
     """
+    from simdref.perf_sources.merge import slot_kind_label
+
     details = (record.arch_details or {}).get(arch) or {}
-    kind = details.get("source_kind") or "measured"
     iclass = perf.record_iclass(record)
     lat = _per_arch_value(details, _latency_for)
     cpi = _per_arch_value(details, lambda d: _cpi_for(d, iclass))
-    return lat, cpi, kind
+    return lat, cpi, slot_kind_label(details)
 
 
 def arch_perf_tag(arch: str, lat: float | None, cpi: float | None, kind: str) -> str:
