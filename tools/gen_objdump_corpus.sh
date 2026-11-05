@@ -33,14 +33,19 @@ for a in "${!TGT[@]}"; do
 	"$LOD" -d -j .text --no-show-raw-insn "$a.o" >"$OUT/${a}__llvm_noraw.txt"
 	"$LOD" -d -j .text --no-leading-addr "$a.o" >"$OUT/${a}__llvm_noaddr.txt"
 	"$LOD" -d -j .text --print-imm-hex "$a.o" >"$OUT/${a}__llvm_immhex.txt"
+	"$LOD" -d -r -j .text "$a.o" >"$OUT/${a}__llvm_r.txt"
 	"$LOD" -d -j .text --no-show-raw-insn "$a.o" >"$a.truth_llvm.txt"
 	g=${GNU[$a]:-}
 	if [ -n "$g" ] && command -v "$g" >/dev/null; then
 		"$g" -d -j .text "$a.o" >"$OUT/${a}__gnu_d.txt"
+		"$g" -d -r -j .text "$a.o" >"$OUT/${a}__gnu_r.txt"
 		"$g" -d -w -j .text --no-show-raw-insn "$a.o" >"$a.truth_gnu.txt"
 		if [ "$a" = x86_64 ]; then
 			"$g" -d -j .text --no-show-raw-insn "$a.o" >"$OUT/${a}__gnu_noraw.txt"
 			"$g" -d -w -j .text "$a.o" >"$OUT/${a}__gnu_w.txt"
+			# Plain-asm label lines ("	add: ret") inside a listing are no address lines (issue #66).
+			awk '{print} !done && /^ *[0-9a-f]+:	/ {print "	add: ret\n	beef: nop\n	dead: fadd %st(1),%st"; done=1}' \
+				"$OUT/${a}__gnu_d.txt" >"$OUT/${a}__gnu_mixed.txt"
 			"$g" -d -j .text -M intel "$a.o" >"$OUT/${a}__gnu_intel.txt"
 			"$g" -d -w -j .text --no-show-raw-insn -M intel "$a.o" >"$a.truth_gnu_intel.txt"
 		fi

@@ -55,7 +55,9 @@ _INSTR_RE = re.compile(
 _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
 # objdump listings (issue #65): one format detection per listing, then one
 # rule per address line: the byte column holds next_address - address bytes.
-_OBJDUMP_ADDR_RE = re.compile(r"^\s*([0-9a-fA-F]+):(?=\s|$)")
+# objdump right-aligns the address with spaces; a TAB right before it marks a
+# relocation line ("-r") or a plain-asm label ("\tadd: ret"), not an address.
+_OBJDUMP_ADDR_RE = re.compile(r"^[ \t]*(?<!\t)([0-9a-fA-F]+):(?=\s|$)")
 # A byte group: 2-digit byte, 4-digit halfword or 8-digit word.
 _HEX_GROUP_RE = re.compile(r"[0-9a-fA-F]{2}|[0-9a-fA-F]{4}|[0-9a-fA-F]{8}")
 # A byte column: a hex run before objdump's TAB, or before 2+ spaces once a
@@ -120,6 +122,11 @@ def _opens_byte_column(body: str) -> bool:
     )
 
 
+def _objdump_shaped(body: str) -> bool:
+    """objdump's address-column form: a TAB or a byte column after the colon."""
+    return body.lstrip(" ")[:1] == "\t" or _opens_byte_column(body)
+
+
 def _group_bytes(group: str) -> bytes:
     # shortcut: a 4-/8-digit group is a little-endian halfword/word value; upgrade for big-endian listings.
     return int(group, 16).to_bytes(len(group) // 2, "little")
@@ -144,11 +151,7 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
     # A pasted fragment has no header: it is objdump-shaped when most content
     # lines are "addr:" lines with a TAB or a byte column after the colon (a
     # label with a same-line instruction, "\tadd: ret", has neither).
-    shaped = [
-        line
-        for line in addr_lines
-        if _objdump_body(line).lstrip(" ")[:1] == "\t" or _opens_byte_column(_objdump_body(line))
-    ]
+    shaped = [line for line in addr_lines if _objdump_shaped(_objdump_body(line))]
     has_header = any(_FILE_FORMAT_RE.search(line) for line in lines[:10])
     if not has_header and not (content and len(shaped) * 2 > len(content)):
         return {}
@@ -160,7 +163,16 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
     for index, line in enumerate(lines):
         m = _OBJDUMP_ADDR_RE.match(line)
         if m:
-            rows.append((index, int(m.group(1), 16), line[m.end() :]))
+            body = line[m.end() :]
+            toks = body.split()[:2]
+            # A pasted relocation or label line lost its TABs but has no byte column
+            # either; a pasted long llvm x86 column has no gap, so two groups count.
+            if (
+                not has_bytes
+                or _objdump_shaped(body)
+                or (len(toks) == 2 and all(map(_HEX_GROUP_RE.fullmatch, toks)))
+            ):
+                rows.append((index, int(m.group(1), 16), body))
         elif not has_addr and line[:1] in " \t" and line.strip() and not line.strip().endswith(":"):
             rows.append((index, None, line))
 
