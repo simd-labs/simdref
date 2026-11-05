@@ -1,0 +1,1650 @@
+{
+ "_type": "Root",
+ "instructions": [
+  {
+   "_type": "Instruction.InstructionSet",
+   "name": "A64",
+   "children": [
+    {
+     "_type": "Instruction.InstructionGroup",
+     "name": "control",
+     "children": [
+      {
+       "_meta": {
+        "encoded_in": {
+         "<imm>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "CRm"
+          },
+          {
+           "_type": "AST.Identifier",
+           "value": "op1"
+          },
+          {
+           "_type": "AST.Identifier",
+           "value": "op2"
+          }
+         ],
+         "<pstatefield>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "CRm"
+          },
+          {
+           "_type": "AST.Identifier",
+           "value": "op1"
+          },
+          {
+           "_type": "AST.Identifier",
+           "value": "op2"
+          }
+         ]
+        }
+       },
+       "_type": "Instruction.Instruction",
+       "assemble": null,
+       "assembly": {
+        "_type": "Instruction.Assembly",
+        "description": {
+         "_type": "Description",
+         "after": null,
+         "before": null
+        },
+        "symbols": [
+         {
+          "_type": "Instruction.Symbols.Literal",
+          "value": "MSR"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "SPACE"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "pstatefield_option"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "hash"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "msr_imm"
+         }
+        ]
+       },
+       "assertions": null,
+       "condition": {
+        "_type": "AST.UnaryOp",
+        "expr": {
+         "_type": "AST.BinaryOp",
+         "left": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.Identifier",
+           "value": "op1"
+          },
+          "op": "==",
+          "right": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          }
+         },
+         "op": "&&",
+         "right": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.Identifier",
+           "value": "op2"
+          },
+          "op": "IN",
+          "right": {
+           "_type": "AST.Set",
+           "values": [
+            {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'00x'"
+            },
+            {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'010'"
+            }
+           ]
+          }
+         }
+        },
+        "op": "!"
+       },
+       "decode": null,
+       "disassemble": null,
+       "encoding": {
+        "_type": "Instruction.Encodeset.Encodeset",
+        "values": [
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op0",
+          "range": {
+           "_type": "Range",
+           "start": 29,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'110'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 26,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'101'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 19,
+           "width": 7
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0100000'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op1",
+          "range": {
+           "_type": "Range",
+           "start": 16,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 12,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0100'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "CRm",
+          "range": {
+           "_type": "Range",
+           "start": 8,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op2",
+          "range": {
+           "_type": "Range",
+           "start": 5,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "Rt",
+          "range": {
+           "_type": "Range",
+           "start": 0,
+           "width": 5
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'00000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'11111'"
+          }
+         }
+        ],
+        "width": 32
+       },
+       "name": "MSR_SI_pstate",
+       "operation_id": "MSR_imm",
+       "operational_note": null,
+       "preferred": null,
+       "properties": {},
+       "title": null,
+       "children": [
+        {
+         "_meta": {
+          "encoded_in": {
+           "<option>": [
+            {
+             "_type": "AST.Identifier",
+             "value": "CRm"
+            },
+            {
+             "_type": "AST.Identifier",
+             "value": "op1"
+            },
+            {
+             "_type": "AST.Identifier",
+             "value": "op2"
+            }
+           ]
+          }
+         },
+         "_type": "Instruction.InstructionAlias",
+         "assembly": {
+          "_type": "Instruction.Assembly",
+          "description": {
+           "_type": "Description",
+           "after": null,
+           "before": null
+          },
+          "symbols": [
+           {
+            "_type": "Instruction.Symbols.Literal",
+            "value": "SMSTART"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "optional_targets__2"
+           }
+          ]
+         },
+         "condition": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.UnaryOp",
+           "expr": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "op1"
+             },
+             "op": "==",
+             "right": {
+              "_type": "Values.Value",
+              "meaning": null,
+              "value": "'000'"
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "op2"
+             },
+             "op": "IN",
+             "right": {
+              "_type": "AST.Set",
+              "values": [
+               {
+                "_type": "Values.Value",
+                "meaning": null,
+                "value": "'00x'"
+               },
+               {
+                "_type": "Values.Value",
+                "meaning": null,
+                "value": "'010'"
+               }
+              ]
+             }
+            }
+           },
+           "op": "!"
+          },
+          "op": "&&",
+          "right": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Function",
+              "arguments": [
+               {
+                "_type": "AST.Identifier",
+                "value": "FEAT_SME"
+               }
+              ],
+              "name": "IsFeatureImplemented",
+              "parameters": []
+             },
+             "op": "&&",
+             "right": {
+              "_type": "AST.BinaryOp",
+              "left": {
+               "_type": "AST.Identifier",
+               "value": "op1"
+              },
+              "op": "==",
+              "right": {
+               "_type": "Values.Value",
+               "meaning": null,
+               "value": "'011'"
+              }
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "CRm"
+             },
+             "op": "IN",
+             "right": {
+              "_type": "AST.Set",
+              "values": [
+               {
+                "_type": "Values.Value",
+                "meaning": null,
+                "value": "'0xx1'"
+               }
+              ]
+             }
+            }
+           },
+           "op": "&&",
+           "right": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.Identifier",
+             "value": "op2"
+            },
+            "op": "==",
+            "right": {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'011'"
+            }
+           }
+          }
+         },
+         "name": "SMSTART",
+         "operation_id": "SMSTART_MSR_imm",
+         "preferred": {
+          "_type": "AST.Bool",
+          "value": true
+         }
+        },
+        {
+         "_meta": {
+          "encoded_in": {
+           "<option>": [
+            {
+             "_type": "AST.Identifier",
+             "value": "CRm"
+            },
+            {
+             "_type": "AST.Identifier",
+             "value": "op1"
+            },
+            {
+             "_type": "AST.Identifier",
+             "value": "op2"
+            }
+           ]
+          }
+         },
+         "_type": "Instruction.InstructionAlias",
+         "assembly": {
+          "_type": "Instruction.Assembly",
+          "description": {
+           "_type": "Description",
+           "after": null,
+           "before": null
+          },
+          "symbols": [
+           {
+            "_type": "Instruction.Symbols.Literal",
+            "value": "SMSTOP"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "optional_targets__3"
+           }
+          ]
+         },
+         "condition": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.UnaryOp",
+           "expr": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "op1"
+             },
+             "op": "==",
+             "right": {
+              "_type": "Values.Value",
+              "meaning": null,
+              "value": "'000'"
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "op2"
+             },
+             "op": "IN",
+             "right": {
+              "_type": "AST.Set",
+              "values": [
+               {
+                "_type": "Values.Value",
+                "meaning": null,
+                "value": "'00x'"
+               },
+               {
+                "_type": "Values.Value",
+                "meaning": null,
+                "value": "'010'"
+               }
+              ]
+             }
+            }
+           },
+           "op": "!"
+          },
+          "op": "&&",
+          "right": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Function",
+              "arguments": [
+               {
+                "_type": "AST.Identifier",
+                "value": "FEAT_SME"
+               }
+              ],
+              "name": "IsFeatureImplemented",
+              "parameters": []
+             },
+             "op": "&&",
+             "right": {
+              "_type": "AST.BinaryOp",
+              "left": {
+               "_type": "AST.Identifier",
+               "value": "op1"
+              },
+              "op": "==",
+              "right": {
+               "_type": "Values.Value",
+               "meaning": null,
+               "value": "'011'"
+              }
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "CRm"
+             },
+             "op": "IN",
+             "right": {
+              "_type": "AST.Set",
+              "values": [
+               {
+                "_type": "Values.Value",
+                "meaning": null,
+                "value": "'0xx0'"
+               }
+              ]
+             }
+            }
+           },
+           "op": "&&",
+           "right": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.Identifier",
+             "value": "op2"
+            },
+            "op": "==",
+            "right": {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'011'"
+            }
+           }
+          }
+         },
+         "name": "SMSTOP",
+         "operation_id": "SMSTOP_MSR_imm",
+         "preferred": {
+          "_type": "AST.Bool",
+          "value": true
+         }
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "encoded_in": {
+         "<Cm>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "CRm"
+          }
+         ],
+         "<Cn>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "CRn"
+          }
+         ],
+         "<Xt>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "Rt"
+          }
+         ],
+         "<op1>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "op1"
+          }
+         ],
+         "<op2>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "op2"
+          }
+         ]
+        }
+       },
+       "_type": "Instruction.Instruction",
+       "assemble": null,
+       "assembly": {
+        "_type": "Instruction.Assembly",
+        "description": {
+         "_type": "Description",
+         "after": null,
+         "before": null
+        },
+        "symbols": [
+         {
+          "_type": "Instruction.Symbols.Literal",
+          "value": "SYS"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "SPACE"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "hash"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "op1"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "Cn"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "Cm"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "hash"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "op2"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "optional_Xm"
+         }
+        ]
+       },
+       "assertions": null,
+       "condition": {
+        "_type": "AST.Bool",
+        "value": true
+       },
+       "decode": null,
+       "disassemble": null,
+       "encoding": {
+        "_type": "Instruction.Encodeset.Encodeset",
+        "values": [
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op0",
+          "range": {
+           "_type": "Range",
+           "start": 29,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'110'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 26,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'101'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 22,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0100'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "L",
+          "range": {
+           "_type": "Range",
+           "start": 21,
+           "width": 1
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 19,
+           "width": 2
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'00'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'01'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op1",
+          "range": {
+           "_type": "Range",
+           "start": 16,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "CRn",
+          "range": {
+           "_type": "Range",
+           "start": 12,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "CRm",
+          "range": {
+           "_type": "Range",
+           "start": 8,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op2",
+          "range": {
+           "_type": "Range",
+           "start": 5,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "Rt",
+          "range": {
+           "_type": "Range",
+           "start": 0,
+           "width": 5
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'00000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxxx'"
+          }
+         }
+        ],
+        "width": 32
+       },
+       "name": "SYS_CR_systeminstrs",
+       "operation_id": "SYS",
+       "operational_note": null,
+       "preferred": null,
+       "properties": {},
+       "title": null,
+       "children": [
+        {
+         "_meta": {
+          "encoded_in": {
+           "<Xt>": [
+            {
+             "_type": "AST.Identifier",
+             "value": "Rt"
+            }
+           ]
+          }
+         },
+         "_type": "Instruction.InstructionAlias",
+         "assembly": {
+          "_type": "Instruction.Assembly",
+          "description": {
+           "_type": "Description",
+           "after": null,
+           "before": null
+          },
+          "symbols": [
+           {
+            "_type": "Instruction.Symbols.Literal",
+            "value": "GCSSS1"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "XtOrXZR__3"
+           }
+          ]
+         },
+         "condition": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Function",
+              "arguments": [
+               {
+                "_type": "AST.Identifier",
+                "value": "FEAT_GCS"
+               }
+              ],
+              "name": "IsFeatureImplemented",
+              "parameters": []
+             },
+             "op": "&&",
+             "right": {
+              "_type": "AST.BinaryOp",
+              "left": {
+               "_type": "AST.Identifier",
+               "value": "op1"
+              },
+              "op": "==",
+              "right": {
+               "_type": "Values.Value",
+               "meaning": null,
+               "value": "'011'"
+              }
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "CRn"
+             },
+             "op": "==",
+             "right": {
+              "_type": "Values.Value",
+              "meaning": null,
+              "value": "'0111'"
+             }
+            }
+           },
+           "op": "&&",
+           "right": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.Identifier",
+             "value": "CRm"
+            },
+            "op": "==",
+            "right": {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'0111'"
+            }
+           }
+          },
+          "op": "&&",
+          "right": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.Identifier",
+            "value": "op2"
+           },
+           "op": "==",
+           "right": {
+            "_type": "Values.Value",
+            "meaning": null,
+            "value": "'010'"
+           }
+          }
+         },
+         "name": "GCSSS1",
+         "operation_id": "GCSSS1_SYS",
+         "preferred": {
+          "_type": "AST.Bool",
+          "value": true
+         }
+        }
+       ]
+      },
+      {
+       "_meta": {
+        "encoded_in": {
+         "<Cm>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "CRm"
+          }
+         ],
+         "<Cn>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "CRn"
+          }
+         ],
+         "<Xt>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "Rt"
+          }
+         ],
+         "<op1>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "op1"
+          }
+         ],
+         "<op2>": [
+          {
+           "_type": "AST.Identifier",
+           "value": "op2"
+          }
+         ]
+        }
+       },
+       "_type": "Instruction.Instruction",
+       "assemble": null,
+       "assembly": {
+        "_type": "Instruction.Assembly",
+        "description": {
+         "_type": "Description",
+         "after": null,
+         "before": null
+        },
+        "symbols": [
+         {
+          "_type": "Instruction.Symbols.Literal",
+          "value": "SYSL"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "SPACE"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "XtOrXZR__4"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "hash"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "op1"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "Cn"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "Cm"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "COMMA"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "hash"
+         },
+         {
+          "_type": "Instruction.Symbols.RuleReference",
+          "rule_id": "op2"
+         }
+        ]
+       },
+       "assertions": null,
+       "condition": {
+        "_type": "AST.Bool",
+        "value": true
+       },
+       "decode": null,
+       "disassemble": null,
+       "encoding": {
+        "_type": "Instruction.Encodeset.Encodeset",
+        "values": [
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op0",
+          "range": {
+           "_type": "Range",
+           "start": 29,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'110'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 26,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'101'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 22,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0100'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "L",
+          "range": {
+           "_type": "Range",
+           "start": 21,
+           "width": 1
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'1'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Bits",
+          "range": {
+           "_type": "Range",
+           "start": 19,
+           "width": 2
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'00'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'01'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op1",
+          "range": {
+           "_type": "Range",
+           "start": 16,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "CRn",
+          "range": {
+           "_type": "Range",
+           "start": 12,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "CRm",
+          "range": {
+           "_type": "Range",
+           "start": 8,
+           "width": 4
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'0000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "op2",
+          "range": {
+           "_type": "Range",
+           "start": 5,
+           "width": 3
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxx'"
+          }
+         },
+         {
+          "_type": "Instruction.Encodeset.Field",
+          "name": "Rt",
+          "range": {
+           "_type": "Range",
+           "start": 0,
+           "width": 5
+          },
+          "should_be_mask": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'00000'"
+          },
+          "value": {
+           "_type": "Values.Value",
+           "meaning": null,
+           "value": "'xxxxx'"
+          }
+         }
+        ],
+        "width": 32
+       },
+       "name": "SYSL_RC_systeminstrs",
+       "operation_id": "SYSL",
+       "operational_note": null,
+       "preferred": null,
+       "properties": {},
+       "title": null,
+       "children": [
+        {
+         "_meta": {
+          "encoded_in": {
+           "<Xt>": [
+            {
+             "_type": "AST.Identifier",
+             "value": "Rt"
+            }
+           ]
+          }
+         },
+         "_type": "Instruction.InstructionAlias",
+         "assembly": {
+          "_type": "Instruction.Assembly",
+          "description": {
+           "_type": "Description",
+           "after": null,
+           "before": null
+          },
+          "symbols": [
+           {
+            "_type": "Instruction.Symbols.Literal",
+            "value": "GCSPOPM"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "optional_XtOrXZR_destination_container"
+           }
+          ]
+         },
+         "condition": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Function",
+              "arguments": [
+               {
+                "_type": "AST.Identifier",
+                "value": "FEAT_GCS"
+               }
+              ],
+              "name": "IsFeatureImplemented",
+              "parameters": []
+             },
+             "op": "&&",
+             "right": {
+              "_type": "AST.BinaryOp",
+              "left": {
+               "_type": "AST.Identifier",
+               "value": "op1"
+              },
+              "op": "==",
+              "right": {
+               "_type": "Values.Value",
+               "meaning": null,
+               "value": "'011'"
+              }
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "CRn"
+             },
+             "op": "==",
+             "right": {
+              "_type": "Values.Value",
+              "meaning": null,
+              "value": "'0111'"
+             }
+            }
+           },
+           "op": "&&",
+           "right": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.Identifier",
+             "value": "CRm"
+            },
+            "op": "==",
+            "right": {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'0111'"
+            }
+           }
+          },
+          "op": "&&",
+          "right": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.Identifier",
+            "value": "op2"
+           },
+           "op": "==",
+           "right": {
+            "_type": "Values.Value",
+            "meaning": null,
+            "value": "'001'"
+           }
+          }
+         },
+         "name": "GCSPOPM",
+         "operation_id": "GCSPOPM_SYSL",
+         "preferred": {
+          "_type": "AST.Bool",
+          "value": true
+         }
+        },
+        {
+         "_meta": {
+          "encoded_in": {
+           "<Xt>": [
+            {
+             "_type": "AST.Identifier",
+             "value": "Rt"
+            }
+           ]
+          }
+         },
+         "_type": "Instruction.InstructionAlias",
+         "assembly": {
+          "_type": "Instruction.Assembly",
+          "description": {
+           "_type": "Description",
+           "after": null,
+           "before": null
+          },
+          "symbols": [
+           {
+            "_type": "Instruction.Symbols.Literal",
+            "value": "GCSSS2"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "SPACE"
+           },
+           {
+            "_type": "Instruction.Symbols.RuleReference",
+            "rule_id": "XtOrXZR__4"
+           }
+          ]
+         },
+         "condition": {
+          "_type": "AST.BinaryOp",
+          "left": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Function",
+              "arguments": [
+               {
+                "_type": "AST.Identifier",
+                "value": "FEAT_GCS"
+               }
+              ],
+              "name": "IsFeatureImplemented",
+              "parameters": []
+             },
+             "op": "&&",
+             "right": {
+              "_type": "AST.BinaryOp",
+              "left": {
+               "_type": "AST.Identifier",
+               "value": "op1"
+              },
+              "op": "==",
+              "right": {
+               "_type": "Values.Value",
+               "meaning": null,
+               "value": "'011'"
+              }
+             }
+            },
+            "op": "&&",
+            "right": {
+             "_type": "AST.BinaryOp",
+             "left": {
+              "_type": "AST.Identifier",
+              "value": "CRn"
+             },
+             "op": "==",
+             "right": {
+              "_type": "Values.Value",
+              "meaning": null,
+              "value": "'0111'"
+             }
+            }
+           },
+           "op": "&&",
+           "right": {
+            "_type": "AST.BinaryOp",
+            "left": {
+             "_type": "AST.Identifier",
+             "value": "CRm"
+            },
+            "op": "==",
+            "right": {
+             "_type": "Values.Value",
+             "meaning": null,
+             "value": "'0111'"
+            }
+           }
+          },
+          "op": "&&",
+          "right": {
+           "_type": "AST.BinaryOp",
+           "left": {
+            "_type": "AST.Identifier",
+            "value": "op2"
+           },
+           "op": "==",
+           "right": {
+            "_type": "Values.Value",
+            "meaning": null,
+            "value": "'011'"
+           }
+          }
+         },
+         "name": "GCSSS2",
+         "operation_id": "GCSSS2_SYSL",
+         "preferred": {
+          "_type": "AST.Bool",
+          "value": true
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "operations": {
+  "SMSTART_MSR_imm": {
+   "_type": "Instruction.OperationAlias",
+   "brief": ".",
+   "description": null,
+   "operation_id": "MSR_imm",
+   "title": ""
+  },
+  "SMSTOP_MSR_imm": {
+   "_type": "Instruction.OperationAlias",
+   "brief": ".",
+   "description": null,
+   "operation_id": "MSR_imm",
+   "title": ""
+  },
+  "GCSSS1_SYS": {
+   "_type": "Instruction.OperationAlias",
+   "brief": ".",
+   "description": null,
+   "operation_id": "SYS",
+   "title": ""
+  },
+  "GCSPOPM_SYSL": {
+   "_type": "Instruction.OperationAlias",
+   "brief": ".",
+   "description": null,
+   "operation_id": "SYSL",
+   "title": ""
+  },
+  "GCSSS2_SYSL": {
+   "_type": "Instruction.OperationAlias",
+   "brief": ".",
+   "description": null,
+   "operation_id": "SYSL",
+   "title": ""
+  },
+  "MSR_imm": {
+   "_type": "Instruction.Operation",
+   "brief": ".",
+   "decode": null,
+   "description": null,
+   "operation": "// Not specified",
+   "title": ""
+  },
+  "SYS": {
+   "_type": "Instruction.Operation",
+   "brief": ".",
+   "decode": null,
+   "description": null,
+   "operation": "// Not specified",
+   "title": ""
+  },
+  "SYSL": {
+   "_type": "Instruction.Operation",
+   "brief": ".",
+   "decode": null,
+   "description": null,
+   "operation": "// Not specified",
+   "title": ""
+  }
+ }
+}

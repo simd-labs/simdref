@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import lru_cache
 import re
@@ -411,6 +412,17 @@ def merge_perf_rows(
                 slot = entry
             record.arch_details[row.core] = slot
             written += 1
+    # An alias row is the same encoding as its target row, so it carries the
+    # target's timing. metadata "aliasof" holds the target row's form key;
+    # the copy runs after every merge pass so later sources refresh it.
+    by_form = {(r.architecture, r.form.strip().casefold()): r for r in records}
+    for record in records:
+        aliasof = (record.metadata.get("aliasof") or "").strip()
+        if not aliasof:
+            continue
+        target = by_form.get((record.architecture, aliasof.casefold()))
+        if target is not None and target is not record:
+            record.arch_details = deepcopy(target.arch_details)
     return written
 
 

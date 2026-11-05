@@ -435,6 +435,7 @@ class _Catalog:
         self.a64_patterns: list[tuple[int, int, Row]] = []
         self.rv_patterns: dict[str, list[tuple[int, int, int, Row]]] = {}
         self.iform_pools: dict[str, list[Row]] = {}
+        self.aliasof: dict[str, str] = {}
         self.keyless = False
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
         try:
@@ -475,6 +476,19 @@ class _Catalog:
                     split_attrs=({} if not splits or splits == "{}" else json.loads(splits)),
                 )
                 self.rows.append(row)
+            if arch == "aarch64" and "payload" in columns:
+                # The aliasof link an alias row carries names its target row
+                # (arm_instructions): the pick must tell the two apart.
+                from simdref.storage import _unpack_payload
+
+                for db_key, payload in conn.execute(
+                    "SELECT db_key, payload FROM instructions_data"
+                    " WHERE architecture = ? AND payload IS NOT NULL",
+                    (want,),
+                ):
+                    meta = _unpack_payload(payload).get("metadata") or {}
+                    if meta.get("aliasof"):
+                        self.aliasof[db_key] = meta["aliasof"]
         finally:
             conn.close()
         if arch == "aarch64":
@@ -898,6 +912,33 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
             refined = _refine_subset(matched)
             rows = [row for _mask, _match, row in refined]
             checks = [(mask, row) for mask, _match, row in matched]
+            # An alias row and its target row share one encoding (the aliasof
+            # link names the target). The line's mnemonic names the row; a
+            # line no row names takes the target, so a finer alias pattern
+            # never steals the target's bytes (issue #65).
+            spelling = entry["text"].split(None, 1)[0].casefold().rstrip(":")
+            matched_rows = [row for _mask, _match, row in matched]
+            named = [row for row in matched_rows if row.mnemonic.casefold() == spelling]
+            if named:
+                rows = [
+                    row
+                    for _m, _x, row in _refine_subset(
+                        [(row.enc_mask, row.enc_match, row) for row in named]
+                    )
+                ] or named
+            else:
+                families: dict[str, list[Row]] = {}
+                for row in matched_rows:
+                    aliasof = catalog.aliasof.get(row.db_key, "").casefold()
+                    families.setdefault(aliasof or row.form.casefold(), []).append(row)
+                contested = [
+                    (fid, members)
+                    for fid, members in families.items()
+                    if len(members) > 1 and any(row.form.casefold() == fid for row in members)
+                ]
+                if len(contested) == 1:
+                    fid, members = contested[0]
+                    rows = [row for row in members if row.form.casefold() == fid]
         else:
             if len(raw) not in (2, 4):
                 result.reason = "no catalog row (not a 16/32-bit word)"
