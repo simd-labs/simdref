@@ -593,16 +593,21 @@ def a64xml_briefs_from_xml(text: str) -> dict[str, str]:
     return dict.fromkeys(keys, html.escape(brief, quote=False))
 
 
-def parse_a64xml_briefs(archive: Path) -> dict[str, str]:
-    """Every instruction brief in the A64 ISA XML archive, keyed by name.
+def parse_a64xml_briefs(archive: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """A64 ISA XML briefs keyed by file name and, unambiguous ones, by name.
 
     Only the release directory the pinned URL names is read, so a later
-    release never mixes its files in. A key several files name (one bare
-    mnemonic, several forms) keeps the first file in sorted order.
+    release never mixes its files in. Returns ``(by_file, by_name)``.
+    ``by_file`` keys each brief by its XML file name, uppercased; a row's
+    ``operation_id`` joins here. ``by_name`` keys a name only when every XML
+    file naming it gives the same brief. A name several files describe
+    differently carries no entry, so no lookup ever falls back to file order.
     """
     release = Path(ARM_A64_XML_URL).name.removesuffix(".tar.gz")
     prefix = f"{release}/"
-    briefs: dict[str, str] = {}
+    by_file: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    conflicts: set[str] = set()
     with tarfile.open(archive, "r:*") as tf:
         names = sorted(
             member.name
@@ -613,16 +618,26 @@ def parse_a64xml_briefs(archive: Path) -> dict[str, str]:
             fh = tf.extractfile(name)
             if fh is None:
                 continue
-            for key, brief in a64xml_briefs_from_xml(fh.read().decode("utf-8")).items():
-                briefs.setdefault(key, brief)
-    return briefs
+            briefs = a64xml_briefs_from_xml(fh.read().decode("utf-8"))
+            if not briefs:
+                continue
+            # One file, one brief; every key of the file maps to it.
+            brief = next(iter(briefs.values()))
+            by_file.setdefault(name[len(prefix) :].removesuffix(".xml").upper(), brief)
+            for key in briefs:
+                if key in conflicts:
+                    continue
+                if by_name.setdefault(key, brief) != brief:
+                    del by_name[key]
+                    conflicts.add(key)
+    return by_file, by_name
 
 
-def read_local_arm_a64_xml_briefs() -> dict[str, str]:
+def read_local_arm_a64_xml_briefs() -> tuple[dict[str, str], dict[str, str]]:
     for archive in LOCAL_ARM_A64_XML_ARCHIVES:
         if archive.exists():
             return parse_a64xml_briefs(archive)
-    return {}
+    return {}, {}
 
 
 def refresh_local_arm_intrinsics_bundle(

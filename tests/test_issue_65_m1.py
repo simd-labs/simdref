@@ -51,7 +51,15 @@ def xml_archive(tmp_path, monkeypatch):
     arm_instructions._a64xml_summaries.cache_clear()
 
 
-def _node(mnemonic: str, name: str, *, title: str = "", aliases: tuple = ()):
+def _node(
+    mnemonic: str,
+    name: str,
+    *,
+    title: str = "",
+    aliases: tuple = (),
+    alias_children: tuple = (),
+    operation_id: str = "",
+):
     children = [
         {
             "_type": "Instruction.InstructionAlias",
@@ -64,6 +72,7 @@ def _node(mnemonic: str, name: str, *, title: str = "", aliases: tuple = ()):
         }
         for alias_name in aliases
     ]
+    children += list(alias_children)
     node = {
         "_type": "Instruction.Instruction",
         "name": name,
@@ -79,7 +88,22 @@ def _node(mnemonic: str, name: str, *, title: str = "", aliases: tuple = ()):
     }
     if title:
         node["title"] = title
+    if operation_id:
+        node["operation_id"] = operation_id
     return node
+
+
+def _alias_child(name: str, *, operation_id: str = "", condition=None):
+    return {
+        "_type": "Instruction.InstructionAlias",
+        "name": name,
+        "condition": condition,
+        "operation_id": operation_id,
+        "assembly": {
+            "_type": "Instruction.Assembly",
+            "symbols": [{"_type": "Instruction.Symbols.Literal", "value": name}],
+        },
+    }
 
 
 def _tree(nodes, group: str = "dp"):
@@ -142,14 +166,21 @@ def test_entity_spelling_stays_in_keys():
 
 
 def test_archive_reads_only_the_release_directory(xml_archive):
-    briefs = parse_a64xml_briefs(xml_archive)
-    assert briefs["ABS"] == "Absolute value"
-    assert "Decoy brief" not in briefs.values()
+    by_file, by_name = parse_a64xml_briefs(xml_archive)
+    assert by_name["ABS"] == "Absolute value"
+    assert by_file["ABS"] == "Absolute value"
+    assert "Decoy brief" not in by_name.values()
+    assert "Decoy brief" not in by_file.values()
 
 
-def test_shared_names_keep_the_first_file_in_sorted_order(xml_archive):
-    # cbcc_regs.xml sorts before cblo_regs.xml and both name CBHI.
-    assert parse_a64xml_briefs(xml_archive)["CBHI"] == "Compare registers and branch"
+def test_conflicting_names_give_no_brief(xml_archive):
+    # cbcc_regs.xml and cblo_regs.xml both name CBHI with different briefs.
+    # No file order decides: the name carries no brief and each file keeps
+    # its own brief under its file name (#65 m1 round 2).
+    by_file, by_name = parse_a64xml_briefs(xml_archive)
+    assert "CBHI" not in by_name
+    assert by_file["CBCC_REGS"] == "Compare registers and branch"
+    assert by_file["CBLO_REGS"] == "Compare unsigned lower than register and branch"
 
 
 def test_placeholder_row_summary_takes_the_brief(xml_archive):
@@ -186,7 +217,7 @@ def test_acle_text_is_untouched(xml_archive, monkeypatch):
     assert _summary(rows, "ABS") == "ACLE says absolute value."
 
 
-def test_alias_rows_take_their_own_brief(xml_archive):
+def test_alias_rows_keep_the_target_title(xml_archive):
     rows = parse_arm_instruction_payload(
         json.dumps(
             _tree(
@@ -201,7 +232,71 @@ def test_alias_rows_take_their_own_brief(xml_archive):
             )
         )
     )
-    # The alias's own brief beats the target title; a name the release does
-    # not carry keeps the target title (#69 behaviour).
-    assert _summary(rows, "ABS") == "Absolute value."
+    # The target title is sourced text and keeps every alias row
+    # byte-identical; the brief fills only placeholder or generated text
+    # (#69 behaviour, #65 m1 round 2).
+    assert _summary(rows, "ABS") == "Move to System register."
     assert _summary(rows, "QQQQ") == "Move to System register."
+
+
+def test_bare_mov_takes_its_own_file_brief(xml_archive):
+    rows = parse_arm_instruction_payload(
+        json.dumps(
+            _tree(
+                [
+                    _node(
+                        "ORR",
+                        "ORR_log_shift",
+                        operation_id="ORR_log_shift",
+                        alias_children=(_alias_child("MOV", operation_id="MOV_ORR_log_shift"),),
+                    )
+                ],
+                group="log_shift",
+            )
+        )
+    )
+    # The row's operation_id names mov_orr_log_shift.xml ("Move register
+    # value"). The bare MOV key names mov_dupm_z_i.xml first in sort order,
+    # whose brief is DUPM's; file order must not decide (#65 m1 round 2).
+    assert _summary(rows, "MOV") == "Move register value."
+
+
+def test_acle_alias_text_is_untouched(xml_archive, monkeypatch):
+    monkeypatch.setattr(
+        arm_instructions,
+        "_acle_instruction_summaries",
+        lambda: {"MOV": "ACLE move text"},
+    )
+    rows = parse_arm_instruction_payload(
+        json.dumps(
+            _tree(
+                [
+                    _node(
+                        "MOVA",
+                        "mova_za_p_rz",
+                        alias_children=(
+                            _alias_child(
+                                "MOV",
+                                operation_id="MOV_ORR_log_shift",
+                                condition={
+                                    "_type": "AST.Function",
+                                    "name": "IsFeatureImplemented",
+                                    "arguments": [{"_type": "AST.Identifier", "value": "FEAT_SME"}],
+                                },
+                            ),
+                        ),
+                    )
+                ],
+                group="mortlach_insert_pred",
+            )
+        )
+    )
+    # ACLE text is sourced and ranks above the brief on alias rows too.
+    assert _summary(rows, "MOV") == "ACLE move text."
+
+
+def test_conflicting_brief_without_operation_id_gives_none(xml_archive):
+    rows = parse_arm_instruction_payload(json.dumps(_tree([_node("CBHI", "CBcc_regs")])))
+    # CBHI has conflicting briefs and the row names no file, so it keeps its
+    # generated text (#65 m1 round 2).
+    assert _summary(rows, "CBHI") == "Cbhi is an Arm instruction."
