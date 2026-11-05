@@ -12,6 +12,7 @@ import json
 import re
 import sqlite3
 import statistics
+import string
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Iterator
@@ -57,15 +58,127 @@ _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
 # rule per address line: the byte column holds next_address - address bytes.
 # objdump right-aligns the address with spaces; a TAB right before it marks a
 # relocation line ("-r") or a plain-asm label ("\tadd: ret"), not an address.
-_OBJDUMP_ADDR_RE = re.compile(r"^[ \t]*(?<!\t)([0-9a-fA-F]+):(?=\s|$)")
-# A byte group: 2-digit byte, 4-digit halfword or 8-digit word.
-_HEX_GROUP_RE = re.compile(r"[0-9a-fA-F]{2}|[0-9a-fA-F]{4}|[0-9a-fA-F]{8}")
+_HEX_DIGITS = frozenset(string.hexdigits)
+_MNEMONIC_CHARS = frozenset(string.ascii_letters + string.digits + "._")
+
+
+def _addr_line(line: str) -> tuple[int, int] | None:
+    """An address line: ``(address, index after the ':')``, else None."""
+    i = 0
+    while i < len(line) and line[i] in " \t":
+        i += 1
+    if i and line[i - 1] == "\t":
+        return None  # a TAB right before the address: a relocation or label line
+    j = i
+    while j < len(line) and line[j] in _HEX_DIGITS:
+        j += 1
+    if j == i or line[j : j + 1] != ":" or line[j + 1 : j + 2].strip():
+        return None
+    return int(line[i:j], 16), j + 1
+
+
+def _is_hex_group(tok: str) -> bool:
+    """A byte group: 2-digit byte, 4-digit halfword or 8-digit word."""
+    return len(tok) in (2, 4, 8) and all(c in _HEX_DIGITS for c in tok)
+
+
 # A byte column: a hex run before objdump's TAB, or before 2+ spaces once a
 # terminal paste expanded the TAB. One group needs padding before the TAB
 # ("fadd\td0" has none); a full llvm x86 column of 10+ bytes has none either.
-_PADDED_RUN_RE = re.compile(r"[ \t]*[0-9a-fA-F]{2,8}(?:(?: [0-9a-fA-F]{2,8})+ *| +)\t")
-_PASTED_RUN_RE = re.compile(r" *[0-9a-fA-F]{2,8}(?: [0-9a-fA-F]{2,8})* {2,}\S")
-_TOKEN_RE = re.compile(r"\S+")
+def _padded_run(body: str) -> bool:
+    """The hex run before objdump's TAB closes the byte column."""
+    s = body.lstrip(" \t")
+    for k in range(2, min(8, len(s)) + 1):
+        if s[k : k + 1] == " " and all(c in _HEX_DIGITS for c in s[:k]) and _tab_tail(s[k:]):
+            return True
+    return False
+
+
+def _tab_tail(t: str) -> bool:
+    """Byte groups and padding after one space, then objdump's closing TAB."""
+    pos = 0
+    while True:
+        j = pos
+        while j < len(t) and t[j] == " ":
+            j += 1
+        if j < len(t) and t[j] == "\t":
+            return True
+        if t[pos : pos + 1] != " ":
+            return False
+        j = pos + 1
+        while j < len(t) and t[j] in _HEX_DIGITS:
+            j += 1
+        if not 2 <= j - pos - 1 <= 8 or t[j : j + 1] not in (" ", "\t"):
+            return False
+        pos = j
+
+
+def _pasted_run(body: str) -> bool:
+    """The hex run before the 2+ space gap that a pasted byte column leaves."""
+    s = body.lstrip(" ")
+    for k in range(2, min(8, len(s)) + 1):
+        if s[k : k + 1] == " " and all(c in _HEX_DIGITS for c in s[:k]) and _gap_tail(s[k:]):
+            return True
+    return False
+
+
+def _gap_tail(t: str) -> bool:
+    """Byte groups after one space, then a 2+ space gap and a non-space char."""
+    pos = 0
+    while True:
+        j = pos
+        while j < len(t) and t[j] == " ":
+            j += 1
+        if j - pos >= 2 and t[j : j + 1] and not t[j].isspace():
+            return True
+        if t[pos : pos + 1] != " ":
+            return False
+        j = pos + 1
+        while j < len(t) and t[j] in _HEX_DIGITS:
+            j += 1
+        if not 2 <= j - pos - 1 <= 8 or t[j : j + 1] != " ":
+            return False
+        pos = j
+
+
+def _token_starts(text: str) -> list[int]:
+    """Start offsets of the whitespace-separated tokens of ``text``."""
+    starts = []
+    pos = 0
+    for tok in text.split():
+        pos = text.find(tok, pos)
+        starts.append(pos)
+        pos += len(tok)
+    return starts
+
+
+def _is_instr_head(head: str) -> bool:
+    """An instruction head: a mnemonic, then optional whitespace operands."""
+    if not head or head[0] not in string.ascii_letters:
+        return False
+    i = 1
+    while i < len(head) and head[i] in _MNEMONIC_CHARS:
+        i += 1
+    return i == len(head) or head[i] in " \t"
+
+
+def _names_file_format(line: str) -> bool:
+    """The objdump ``file format NAME`` header phrase with its word boundaries."""
+    start = 0
+    while True:
+        i = line.find("file format", start)
+        if i < 0:
+            return False
+        start = i + 1
+        if i and (line[i - 1] == "_" or line[i - 1].isalnum()):
+            continue
+        j = k = i + len("file format")
+        while k < len(line) and line[k].isspace():
+            k += 1
+        if j < k < len(line):
+            return True
+
+
 # objdump -S injects "file:line" comment lines before the instruction block.
 _OBJDUMP_SRC_RE = re.compile(r"^\s*(?P<file>[^ \t/][^:]*):(?P<line>\d+)\s*$")
 
@@ -109,17 +222,15 @@ def _strip_prefix_tokens(head: str) -> str:
 
 def _objdump_body(line: str) -> str:
     """The text after the address colon, or the whole line when it has no address."""
-    m = _OBJDUMP_ADDR_RE.match(line)
-    return line[m.end() :] if m else line
+    addr = _addr_line(line)
+    return line[addr[1] :] if addr else line
 
 
 def _opens_byte_column(body: str) -> bool:
     toks = body.split()
-    run_re = _PADDED_RUN_RE if "\t" in body else _PASTED_RUN_RE
+    run = _padded_run if "\t" in body else _pasted_run
     # A byte-only body is a GNU wrap continuation line, also a byte column.
-    return bool(run_re.match(body)) or (
-        bool(toks) and all(_HEX_GROUP_RE.fullmatch(t) for t in toks)
-    )
+    return run(body) or (bool(toks) and all(map(_is_hex_group, toks)))
 
 
 def _objdump_shaped(body: str) -> bool:
@@ -147,12 +258,12 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
     line is the run of hex groups that holds next_address - address bytes.
     """
     content = [line for line in lines if line[:1] in " \t" and line.strip()]
-    addr_lines = [line for line in content if _OBJDUMP_ADDR_RE.match(line)]
+    addr_lines = [line for line in content if _addr_line(line)]
     # A pasted fragment has no header: it is objdump-shaped when most content
     # lines are "addr:" lines with a TAB or a byte column after the colon (a
     # label with a same-line instruction, "\tadd: ret", has neither).
     shaped = [line for line in addr_lines if _objdump_shaped(_objdump_body(line))]
-    has_header = any(_FILE_FORMAT_RE.search(line) for line in lines[:10])
+    has_header = any(map(_names_file_format, lines[:10]))
     if not has_header and not (content and len(shaped) * 2 > len(content)):
         return {}
     has_addr = len(addr_lines) * 2 > len(content)  # --no-leading-addr still prints data addresses
@@ -161,29 +272,29 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
 
     rows: list[tuple[int, int | None, str]] = []
     for index, line in enumerate(lines):
-        m = _OBJDUMP_ADDR_RE.match(line)
-        if m:
-            body = line[m.end() :]
+        addr = _addr_line(line)
+        if addr:
+            body = line[addr[1] :]
             toks = body.split()[:2]
             # A pasted relocation or label line lost its TABs but has no byte column
             # either; a pasted long llvm x86 column has no gap, so two groups count.
             if (
                 not has_bytes
                 or _objdump_shaped(body)
-                or (len(toks) == 2 and all(map(_HEX_GROUP_RE.fullmatch, toks)))
+                or (len(toks) == 2 and all(map(_is_hex_group, toks)))
             ):
-                rows.append((index, int(m.group(1), 16), body))
+                rows.append((index, addr[0], body))
         elif not has_addr and line[:1] in " \t" and line.strip() and not line.strip().endswith(":"):
             rows.append((index, None, line))
 
     records: dict[int, _ObjdumpRecord] = {}
     last = None  # line index of the open instruction, for wrap folding
     for k, (index, addr, text) in enumerate(rows):
-        spans = [m.span() for m in _TOKEN_RE.finditer(text)]
-        toks = [text[start:end] for start, end in spans]
+        starts = _token_starts(text)
+        toks = text.split()
         run = []
         for tok in toks:
-            if not _HEX_GROUP_RE.fullmatch(tok):
+            if not _is_hex_group(tok):
                 break
             run.append(tok)
         cum = [0]
@@ -207,7 +318,7 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
             n = gap if gap <= len(run) else 0
         # The split must leave a mnemonic or a directive: "fadd %st(1),%st" and
         # "addb $1" have no byte column although "fadd" and "addb" are hex.
-        if n < len(toks) and not (toks[n].startswith(".") or _INSTR_RE.match(toks[n])):
+        if n < len(toks) and not (toks[n].startswith(".") or _is_instr_head(toks[n])):
             n = 0
         col = b"".join(map(_group_bytes, run[:n])) if has_bytes else None
         if n == len(toks):  # wrap continuation: fold into the open instruction when contiguous
@@ -217,8 +328,8 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
                     b0 = (b0 or b"") + col
                     records[last] = (a0, b0, rest0, b0.hex(" "))
             continue
-        rest = text[spans[n][0] :].rstrip()
-        if not _INSTR_RE.match(_strip_prefix_tokens(_split_comment(rest)[0])):
+        rest = text[starts[n] :].rstrip()
+        if not _is_instr_head(_strip_prefix_tokens(_split_comment(rest)[0])):
             last = None  # data (".word"), "(bad)", "...": no instruction
             continue
         word = n == 1 and len(run[0]) > 2
