@@ -29,6 +29,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from simdref.perf_sources.merge import SOURCE_INTEL_OPTREF, PerfRow
+from simdref.tablecols import value_shape, word_spans
 
 SOURCE_VERSION = "356477-051US, October 2026"
 CITATION_URL = (
@@ -118,7 +119,6 @@ class _Candidate:
     name_line: int = -1  # line the name started on; later lines hold notes
 
 
-_VALUE_RE = re.compile(r"^[-~<>]?\d[\d.,~<>()/a-zA-Z-]*$")
 _TITLE_RE = re.compile(r"Table\s+(\d+-\d+)\.")
 _JUNK_RES = [
     re.compile(r"Document #"),
@@ -144,7 +144,7 @@ def _is_value(tok: str) -> bool:
         return False  # CPUID signatures and placeholders, never cell values
     if tok.count("(") != tok.count(")"):
         return False  # parenthetical prose such as "0)", never a cell value
-    return tok == "-" or bool(_VALUE_RE.match(tok))
+    return tok == "-" or value_shape(tok)
 
 
 def _is_junk_line(line: str) -> bool:
@@ -267,8 +267,7 @@ def _parse_text_lines(text: str) -> dict[str, list[_Candidate]]:
         if key is None:
             continue
         toks = [
-            _Tok(m.group(), m.start(), lineno, first=(i == 0))
-            for i, m in enumerate(re.finditer(r"\S+", line))
+            _Tok(text, x, lineno, first=(i == 0)) for i, (text, x) in enumerate(word_spans(line))
         ]
         # 6-19 MSROM flags trail every Atom row and are not values.
         while len(toks) > 2 and toks[-1].text in _NAME_DROP:
@@ -286,7 +285,7 @@ def _parse_text_lines(text: str) -> dict[str, list[_Candidate]]:
             continue
         if not vals:
             continue  # blank line
-        if any(re.match(r"[a-z]{5,}", t) for t in names):
+        if any(len(t) > 4 and all("a" <= c <= "z" for c in t[:5]) for t in names):
             flush()  # prose carrying a stray number between tables
             continue
         # A line with values closes a row that already has values. Rows
