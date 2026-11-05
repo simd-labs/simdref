@@ -15,7 +15,7 @@ import pytest
 
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.asm_identity import _refine_subset, _tool_path, identify_lines
-from simdref.models import Catalog, SourceVersion
+from simdref.models import Catalog, InstructionRecord, SourceVersion
 from simdref.perf_sources.merge import PerfRow, merge_perf_rows
 from simdref.storage import build_sqlite
 
@@ -141,3 +141,64 @@ def test_smstart_line_names_alias_not_msr(rows, tmp_path, line):
     (result,) = identify_lines([(line, None)], catalog_path=db)
     assert result.status == "row", result.reason
     assert result.row.mnemonic == line.upper()
+
+
+# SVE DUP (immediate) and its FMOV (immediate) alias. Ground truth: llvm-mc-23
+# -show-encoding prints word 0x25B8C000 for each of the lines "dup z0.s, #0",
+# "mov z0.s, #0" and "fmov z0.s, #0.0". The (enc_mask, enc_match) pairs are the
+# two catalog rows' encodesets; the FMOV alias is strictly finer than its DUP
+# target, so the subset rule alone would give every one of the lines the alias.
+DUP_Z_FORM = "DUP (Z0.4S, <HASH>#0#0)"
+
+
+def _dup_fmov_rows():
+    dup = InstructionRecord(
+        mnemonic="DUP",
+        form=DUP_Z_FORM,
+        summary="Duplicate vector element to vector or scalar.",
+        architecture="arm",
+        isa=["A64", "SVE"],
+        metadata={},
+        source="arm-a64",
+        enc_bits=32,
+        enc_mask=0xFF3FC000,
+        enc_match=0x2538C000,
+    )
+    fmov = InstructionRecord(
+        mnemonic="FMOV",
+        form="FMOV (Z0.4S, <HASH>0.0)",
+        summary="Floating-point move.",
+        architecture="arm",
+        isa=["A64", "SVE"],
+        metadata={"aliasof": DUP_Z_FORM},
+        source="arm-a64",
+        enc_bits=32,
+        enc_mask=0xFF3FFFE0,
+        enc_match=0x2538C000,
+    )
+    return [dup, fmov]
+
+
+@needs_mc
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("mov z0.s, #0", "DUP"),  # names no row of the family: the target wins
+        ("dup z0.s, #0", "DUP"),  # names the target row
+        ("fmov z0.s, #0.0", "FMOV"),  # names the alias row
+    ],
+)
+def test_alias_row_wins_bytes_only_when_named(tmp_path, line, expected):
+    db = tmp_path / "catalog.db"
+    build_sqlite(
+        Catalog(
+            intrinsics=[],
+            instructions=_dup_fmov_rows(),
+            sources=[SourceVersion(source="t", version="t", fetched_at="2025", url="t://")],
+            generated_at="2025",
+        ),
+        db,
+    )
+    (result,) = identify_lines([(line, "25b8c000")], catalog_path=db)
+    assert result.status == "row", result.reason
+    assert result.row.mnemonic == expected
