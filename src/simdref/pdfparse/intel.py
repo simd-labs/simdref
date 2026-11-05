@@ -33,6 +33,7 @@ from simdref.pdfparse.base import chars_to_lines, extract_sections_from_lines
 from simdref.pdfparse.registry import register_pdf_source
 from simdref.pdfparse.types import PdfDescriptionPayload, PdfEnrichmentResult, PdfSourceSpec
 from simdref.storage import DATA_DIR
+from simdref.tablecols import split_cells
 
 log = logging.getLogger(__name__)
 
@@ -237,7 +238,7 @@ def parse_opcode_table(lines: list[str]):
             follow_stripped = follow.strip()
             if _OPERAND_ENCODING_CAPTION_RE.search(follow) or follow_stripped in stop_captions:
                 break
-            follow_cells = re.split(r"\s{2,}", follow_stripped)
+            follow_cells = split_cells(follow_stripped)
             if _oe_header_shape(follow_cells)[0]:
                 break
             for cell in follow_cells:
@@ -262,7 +263,7 @@ def parse_operand_encoding_table(lines: list[str]):
     has_tuple = False
     seen_header = False
     for idx, line in enumerate(lines):
-        cells = re.split(r"\s{2,}", line.strip())
+        cells = split_cells(line.strip())
         is_header, header_has_tuple = _oe_header_shape(cells)
         if not active:
             if is_header or _OPERAND_ENCODING_CAPTION_RE.search(line):
