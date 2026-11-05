@@ -136,6 +136,21 @@ def latency_cycle_values(latencies: list[dict[str, Any]]) -> list[str]:
     return values
 
 
+_ADDRESS_VALUE_KEYS = (
+    "cycles_addr",
+    "cycles_addr_index",
+    "min_cycles_addr",
+    "max_cycles_addr",
+    "min_cycles_addr_index",
+    "max_cycles_addr_index",
+)
+
+
+def _starts_at_address(latency: dict[str, Any]) -> bool:
+    """True when the pair stores an address-path cycle value."""
+    return any(latency.get(key) for key in _ADDRESS_VALUE_KEYS)
+
+
 def latency_bounds(
     details: dict[str, Any], operands: list[dict[str, Any]] | None = None
 ) -> tuple[str, str] | None:
@@ -143,18 +158,26 @@ def latency_bounds(
 
     A pair that starts at a write-only operand (``w`` without ``r`` in
     *operands*) carries no input dependency, often a stored ``0``, so the
-    pick skips it. When no read-start pair has data, the function returns
-    ``None`` and the caller keeps its own value. ``high`` is the largest
-    value over the remaining pairs, memory and address paths included: the
-    figure uops.info and llvm-mca give for the instruction. ``low`` is the
-    smallest lower bound when a pair stores a ``min-max`` range, else
-    ``high``. Returns ``None`` when no pair has a numeric value.
+    pick skips it. The address path is the exception: a pair whose value
+    comes from ``cycles_addr`` or ``cycles_addr_index`` starts at the base
+    and index registers, which every memory access reads. Such a pair
+    counts as read-start whatever the memory operand flags say. When no
+    kept pair has data, the function returns ``None`` and the caller keeps
+    its own value. ``high`` is the largest value over the remaining pairs,
+    memory and address paths included: the figure uops.info and llvm-mca
+    give for the instruction. ``low`` is the smallest lower bound when a
+    pair stores a ``min-max`` range, else ``high``. Returns ``None`` when
+    no pair has a numeric value.
     """
     latencies = details.get("latencies") or []
     write_only = {
         str(op.get("idx")) for op in operands or [] if op.get("w") == "1" and op.get("r") != "1"
     }
-    kept = [lat for lat in latencies if str(lat.get("start_op")) not in write_only]
+    kept = [
+        lat
+        for lat in latencies
+        if str(lat.get("start_op")) not in write_only or _starts_at_address(lat)
+    ]
     spans: list[tuple[str, str]] = []
     for value in latency_cycle_values(kept):
         low, _, high = str(value).partition("-")

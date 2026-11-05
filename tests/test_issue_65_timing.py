@@ -170,8 +170,9 @@ def test_hover_row_and_annotate_agree():
         assert arch_latency(record, arch) == float(text.split("-")[-1])
 
 
-# KMOVQ (M64, K): the only pair starts at the write-only memory operand.
-# No read-start pair has data, so the stored value stays (never 0 or None).
+# KMOVQ (M64, K): the only pair starts at the write-only memory operand
+# and stores cycles_addr 5. The address path counts as read-start, so the
+# row keeps 5, never 0 or None.
 def test_no_read_start_pair_keeps_the_stored_value():
     rec = _record(
         "KMOVQ (M64, K)",
@@ -181,3 +182,25 @@ def test_no_read_start_pair_keeps_the_stored_value():
     )
     assert arch_latency(rec, "SKL") == 5.0
     assert measurement_rows(rec)[0]["latency"] == "5"
+
+
+# STOSW (M16) on SKL: operand 1 is the write-only memory operand. The pair
+# from it stores cycles_addr 6 (the base register is always read), the read
+# pair stores 0. llvm-mca-23 -mcpu=skylake: stosw latency 6.
+STOSW_M16_SKL = _record(
+    "STOS (M16)",
+    [{"idx": "1", "type": "mem", "w": "1"}, _reg(2), _reg(3)],
+    "SKL",
+    [
+        {"start_op": "1", "target_op": "3", "cycles_addr": "6"},
+        {"start_op": "2", "target_op": "3", "cycles": "0"},
+    ],
+)
+
+
+def test_store_address_pair_counts_as_read_start(monkeypatch):
+    assert arch_latency(STOSW_M16_SKL, "SKL") == 6.0
+    assert measurement_rows(STOSW_M16_SKL)[0]["latency"] == "6"
+    rec = _annotate_json(monkeypatch, STOSW_M16_SKL, "stosw %ax,(%rdi)", "SKL")
+    assert rec["latency"] == 6.0
+    assert "lat=6.0c" in rec["annotation"]
