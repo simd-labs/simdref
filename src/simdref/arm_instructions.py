@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from simdref.ingest_sources import read_local_arm_a64_xml_briefs
 from simdref.models import InstructionRecord
 
 
@@ -115,6 +116,12 @@ def _acle_instruction_summaries() -> dict[str, str]:
     return {}
 
 
+@lru_cache(maxsize=1)
+def _a64xml_summaries() -> dict[str, str]:
+    """A64 ISA XML ``<desc><brief>`` one-liners, unescaped, keyed by name."""
+    return {key: html.unescape(text) for key, text in read_local_arm_a64_xml_briefs().items()}
+
+
 # A64 condition-code spellings for B.cond with their encoded cond field value
 # (Arm ARM cond field, B.cond bits 3:0; llvm-mc -show-inst prints the same
 # value as the Bcc immediate). The hs/lo spellings share the cs/cc values, as
@@ -154,6 +161,9 @@ def _generated_summary(mnemonic: str, isa: list[str] | None = None) -> str:
     title = _AARCHMRS_TITLES.get(core)
     if title:
         return f"{title}."
+    brief = _a64xml_summaries().get(core)
+    if brief:
+        return f"{brief}."
     if core.startswith("ADD"):
         return "Add operands."
     if core.startswith("SUB"):
@@ -781,19 +791,27 @@ def _alias_children(
         if not rendered:
             continue
         head, _, tail = rendered.partition(" ")
-        mnemonic_match = re.match(r"[A-Z][A-Z0-9]*", head.strip().upper())
-        if not mnemonic_match:
+        up = head.strip().upper()
+        end = 0
+        while end < len(up) and up[end].isalnum():
+            end += 1
+        if not end or not up[0].isalpha():
             continue
-        mnemonic = mnemonic_match.group(0)
+        mnemonic = up[:end]
         operand_form = tail.strip()
         form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
         row_isa = list(isa)
         for tag in _alias_feature_tags(alias.get("condition")):
             if tag not in row_isa:
                 row_isa.append(tag)
-        # The target's title when the data has one; else the alias's own name,
+        # The alias's own A64 XML brief when the release names it; else the
+        # target's title when the data has one; else the alias's own name,
         # because a generated "Msr is an Arm instruction." would name the target.
-        summary = target_title or _generated_summary(mnemonic, row_isa)
+        summary = (
+            _a64xml_summaries().get(mnemonic)
+            or target_title
+            or _generated_summary(mnemonic, row_isa)
+        )
         if not summary.endswith("."):
             summary += "."
         key = (mnemonic, form.casefold())

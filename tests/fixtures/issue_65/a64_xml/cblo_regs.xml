@@ -1,0 +1,148 @@
+<?xml version="1.0" ?><?xml-stylesheet type="text/xsl" encoding="UTF-8" href="iform.xsl" version="1.0"?><!DOCTYPE instructionsection  PUBLIC '-//ARM//DTD instructionsection //EN'  'iform-p.dtd'><!-- Copyright (c) 2010-2026 Arm Limited or its affiliates. All rights reserved. --><!-- This document is Non-Confidential. This document may only be used and distributed in accordance with the terms of the agreement entered into by Arm and the party that Arm delivered this document to. --><instructionsection id="CBLO_regs" title="CBLO (register) -- A64" type="alias">
+  <docvars>
+    <docvar key="alias_mnemonic" value="CBLO"/>
+    <docvar key="instr-class" value="general"/>
+    <docvar key="isa" value="A64"/>
+    <docvar key="mnemonic" value="CBHI"/>
+    <docvar key="sve-compare-type" value="hi"/>
+  </docvars>
+  <heading>CBLO (register)</heading>
+  <desc>
+    <brief>
+      <para>Compare unsigned lower than register and branch</para>
+    </brief>
+    <authored>
+      <para>This instruction compares the unsigned values in two registers, and conditionally
+branches to a label at a PC-relative offset if the second value is lower than the first.
+This instruction provides a hint that this is not a subroutine call or return.
+This instruction does not affect the condition flags.</para>
+    </authored>
+  </desc>
+  <aliasto refiform="cbcc_regs.xml" iformid="CBcc_regs">CB&lt;cc&gt; (register)</aliasto>
+  <classes>
+    <iclass name="Branch" oneof="1" id="iclass_branch" no_encodings="2" isa="A64">
+      <docvars>
+        <docvar key="instr-class" value="general"/>
+        <docvar key="isa" value="A64"/>
+        <docvar key="mnemonic" value="CBHI"/>
+        <docvar key="sve-compare-type" value="hi"/>
+      </docvars>
+      <iclassintro count="2"/>
+      <arch_variants>
+        <arch_variant feature="FEAT_CMPBR" name="v9Ap6"/>
+      </arch_variants>
+      <regdiagram form="32" psname="A64.control.compbranch_regs.CBHI_32_regs.CBLO" tworows="1">
+        <box hibit="31" width="1" name="sf" usename="1">
+          <c colspan="1"/>
+        </box>
+        <box hibit="30" width="7" settings="7">
+          <c>1</c>
+          <c>1</c>
+          <c>1</c>
+          <c>0</c>
+          <c>1</c>
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="23" width="3" name="cc" usename="1" settings="3" psbits="xxx">
+          <c>0</c>
+          <c>1</c>
+          <c>0</c>
+        </box>
+        <box hibit="20" width="5" name="Rm" usename="1">
+          <c colspan="5"/>
+        </box>
+        <box hibit="15" width="2" settings="2">
+          <c>0</c>
+          <c>0</c>
+        </box>
+        <box hibit="13" width="9" name="imm9" usename="1">
+          <c colspan="9"/>
+        </box>
+        <box hibit="4" width="5" name="Rt" usename="1">
+          <c colspan="5"/>
+        </box>
+      </regdiagram>
+      <encoding name="CBLO_CBHI_32_regs" oneofinclass="2" oneof="2" label="32-bit higher" bitdiffs="sf == 0">
+        <docvars>
+          <docvar key="instr-class" value="general"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="sve-compare-type" value="hi"/>
+          <docvar key="datatype" value="32"/>
+          <docvar key="mnemonic" value="CBHI"/>
+          <docvar key="alias_mnemonic" value="CBLO"/>
+        </docvars>
+        <box hibit="31" width="1" name="sf">
+          <c>0</c>
+        </box>
+        <asmtemplate><text>CBLO  </text><a hover="Is the 32-bit name of the second general-purpose source register, encoded in the &quot;Rm&quot; field." link="WmOrWZR__2">&lt;Wm&gt;</a><text>, </text><a hover="Is the 32-bit name of the general-purpose register to be tested, encoded in the &quot;Rt&quot; field." link="WtOrWZR">&lt;Wt&gt;</a><text>, </text><a hover="Is the program label to be conditionally branched to. Its offset from the address of this instruction, in the range -1024 to 1020, is encoded as &quot;imm9&quot; times 4." link="imm9_offset">&lt;label&gt;</a></asmtemplate>
+        <equivalent_to>
+          <asmtemplate><a href="cbcc_regs.xml#CBHI_32_regs">CBHI</a><text>  </text><a hover="Is the 32-bit name of the general-purpose register to be tested, encoded in the &quot;Rt&quot; field." href="cbcc_regs.xml#WtOrWZR">&lt;Wt&gt;</a><text>, </text><a hover="Is the 32-bit name of the second general-purpose source register, encoded in the &quot;Rm&quot; field." href="cbcc_regs.xml#WmOrWZR__2">&lt;Wm&gt;</a><text>, </text><a hover="Is the program label to be conditionally branched to. Its offset from the address of this instruction, in the range -1024 to 1020, is encoded as &quot;imm9&quot; times 4." href="cbcc_regs.xml#imm9_offset">&lt;label&gt;</a></asmtemplate>
+          <aliascond>Never</aliascond>
+        </equivalent_to>
+      </encoding>
+      <encoding name="CBLO_CBHI_64_regs" oneofinclass="2" oneof="2" label="64-bit higher" bitdiffs="sf == 1">
+        <docvars>
+          <docvar key="instr-class" value="general"/>
+          <docvar key="isa" value="A64"/>
+          <docvar key="sve-compare-type" value="hi"/>
+          <docvar key="datatype" value="64"/>
+          <docvar key="mnemonic" value="CBHI"/>
+          <docvar key="alias_mnemonic" value="CBLO"/>
+        </docvars>
+        <box hibit="31" width="1" name="sf">
+          <c>1</c>
+        </box>
+        <asmtemplate><text>CBLO  </text><a hover="Is the 64-bit name of the second general-purpose source register, encoded in the &quot;Rm&quot; field." link="XmOrXZR__4">&lt;Xm&gt;</a><text>, </text><a hover="Is the 64-bit name of the general-purpose register to be tested, encoded in the &quot;Rt&quot; field." link="XtOrXZR">&lt;Xt&gt;</a><text>, </text><a hover="Is the program label to be conditionally branched to. Its offset from the address of this instruction, in the range -1024 to 1020, is encoded as &quot;imm9&quot; times 4." link="imm9_offset">&lt;label&gt;</a></asmtemplate>
+        <equivalent_to>
+          <asmtemplate><a href="cbcc_regs.xml#CBHI_64_regs">CBHI</a><text>  </text><a hover="Is the 64-bit name of the general-purpose register to be tested, encoded in the &quot;Rt&quot; field." href="cbcc_regs.xml#XtOrXZR">&lt;Xt&gt;</a><text>, </text><a hover="Is the 64-bit name of the second general-purpose source register, encoded in the &quot;Rm&quot; field." href="cbcc_regs.xml#XmOrXZR__4">&lt;Xm&gt;</a><text>, </text><a hover="Is the program label to be conditionally branched to. Its offset from the address of this instruction, in the range -1024 to 1020, is encoded as &quot;imm9&quot; times 4." href="cbcc_regs.xml#imm9_offset">&lt;label&gt;</a></asmtemplate>
+          <aliascond>Never</aliascond>
+        </equivalent_to>
+      </encoding>
+    </iclass>
+  </classes>
+  <explanations scope="all">
+    <explanation enclist="CBLO_CBHI_32_regs" symboldefcount="1">
+      <symbol link="WmOrWZR__2">&lt;Wm&gt;</symbol>
+      <account encodedin="Rm">
+        <intro>
+          <para>Is the 32-bit name of the second general-purpose source register, encoded in the &quot;Rm&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="CBLO_CBHI_32_regs" symboldefcount="1">
+      <symbol link="WtOrWZR">&lt;Wt&gt;</symbol>
+      <account encodedin="Rt">
+        <intro>
+          <para>Is the 32-bit name of the general-purpose register to be tested, encoded in the &quot;Rt&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="CBLO_CBHI_32_regs, CBLO_CBHI_64_regs" symboldefcount="1">
+      <symbol link="imm9_offset">&lt;label&gt;</symbol>
+      <account encodedin="imm9">
+        <intro>
+          <para>Is the program label to be conditionally branched to. Its offset from the address of this instruction, in the range -1024 to 1020, is encoded as &quot;imm9&quot; times 4.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="CBLO_CBHI_64_regs" symboldefcount="1">
+      <symbol link="XmOrXZR__4">&lt;Xm&gt;</symbol>
+      <account encodedin="Rm">
+        <intro>
+          <para>Is the 64-bit name of the second general-purpose source register, encoded in the &quot;Rm&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+    <explanation enclist="CBLO_CBHI_64_regs" symboldefcount="1">
+      <symbol link="XtOrXZR">&lt;Xt&gt;</symbol>
+      <account encodedin="Rt">
+        <intro>
+          <para>Is the 64-bit name of the general-purpose register to be tested, encoded in the &quot;Rt&quot; field.</para>
+        </intro>
+      </account>
+    </explanation>
+  </explanations>
+  <timestamp>2026-06-24 17:12:09</timestamp>
+  <commit_id>2026-06_rel</commit_id>
+</instructionsection>
