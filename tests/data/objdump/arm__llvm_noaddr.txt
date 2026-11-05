@@ -1,0 +1,100 @@
+
+arm.o:	file format elf32-littlearm
+
+Disassembly of section .text:
+
+<sw>:
+ e3500009              	cmp	r0, #9
+ 83a00000              	movhi	r0, #0
+ 812fff1e              	bxhi	lr
+ e28f2004              	add	r2, pc, #4
+ e7920100              	ldr	r0, [r2, r0, lsl #2]
+ e082f000              	add	pc, r2, r0
+      18: 28 00 00 00  	.word	0x00000028
+      1c: 64 00 00 00  	.word	0x00000064
+      20: 4c 00 00 00  	.word	0x0000004c
+      24: 54 00 00 00  	.word	0x00000054
+      28: 30 00 00 00  	.word	0x00000030
+      2c: 6c 00 00 00  	.word	0x0000006c
+      30: 74 00 00 00  	.word	0x00000074
+      34: 5c 00 00 00  	.word	0x0000005c
+      38: 7c 00 00 00  	.word	0x0000007c
+      3c: 38 00 00 00  	.word	0x00000038
+ e2810001              	add	r0, r1, #1
+ e12fff1e              	bx	lr
+ e1a00101              	lsl	r0, r1, #2
+ e12fff1e              	bx	lr
+ e3050556              	movw	r0, #0x5556
+ e3450555              	movt	r0, #0x5555
+ e750f011              	smmul	r0, r1, r0
+ e0800fa0              	add	r0, r0, r0, lsr #31
+ e12fff1e              	bx	lr
+ e2410007              	sub	r0, r1, #7
+ e12fff1e              	bx	lr
+ e2210005              	eor	r0, r1, #5
+ e12fff1e              	bx	lr
+ e2010003              	and	r0, r1, #3
+ e12fff1e              	bx	lr
+ e0810081              	add	r0, r1, r1, lsl #1
+ e12fff1e              	bx	lr
+ e1a000c1              	asr	r0, r1, #1
+ e12fff1e              	bx	lr
+ e3810009              	orr	r0, r1, #9
+ e12fff1e              	bx	lr
+ e2610000              	rsb	r0, r1, #0
+ e12fff1e              	bx	lr
+
+<big>:
+ e3070788              	movw	r0, #0x7788
+ e3031344              	movw	r1, #0x3344
+ e3450566              	movt	r0, #0x5566
+ e3411122              	movt	r1, #0x1122
+ e12fff1e              	bx	lr
+
+<fadd3>:
+ ee700b01              	vadd.f64	d16, d0, d1
+ ee300b82              	vadd.f64	d0, d16, d2
+ e12fff1e              	bx	lr
+
+<bytes8>:
+ e5d01000              	ldrb	r1, [r0]
+ e2811001              	add	r1, r1, #1
+ e5c01000              	strb	r1, [r0]
+ e3031344              	movw	r1, #0x3344
+ e3411122              	movt	r1, #0x1122
+ e7f01001              	ldrb	r1, [r0, r1]!
+ e2811002              	add	r1, r1, #2
+ e5c01000              	strb	r1, [r0]
+ e12fff1e              	bx	lr
+
+<loop>:
+ e3520001              	cmp	r2, #1
+ b12fff1e              	bxlt	lr
+ ed900a00              	vldr	s0, [r0]
+ e2522001              	subs	r2, r2, #1
+ ecb11a01              	vldmia	r1!, {s2}
+ ee300a00              	vadd.f32	s0, s0, s0
+ ee300a01              	vadd.f32	s0, s0, s2
+ eca00a01              	vstmia	r0!, {s0}
+ 1afffff8              	bne	0xe8 <loop+0x8>         @ imm = #-0x20
+ e12fff1e              	bx	lr
+
+<dat>:
+ e320f000              	nop
+     10c: 78 56 34 12  	.word	0x12345678
+     110: ef be ad de  	.word	0xdeadbeef
+ e320f000              	nop
+ e12fff1e              	bx	lr
+
+<lit>:
+ e59f0000              	ldr	r0, [pc]                @ 0x124 <lit+0x8>
+ ea000000              	b	0x128 <lit+0xc>         @ imm = #0x0
+     124: 0d f0 fe ca  	.word	0xcafef00d
+ e12fff1e              	bx	lr
+
+<ldr2>:
+ e3a01a01              	mov	r1, #4096
+ e7901001              	ldr	r1, [r0, r1]
+ e5900004              	ldr	r0, [r0, #0x4]
+ e0800001              	add	r0, r0, r1
+ e12fff1e              	bx	lr

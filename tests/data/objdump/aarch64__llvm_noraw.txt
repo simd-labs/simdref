@@ -1,0 +1,120 @@
+
+aarch64.o:	file format elf64-littleaarch64
+
+Disassembly of section .text:
+
+0000000000000000 <sw>:
+       0:      	cmp	w0, #0x9
+       4:      	b.hi	0x84 <sw+0x84>
+       8:      	mov	w8, w0
+       c:      	adrp	x9, 0x0 <sw>
+      10:      	add	x9, x9, #0x0
+      14:      	adr	x10, 0x24 <sw+0x24>
+      18:      	ldrb	w11, [x9, x8]
+      1c:      	add	x10, x10, x11, lsl #2
+      20:      	br	x10
+      24:      	add	w0, w1, #0x1
+      28:      	ret
+      2c:      	lsl	w0, w1, #2
+      30:      	ret
+      34:      	mov	w8, #0x5556             // =21846
+      38:      	movk	w8, #0x5555, lsl #16
+      3c:      	smull	x8, w1, w8
+      40:      	lsr	x9, x8, #32
+      44:      	add	x0, x9, x8, lsr #63
+      48:      	ret
+      4c:      	sub	w0, w1, #0x7
+      50:      	ret
+      54:      	mov	w8, #0x5                // =5
+      58:      	eor	w0, w1, w8
+      5c:      	ret
+      60:      	and	w0, w1, #0x3
+      64:      	ret
+      68:      	add	w0, w1, w1, lsl #1
+      6c:      	ret
+      70:      	asr	w0, w1, #1
+      74:      	ret
+      78:      	mov	w8, #0x9                // =9
+      7c:      	orr	w0, w1, w8
+      80:      	ret
+      84:      	mov	w0, wzr
+      88:      	ret
+      8c:      	neg	w0, w1
+      90:      	ret
+
+0000000000000094 <big>:
+      94:      	mov	x0, #0x7788             // =30600
+      98:      	movk	x0, #0x5566, lsl #16
+      9c:      	movk	x0, #0x3344, lsl #32
+      a0:      	movk	x0, #0x1122, lsl #48
+      a4:      	ret
+
+00000000000000a8 <fadd3>:
+      a8:      	fadd	d0, d0, d1
+      ac:      	fadd	d0, d0, d2
+      b0:      	ret
+
+00000000000000b4 <bytes8>:
+      b4:      	ldrb	w9, [x0]
+      b8:      	mov	w8, #0x3344             // =13124
+      bc:      	movk	w8, #0x1122, lsl #16
+      c0:      	add	w9, w9, #0x1
+      c4:      	strb	w9, [x0]
+      c8:      	ldrb	w9, [x0, x8]
+      cc:      	add	w9, w9, #0x2
+      d0:      	strb	w9, [x0, x8]
+      d4:      	ret
+
+00000000000000d8 <loop>:
+      d8:      	cmp	w2, #0x1
+      dc:      	b.lt	0x134 <loop+0x5c>
+      e0:      	cmp	w2, #0x8
+      e4:      	mov	w8, w2
+      e8:      	b.lo	0x104 <loop+0x2c>
+      ec:      	lsl	x9, x8, #2
+      f0:      	add	x10, x0, x9
+      f4:      	add	x9, x1, x9
+      f8:      	cmp	x1, x10
+      fc:      	ccmp	x0, x9, #0x2, lo
+     100:      	b.hs	0x138 <loop+0x60>
+     104:      	mov	x9, xzr
+     108:      	lsl	x11, x9, #2
+     10c:      	fmov	s0, #2.00000000
+     110:      	sub	x8, x8, x9
+     114:      	add	x10, x1, x11
+     118:      	add	x11, x0, x11
+     11c:      	ldr	s1, [x11]
+     120:      	ldr	s2, [x10], #0x4
+     124:      	subs	x8, x8, #0x1
+     128:      	fmadd	s1, s1, s0, s2
+     12c:      	str	s1, [x11], #0x4
+     130:      	b.ne	0x11c <loop+0x44>
+     134:      	ret
+     138:      	movi	v0.4s, #0x40, lsl #24
+     13c:      	and	x9, x8, #0x7ffffff8
+     140:      	add	x10, x1, #0x10
+     144:      	add	x11, x0, #0x10
+     148:      	and	x12, x8, #0x7ffffff8
+     14c:      	ldp	q1, q4, [x10, #-0x10]
+     150:      	subs	x12, x12, #0x8
+     154:      	ldp	q2, q3, [x11, #-0x10]
+     158:      	add	x10, x10, #0x20
+     15c:      	fmla	v1.4s, v0.4s, v2.4s
+     160:      	fmla	v4.4s, v0.4s, v3.4s
+     164:      	stp	q1, q4, [x11, #-0x10]
+     168:      	add	x11, x11, #0x20
+     16c:      	b.ne	0x14c <loop+0x74>
+     170:      	cmp	x9, x8
+     174:      	b.eq	0x134 <loop+0x5c>
+     178:      	b	0x108 <loop+0x30>
+
+000000000000017c <dat>:
+     17c:      	nop
+     180: 78 56 34 12  	.word	0x12345678
+     184: ef be ad de  	.word	0xdeadbeef
+     188:      	nop
+     18c:      	ret
+
+0000000000000190 <fma1>:
+     190:      	fmadd	s0, s0, s1, s2
+     194:      	ret

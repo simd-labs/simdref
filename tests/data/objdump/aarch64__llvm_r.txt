@@ -1,0 +1,122 @@
+
+aarch64.o:	file format elf64-littleaarch64
+
+Disassembly of section .text:
+
+0000000000000000 <sw>:
+       0: 7100241f     	cmp	w0, #0x9
+       4: 54000408     	b.hi	0x84 <sw+0x84>
+       8: 2a0003e8     	mov	w8, w0
+       c: 90000009     	adrp	x9, 0x0 <sw>
+		000000000000000c:  R_AARCH64_ADR_PREL_PG_HI21	.rodata
+      10: 91000129     	add	x9, x9, #0x0
+		0000000000000010:  R_AARCH64_ADD_ABS_LO12_NC	.rodata
+      14: 1000008a     	adr	x10, 0x24 <sw+0x24>
+      18: 3868692b     	ldrb	w11, [x9, x8]
+      1c: 8b0b094a     	add	x10, x10, x11, lsl #2
+      20: d61f0140     	br	x10
+      24: 11000420     	add	w0, w1, #0x1
+      28: d65f03c0     	ret
+      2c: 531e7420     	lsl	w0, w1, #2
+      30: d65f03c0     	ret
+      34: 528aaac8     	mov	w8, #0x5556             // =21846
+      38: 72aaaaa8     	movk	w8, #0x5555, lsl #16
+      3c: 9b287c28     	smull	x8, w1, w8
+      40: d360fd09     	lsr	x9, x8, #32
+      44: 8b48fd20     	add	x0, x9, x8, lsr #63
+      48: d65f03c0     	ret
+      4c: 51001c20     	sub	w0, w1, #0x7
+      50: d65f03c0     	ret
+      54: 528000a8     	mov	w8, #0x5                // =5
+      58: 4a080020     	eor	w0, w1, w8
+      5c: d65f03c0     	ret
+      60: 12000420     	and	w0, w1, #0x3
+      64: d65f03c0     	ret
+      68: 0b010420     	add	w0, w1, w1, lsl #1
+      6c: d65f03c0     	ret
+      70: 13017c20     	asr	w0, w1, #1
+      74: d65f03c0     	ret
+      78: 52800128     	mov	w8, #0x9                // =9
+      7c: 2a080020     	orr	w0, w1, w8
+      80: d65f03c0     	ret
+      84: 2a1f03e0     	mov	w0, wzr
+      88: d65f03c0     	ret
+      8c: 4b0103e0     	neg	w0, w1
+      90: d65f03c0     	ret
+
+0000000000000094 <big>:
+      94: d28ef100     	mov	x0, #0x7788             // =30600
+      98: f2aaacc0     	movk	x0, #0x5566, lsl #16
+      9c: f2c66880     	movk	x0, #0x3344, lsl #32
+      a0: f2e22440     	movk	x0, #0x1122, lsl #48
+      a4: d65f03c0     	ret
+
+00000000000000a8 <fadd3>:
+      a8: 1e612800     	fadd	d0, d0, d1
+      ac: 1e622800     	fadd	d0, d0, d2
+      b0: d65f03c0     	ret
+
+00000000000000b4 <bytes8>:
+      b4: 39400009     	ldrb	w9, [x0]
+      b8: 52866888     	mov	w8, #0x3344             // =13124
+      bc: 72a22448     	movk	w8, #0x1122, lsl #16
+      c0: 11000529     	add	w9, w9, #0x1
+      c4: 39000009     	strb	w9, [x0]
+      c8: 38686809     	ldrb	w9, [x0, x8]
+      cc: 11000929     	add	w9, w9, #0x2
+      d0: 38286809     	strb	w9, [x0, x8]
+      d4: d65f03c0     	ret
+
+00000000000000d8 <loop>:
+      d8: 7100045f     	cmp	w2, #0x1
+      dc: 540002cb     	b.lt	0x134 <loop+0x5c>
+      e0: 7100205f     	cmp	w2, #0x8
+      e4: 2a0203e8     	mov	w8, w2
+      e8: 540000e3     	b.lo	0x104 <loop+0x2c>
+      ec: d37ef509     	lsl	x9, x8, #2
+      f0: 8b09000a     	add	x10, x0, x9
+      f4: 8b090029     	add	x9, x1, x9
+      f8: eb0a003f     	cmp	x1, x10
+      fc: fa493002     	ccmp	x0, x9, #0x2, lo
+     100: 540001c2     	b.hs	0x138 <loop+0x60>
+     104: aa1f03e9     	mov	x9, xzr
+     108: d37ef52b     	lsl	x11, x9, #2
+     10c: 1e201000     	fmov	s0, #2.00000000
+     110: cb090108     	sub	x8, x8, x9
+     114: 8b0b002a     	add	x10, x1, x11
+     118: 8b0b000b     	add	x11, x0, x11
+     11c: bd400161     	ldr	s1, [x11]
+     120: bc404542     	ldr	s2, [x10], #0x4
+     124: f1000508     	subs	x8, x8, #0x1
+     128: 1f000821     	fmadd	s1, s1, s0, s2
+     12c: bc004561     	str	s1, [x11], #0x4
+     130: 54ffff61     	b.ne	0x11c <loop+0x44>
+     134: d65f03c0     	ret
+     138: 4f026400     	movi	v0.4s, #0x40, lsl #24
+     13c: 927d6d09     	and	x9, x8, #0x7ffffff8
+     140: 9100402a     	add	x10, x1, #0x10
+     144: 9100400b     	add	x11, x0, #0x10
+     148: 927d6d0c     	and	x12, x8, #0x7ffffff8
+     14c: ad7f9141     	ldp	q1, q4, [x10, #-0x10]
+     150: f100218c     	subs	x12, x12, #0x8
+     154: ad7f8d62     	ldp	q2, q3, [x11, #-0x10]
+     158: 9100814a     	add	x10, x10, #0x20
+     15c: 4e22cc01     	fmla	v1.4s, v0.4s, v2.4s
+     160: 4e23cc04     	fmla	v4.4s, v0.4s, v3.4s
+     164: ad3f9161     	stp	q1, q4, [x11, #-0x10]
+     168: 9100816b     	add	x11, x11, #0x20
+     16c: 54ffff01     	b.ne	0x14c <loop+0x74>
+     170: eb08013f     	cmp	x9, x8
+     174: 54fffe00     	b.eq	0x134 <loop+0x5c>
+     178: 17ffffe4     	b	0x108 <loop+0x30>
+
+000000000000017c <dat>:
+     17c: d503201f     	nop
+     180: 78 56 34 12  	.word	0x12345678
+     184: ef be ad de  	.word	0xdeadbeef
+     188: d503201f     	nop
+     18c: d65f03c0     	ret
+
+0000000000000190 <fma1>:
+     190: 1f010800     	fmadd	s0, s0, s1, s2
+     194: d65f03c0     	ret
