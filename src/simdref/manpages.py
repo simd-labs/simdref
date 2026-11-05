@@ -104,7 +104,10 @@ def intrinsic_page(
 
 def instruction_page(record: InstructionRecord) -> str:
     parts = [f'.TH "{record.mnemonic}" "7" "simdref" "simdref" "SIMD Instruction Reference"\n']
-    parts.append(_section("NAME", f"{_roff_escape(record.key)} \\- {_roff_escape(record.summary)}"))
+    name = _roff_escape(record.key)
+    if record.summary:
+        name += f" \\- {_roff_escape(record.summary)}"
+    parts.append(_section("NAME", name))
     if record.description.get("Description"):
         parts.append(_section("DESCRIPTION", _roff_escape(record.description["Description"])))
     else:

@@ -1715,9 +1715,9 @@ def _llm_format_markdown(payload: dict) -> str:
         title = r.get("intrinsic") or r.get("query") or ""
         if isinstance(title, list):
             title = ", ".join(title)
-        summary = r.get("summary", "")
+        summary = (r.get("summary") or "").strip()
         isa = ", ".join(r.get("isa") or [])
-        lines.append(f"- **{title}** `{isa}` — {summary}")
+        lines.append(f"- **{title}** `{isa}`" + (f" — {summary}" if summary else ""))
     return "\n".join(lines)
 
 

@@ -279,7 +279,7 @@ def search_records(
                     kind="instruction",
                     key=item.db_key,
                     title=item.key,
-                    subtitle=item.summary,
+                    subtitle=(item.summary or "").strip(),
                     score=score,
                 )
             )
