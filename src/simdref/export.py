@@ -69,7 +69,7 @@ def _web_measurements(item) -> list[dict]:
         measurement = details.get("measurement") or {}
         if not measurement:
             continue
-        lat, cpi = perf_row_values(details)
+        lat, cpi = perf_row_values(details, item.operand_details)
         row = {
             "uarch": uarch,
             "ports": measurement.get("ports", "-"),

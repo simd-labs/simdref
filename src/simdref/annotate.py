@@ -861,16 +861,47 @@ class PerfSummary:
 def _per_arch_value(details: dict[str, Any], value_fn) -> float | None:
     for v in value_fn(details):
         try:
-            # Latency ranges render as "min-max" strings (simdref#50); the
-            # float view takes the min so aggregates stay numeric.
+            # A "min-max" string keeps its first number so the float stays numeric.
             return float(str(v).split("-", 1)[0])
         except (TypeError, ValueError):
             continue
     return None
 
 
-def _latency_for(details: dict[str, Any]) -> list[str]:
-    return perf.latency_cycle_values(details.get("latencies") or [])
+def _latency_for(
+    details: dict[str, Any], operands: list[dict[str, Any]] | None = None
+) -> list[str]:
+    # One value per row: the largest latency over the read-operand pairs
+    # (simdref#65), never the first listed pair.
+    # Without operands (arch_perf, aggregate_perf) the old first-value pick stays.
+    bounds = None if operands is None else perf.latency_bounds(details, operands)
+    if bounds is None:
+        # No read-start pair has data (KMOVQ (M64, K)): keep the old first value.
+        return perf.latency_cycle_values(details.get("latencies") or [])
+    return [bounds[1]]
+
+
+def arch_latency(record: InstructionRecord, arch: str) -> float | None:
+    """Latency of the row of *arch*, with the write-only-start pairs skipped."""
+    details = (record.arch_details or {}).get(arch) or {}
+    return _per_arch_value(details, lambda d: _latency_for(d, record.operand_details))
+
+
+def arch_latency_range(record: InstructionRecord, arch: str) -> tuple[float, float] | None:
+    """``(low, high)`` when the row of *arch* stores a min-max latency range, else None."""
+    details = (record.arch_details or {}).get(arch) or {}
+    bounds = perf.latency_bounds(details, record.operand_details)
+    if bounds is None or bounds[0] == bounds[1]:
+        return None
+    return float(bounds[0]), float(bounds[1])
+
+
+def fmt_arch_latency(record: InstructionRecord, arch: str, lat: float | None) -> str:
+    """The latency text of a pinned row: ``MIN-MAX`` for a stored range, else ``lat``."""
+    lat_range = arch_latency_range(record, arch)
+    if lat_range is None:
+        return _fmt_num(lat)
+    return f"{_fmt_num(lat_range[0])}-{_fmt_num(lat_range[1])}"
 
 
 def _cpi_for(details: dict[str, Any], iclass: str | None = None) -> list[str]:
@@ -1095,6 +1126,8 @@ def format_annotation(
         uops_frag = ""
         if arch is not None:
             lat, cpi, kind = arch_perf(record, arch)
+            lat = arch_latency(record, arch)
+            lat_text = fmt_arch_latency(record, arch, lat)
             tag = arch_perf_tag(arch, lat, cpi, kind)
             uops_val, microcoded_val = _uops_for(
                 (record.arch_details or {}).get(arch) or {}, arch, perf.record_iclass(record)
@@ -1116,7 +1149,8 @@ def format_annotation(
                 tag = f"[avg of {summary.n_archs} archs, {summary.source_kind}]"
             else:
                 tag = f"[{agg} of {summary.n_archs} archs, {summary.source_kind}]"
-        perf_frag = f"lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)}{uops_frag} {tag}"
+            lat_text = _fmt_num(lat)
+        perf_frag = f"lat={lat_text}c cpi={_fmt_num(cpi)}{uops_frag} {tag}"
         parts.append(perf_frag)
     return " | ".join(parts)
 
@@ -1284,6 +1318,7 @@ def _annotate_instruction(
     )
     if opts.arch is not None:
         lat_val, cpi_val, _ = arch_perf(record, opts.arch)
+        lat_val = arch_latency(record, opts.arch)
         archs_used: list[str] = [opts.arch] if (opts.arch in (record.arch_details or {})) else []
     else:
         lat_val, cpi_val = summary.latency, summary.cpi
@@ -1300,6 +1335,10 @@ def _annotate_instruction(
         "ports": ports_val,
     }
     if opts.arch is not None:
+        lat_range = arch_latency_range(record, opts.arch)
+        if lat_range is not None:
+            # "latency" keeps the max; the stored min-max range rides beside it.
+            json_record["latency_min"], json_record["latency_max"] = lat_range
         # A single core is pinned, so its uop count is well defined. In the
         # aggregate case the count differs per core and both fields stay out.
         uops_val, microcoded_val = _uops_for(

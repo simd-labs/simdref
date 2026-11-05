@@ -54,6 +54,8 @@ def test_zen4_vpcompressd_memory_keeps_measured_cpi(monkeypatch):
     # Issue #57 repro: the ZEN4 row drops the measured 72.50 and the 144 uops.
     rec = _records()["VPCOMPRESSD (M512, K, ZMM)"]
     row = _annotate(monkeypatch, rec, "vpcompressd ZMMWORD PTR [rsi+rcx*4]{k1},zmm0", "ZEN4")
+    # simdref#65: the address pair from the write-only store target counts
+    # as read-start (52), so the latency is the max over pairs, 52.
     assert row["latency"] == 52.0
     assert row["cpi"] == 72.5
     assert row["ports"] == ["1*FP01+1*FP12+2*FP23+18*FP45"]
