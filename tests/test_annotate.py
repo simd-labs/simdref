@@ -178,6 +178,76 @@ def test_objdump_byte_continuation_yields_no_record(monkeypatch, line):
     assert json.loads(out) == [], line
 
 
+# Issue #65 repro lines, copied byte-exact from real llvm-objdump -d output
+# (llvm-objdump-24). B4: a Thumb-2 two-halfword byte column dropped the line
+# after #63. B5: x86 encodings of 9-12 bytes fill the fixed-width byte column
+# and leave no padding before the TAB. Each tuple is one objdump line with
+# real tabs, its address, mnemonic, operands and byte column.
+_BYTECOL_REPROS = [
+    ("       0: 4770         \tbx\tlr", 0x0, "bx", "lr", "4770"),
+    # A Thumb-2 pair is two little-endian halfwords: the bytes are d0 f8 00 c0.
+    ("       4: f8d0 c000    \tldr.w\tr12, [r0]", 0x4, "ldr.w", "r12, [r0]", "d0 f8 00 c0"),
+    (
+        "       0: 48 b8 88 77 66 55 44 33 22 11\tmovabsq\t"
+        "$0x1122334455667788, %rax # imm = 0x1122334455667788",
+        0x0,
+        "movabsq",
+        "$0x1122334455667788, %rax",
+        "48 b8 88 77 66 55 44 33 22 11",
+    ),
+    (
+        "      11: 62 f3 6d 28 25 5c 18 03 aa   \tvpternlogd\t"
+        "$0xaa, 0x60(%rax,%rbx), %ymm2, %ymm3 # ymm3 = mem",
+        0x11,
+        "vpternlogd",
+        "$0xaa, 0x60(%rax,%rbx), %ymm2, %ymm3",
+        "62 f3 6d 28 25 5c 18 03 aa",
+    ),
+    (
+        "      1a: c7 84 98 44 33 22 11 44 33 22 11     \tmovl\t"
+        "$0x11223344, 0x11223344(%rax,%rbx,4) # imm = 0x11223344",
+        0x1A,
+        "movl",
+        "$0x11223344, 0x11223344(%rax,%rbx,4)",
+        "c7 84 98 44 33 22 11 44 33 22 11",
+    ),
+    (
+        "      25: 64 f0 81 80 44 33 22 11 44 33 22 11  \tlock\t\taddl\t"
+        "$0x11223344, %fs:0x11223344(%rax) # imm = 0x11223344",
+        0x25,
+        "addl",
+        "$0x11223344, %fs:0x11223344(%rax)",
+        "64 f0 81 80 44 33 22 11 44 33 22 11",
+    ),
+]
+
+
+@pytest.mark.parametrize(("line", "addr", "mnem", "ops", "bytehex"), _BYTECOL_REPROS)
+def test_objdump_byte_column_repro_line(monkeypatch, line, addr, mnem, ops, bytehex):
+    from simdref import annotate as _annotate
+
+    obj = _parse_objdump_instr(line)
+    assert obj is not None, line
+    assert obj[0] == addr
+    assert obj[2] == bytehex
+    parsed = parse_asm_line(line)
+    assert parsed.kind == LineKind.INSTRUCTION, line
+    assert parsed.mnemonic == mnem
+    assert parsed.operands == ops
+    assert parsed.address == addr
+
+    rec = _make_record(
+        mnemonic=mnem, summary="Repro record.", arch_details={"SKX": _arch_entry("3", "0.5")}
+    )
+    monkeypatch.setattr(_annotate, "lookup", _fake_lookup_factory({mnem.lower(): [rec]}))
+    conn = sqlite3.connect(":memory:")
+    out = "".join(annotate_stream(iter([line + "\n"]), opts=AnnotateOptions(fmt="json"), conn=conn))
+    data = json.loads(out)
+    assert len(data) == 1, line
+    assert data[0]["mnemonic"] == mnem
+    assert data[0]["address"] == f"0x{addr:x}"
+
+
 # An indented label with a hex-letter name and a same-line instruction stays
 # a label: objdump always TABs the mnemonic off the address column
 # (review F2).

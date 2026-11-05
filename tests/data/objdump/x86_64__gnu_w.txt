@@ -1,0 +1,155 @@
+
+x86_64.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <sw>:
+   0:	83 ff 09             	cmp    $0x9,%edi
+   3:	77 49                	ja     4e <sw+0x4e>
+   5:	89 f0                	mov    %esi,%eax
+   7:	89 f9                	mov    %edi,%ecx
+   9:	48 8d 15 00 00 00 00 	lea    0x0(%rip),%rdx        # 10 <sw+0x10>
+  10:	48 63 0c 8a          	movslq (%rdx,%rcx,4),%rcx
+  14:	48 01 d1             	add    %rdx,%rcx
+  17:	ff e1                	jmp    *%rcx
+  19:	ff c0                	inc    %eax
+  1b:	c3                   	ret
+  1c:	c1 e0 02             	shl    $0x2,%eax
+  1f:	c3                   	ret
+  20:	48 98                	cltq
+  22:	48 69 c0 56 55 55 55 	imul   $0x55555556,%rax,%rax
+  29:	48 89 c1             	mov    %rax,%rcx
+  2c:	48 c1 e9 3f          	shr    $0x3f,%rcx
+  30:	48 c1 e8 20          	shr    $0x20,%rax
+  34:	01 c8                	add    %ecx,%eax
+  36:	c3                   	ret
+  37:	83 c0 f9             	add    $0xfffffff9,%eax
+  3a:	c3                   	ret
+  3b:	83 f0 05             	xor    $0x5,%eax
+  3e:	c3                   	ret
+  3f:	83 e0 03             	and    $0x3,%eax
+  42:	c3                   	ret
+  43:	8d 04 40             	lea    (%rax,%rax,2),%eax
+  46:	c3                   	ret
+  47:	d1 f8                	sar    $1,%eax
+  49:	c3                   	ret
+  4a:	83 c8 09             	or     $0x9,%eax
+  4d:	c3                   	ret
+  4e:	31 c0                	xor    %eax,%eax
+  50:	c3                   	ret
+  51:	f7 d8                	neg    %eax
+  53:	c3                   	ret
+  54:	66 66 66 2e 0f 1f 84 00 00 00 00 00 	data16 data16 cs nopw 0x0(%rax,%rax,1)
+
+0000000000000060 <big>:
+  60:	48 b8 88 77 66 55 44 33 22 11 	movabs $0x1122334455667788,%rax
+  6a:	c3                   	ret
+  6b:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)
+
+0000000000000070 <fadd3>:
+  70:	f2 0f 58 c1          	addsd  %xmm1,%xmm0
+  74:	f2 0f 58 c2          	addsd  %xmm2,%xmm0
+  78:	c3                   	ret
+  79:	0f 1f 80 00 00 00 00 	nopl   0x0(%rax)
+
+0000000000000080 <bytes8>:
+  80:	fe 07                	incb   (%rdi)
+  82:	80 87 44 33 22 11 02 	addb   $0x2,0x11223344(%rdi)
+  89:	c3                   	ret
+  8a:	66 0f 1f 44 00 00    	nopw   0x0(%rax,%rax,1)
+
+0000000000000090 <loop>:
+  90:	85 d2                	test   %edx,%edx
+  92:	0f 8e e6 00 00 00    	jle    17e <loop+0xee>
+  98:	89 d0                	mov    %edx,%eax
+  9a:	83 fa 08             	cmp    $0x8,%edx
+  9d:	72 18                	jb     b7 <loop+0x27>
+  9f:	48 8d 0c 87          	lea    (%rdi,%rax,4),%rcx
+  a3:	48 8d 14 86          	lea    (%rsi,%rax,4),%rdx
+  a7:	48 39 d7             	cmp    %rdx,%rdi
+  aa:	0f 92 c2             	setb   %dl
+  ad:	48 39 ce             	cmp    %rcx,%rsi
+  b0:	0f 92 c1             	setb   %cl
+  b3:	84 ca                	test   %cl,%dl
+  b5:	74 6d                	je     124 <loop+0x94>
+  b7:	31 c9                	xor    %ecx,%ecx
+  b9:	48 89 ca             	mov    %rcx,%rdx
+  bc:	a8 01                	test   $0x1,%al
+  be:	74 17                	je     d7 <loop+0x47>
+  c0:	f3 0f 10 04 8f       	movss  (%rdi,%rcx,4),%xmm0
+  c5:	f3 0f 58 c0          	addss  %xmm0,%xmm0
+  c9:	f3 0f 58 04 8e       	addss  (%rsi,%rcx,4),%xmm0
+  ce:	f3 0f 11 04 8f       	movss  %xmm0,(%rdi,%rcx,4)
+  d3:	48 8d 51 01          	lea    0x1(%rcx),%rdx
+  d7:	4c 8d 40 ff          	lea    -0x1(%rax),%r8
+  db:	4c 39 c1             	cmp    %r8,%rcx
+  de:	0f 84 9a 00 00 00    	je     17e <loop+0xee>
+  e4:	66 66 66 2e 0f 1f 84 00 00 00 00 00 	data16 data16 cs nopw 0x0(%rax,%rax,1)
+  f0:	f3 0f 10 04 97       	movss  (%rdi,%rdx,4),%xmm0
+  f5:	f3 0f 10 4c 97 04    	movss  0x4(%rdi,%rdx,4),%xmm1
+  fb:	f3 0f 58 c0          	addss  %xmm0,%xmm0
+  ff:	f3 0f 58 04 96       	addss  (%rsi,%rdx,4),%xmm0
+ 104:	f3 0f 11 04 97       	movss  %xmm0,(%rdi,%rdx,4)
+ 109:	f3 0f 58 c9          	addss  %xmm1,%xmm1
+ 10d:	f3 0f 58 4c 96 04    	addss  0x4(%rsi,%rdx,4),%xmm1
+ 113:	f3 0f 11 4c 97 04    	movss  %xmm1,0x4(%rdi,%rdx,4)
+ 119:	48 83 c2 02          	add    $0x2,%rdx
+ 11d:	48 39 d0             	cmp    %rdx,%rax
+ 120:	75 ce                	jne    f0 <loop+0x60>
+ 122:	eb 5a                	jmp    17e <loop+0xee>
+ 124:	89 c1                	mov    %eax,%ecx
+ 126:	81 e1 f8 ff ff 7f    	and    $0x7ffffff8,%ecx
+ 12c:	89 c2                	mov    %eax,%edx
+ 12e:	c1 ea 03             	shr    $0x3,%edx
+ 131:	81 e2 ff ff ff 0f    	and    $0xfffffff,%edx
+ 137:	48 c1 e2 05          	shl    $0x5,%rdx
+ 13b:	45 31 c0             	xor    %r8d,%r8d
+ 13e:	66 90                	xchg   %ax,%ax
+ 140:	42 0f 10 04 07       	movups (%rdi,%r8,1),%xmm0
+ 145:	42 0f 10 4c 07 10    	movups 0x10(%rdi,%r8,1),%xmm1
+ 14b:	42 0f 10 14 06       	movups (%rsi,%r8,1),%xmm2
+ 150:	42 0f 10 5c 06 10    	movups 0x10(%rsi,%r8,1),%xmm3
+ 156:	0f 58 c0             	addps  %xmm0,%xmm0
+ 159:	0f 58 c2             	addps  %xmm2,%xmm0
+ 15c:	0f 58 c9             	addps  %xmm1,%xmm1
+ 15f:	0f 58 cb             	addps  %xmm3,%xmm1
+ 162:	42 0f 11 04 07       	movups %xmm0,(%rdi,%r8,1)
+ 167:	42 0f 11 4c 07 10    	movups %xmm1,0x10(%rdi,%r8,1)
+ 16d:	49 83 c0 20          	add    $0x20,%r8
+ 171:	4c 39 c2             	cmp    %r8,%rdx
+ 174:	75 ca                	jne    140 <loop+0xb0>
+ 176:	39 c1                	cmp    %eax,%ecx
+ 178:	0f 85 3b ff ff ff    	jne    b9 <loop+0x29>
+ 17e:	c3                   	ret
+ 17f:	90                   	nop
+
+0000000000000180 <evex>:
+ 180:	62 f1 7c 48 10 87 14 8d 04 00 	vmovups 0x48d14(%rdi),%zmm0
+ 18a:	62 f1 7c 48 58 87 00 00 10 00 	vaddps 0x100000(%rdi),%zmm0,%zmm0
+ 194:	62 f1 7c 48 11 87 58 d1 08 00 	vmovups %zmm0,0x8d158(%rdi)
+ 19e:	62 f1 fe 48 6f 07    	vmovdqu64 (%rdi),%zmm0
+ 1a4:	62 f3 7d 48 25 47 01 96 	vpternlogd $0x96,0x40(%rdi),%zmm0,%zmm0
+ 1ac:	62 f1 fe 48 7f 87 00 00 0c 00 	vmovdqu64 %zmm0,0xc0000(%rdi)
+ 1b6:	c5 f8 77             	vzeroupper
+ 1b9:	c3                   	ret
+ 1ba:	66 0f 1f 44 00 00    	nopw   0x0(%rax,%rax,1)
+
+00000000000001c0 <longenc>:
+ 1c0:	48 b8 88 77 66 55 44 33 22 11 	movabs $0x1122334455667788,%rax
+ 1ca:	64 f0 81 80 44 33 22 11 44 33 22 11 	lock addl $0x11223344,%fs:0x11223344(%rax)
+ 1d6:	c7 84 98 44 33 22 11 44 33 22 11 	movl   $0x11223344,0x11223344(%rax,%rbx,4)
+ 1e1:	d8 c1                	fadd   %st(1),%st
+ 1e3:	80 00 01             	addb   $0x1,(%rax)
+ 1e6:	66 2e 66 0f 1f 04 00 	data16 cs nopw (%rax,%rax,1)
+ 1ed:	f3 aa                	rep stos %al,(%rdi)
+ 1ef:	62 f3 75 48 25 54 98 01 96 	vpternlogd $0x96,0x40(%rax,%rbx,4),%zmm1,%zmm2
+ 1f8:	0f 0b                	ud2
+ 1fa:	c3                   	ret
+ 1fb:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)
+
+0000000000000200 <x87>:
+ 200:	db 6c 24 18          	fldt   0x18(%rsp)
+ 204:	db 6c 24 08          	fldt   0x8(%rsp)
+ 208:	de c1                	faddp  %st,%st(1)
+ 20a:	c3                   	ret

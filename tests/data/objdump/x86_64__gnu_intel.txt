@@ -1,0 +1,167 @@
+
+x86_64.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <sw>:
+   0:	83 ff 09             	cmp    edi,0x9
+   3:	77 49                	ja     4e <sw+0x4e>
+   5:	89 f0                	mov    eax,esi
+   7:	89 f9                	mov    ecx,edi
+   9:	48 8d 15 00 00 00 00 	lea    rdx,[rip+0x0]        # 10 <sw+0x10>
+  10:	48 63 0c 8a          	movsxd rcx,DWORD PTR [rdx+rcx*4]
+  14:	48 01 d1             	add    rcx,rdx
+  17:	ff e1                	jmp    rcx
+  19:	ff c0                	inc    eax
+  1b:	c3                   	ret
+  1c:	c1 e0 02             	shl    eax,0x2
+  1f:	c3                   	ret
+  20:	48 98                	cdqe
+  22:	48 69 c0 56 55 55 55 	imul   rax,rax,0x55555556
+  29:	48 89 c1             	mov    rcx,rax
+  2c:	48 c1 e9 3f          	shr    rcx,0x3f
+  30:	48 c1 e8 20          	shr    rax,0x20
+  34:	01 c8                	add    eax,ecx
+  36:	c3                   	ret
+  37:	83 c0 f9             	add    eax,0xfffffff9
+  3a:	c3                   	ret
+  3b:	83 f0 05             	xor    eax,0x5
+  3e:	c3                   	ret
+  3f:	83 e0 03             	and    eax,0x3
+  42:	c3                   	ret
+  43:	8d 04 40             	lea    eax,[rax+rax*2]
+  46:	c3                   	ret
+  47:	d1 f8                	sar    eax,1
+  49:	c3                   	ret
+  4a:	83 c8 09             	or     eax,0x9
+  4d:	c3                   	ret
+  4e:	31 c0                	xor    eax,eax
+  50:	c3                   	ret
+  51:	f7 d8                	neg    eax
+  53:	c3                   	ret
+  54:	66 66 66 2e 0f 1f 84 	data16 data16 cs nop WORD PTR [rax+rax*1+0x0]
+  5b:	00 00 00 00 00
+
+0000000000000060 <big>:
+  60:	48 b8 88 77 66 55 44 	movabs rax,0x1122334455667788
+  67:	33 22 11
+  6a:	c3                   	ret
+  6b:	0f 1f 44 00 00       	nop    DWORD PTR [rax+rax*1+0x0]
+
+0000000000000070 <fadd3>:
+  70:	f2 0f 58 c1          	addsd  xmm0,xmm1
+  74:	f2 0f 58 c2          	addsd  xmm0,xmm2
+  78:	c3                   	ret
+  79:	0f 1f 80 00 00 00 00 	nop    DWORD PTR [rax+0x0]
+
+0000000000000080 <bytes8>:
+  80:	fe 07                	inc    BYTE PTR [rdi]
+  82:	80 87 44 33 22 11 02 	add    BYTE PTR [rdi+0x11223344],0x2
+  89:	c3                   	ret
+  8a:	66 0f 1f 44 00 00    	nop    WORD PTR [rax+rax*1+0x0]
+
+0000000000000090 <loop>:
+  90:	85 d2                	test   edx,edx
+  92:	0f 8e e6 00 00 00    	jle    17e <loop+0xee>
+  98:	89 d0                	mov    eax,edx
+  9a:	83 fa 08             	cmp    edx,0x8
+  9d:	72 18                	jb     b7 <loop+0x27>
+  9f:	48 8d 0c 87          	lea    rcx,[rdi+rax*4]
+  a3:	48 8d 14 86          	lea    rdx,[rsi+rax*4]
+  a7:	48 39 d7             	cmp    rdi,rdx
+  aa:	0f 92 c2             	setb   dl
+  ad:	48 39 ce             	cmp    rsi,rcx
+  b0:	0f 92 c1             	setb   cl
+  b3:	84 ca                	test   dl,cl
+  b5:	74 6d                	je     124 <loop+0x94>
+  b7:	31 c9                	xor    ecx,ecx
+  b9:	48 89 ca             	mov    rdx,rcx
+  bc:	a8 01                	test   al,0x1
+  be:	74 17                	je     d7 <loop+0x47>
+  c0:	f3 0f 10 04 8f       	movss  xmm0,DWORD PTR [rdi+rcx*4]
+  c5:	f3 0f 58 c0          	addss  xmm0,xmm0
+  c9:	f3 0f 58 04 8e       	addss  xmm0,DWORD PTR [rsi+rcx*4]
+  ce:	f3 0f 11 04 8f       	movss  DWORD PTR [rdi+rcx*4],xmm0
+  d3:	48 8d 51 01          	lea    rdx,[rcx+0x1]
+  d7:	4c 8d 40 ff          	lea    r8,[rax-0x1]
+  db:	4c 39 c1             	cmp    rcx,r8
+  de:	0f 84 9a 00 00 00    	je     17e <loop+0xee>
+  e4:	66 66 66 2e 0f 1f 84 	data16 data16 cs nop WORD PTR [rax+rax*1+0x0]
+  eb:	00 00 00 00 00
+  f0:	f3 0f 10 04 97       	movss  xmm0,DWORD PTR [rdi+rdx*4]
+  f5:	f3 0f 10 4c 97 04    	movss  xmm1,DWORD PTR [rdi+rdx*4+0x4]
+  fb:	f3 0f 58 c0          	addss  xmm0,xmm0
+  ff:	f3 0f 58 04 96       	addss  xmm0,DWORD PTR [rsi+rdx*4]
+ 104:	f3 0f 11 04 97       	movss  DWORD PTR [rdi+rdx*4],xmm0
+ 109:	f3 0f 58 c9          	addss  xmm1,xmm1
+ 10d:	f3 0f 58 4c 96 04    	addss  xmm1,DWORD PTR [rsi+rdx*4+0x4]
+ 113:	f3 0f 11 4c 97 04    	movss  DWORD PTR [rdi+rdx*4+0x4],xmm1
+ 119:	48 83 c2 02          	add    rdx,0x2
+ 11d:	48 39 d0             	cmp    rax,rdx
+ 120:	75 ce                	jne    f0 <loop+0x60>
+ 122:	eb 5a                	jmp    17e <loop+0xee>
+ 124:	89 c1                	mov    ecx,eax
+ 126:	81 e1 f8 ff ff 7f    	and    ecx,0x7ffffff8
+ 12c:	89 c2                	mov    edx,eax
+ 12e:	c1 ea 03             	shr    edx,0x3
+ 131:	81 e2 ff ff ff 0f    	and    edx,0xfffffff
+ 137:	48 c1 e2 05          	shl    rdx,0x5
+ 13b:	45 31 c0             	xor    r8d,r8d
+ 13e:	66 90                	xchg   ax,ax
+ 140:	42 0f 10 04 07       	movups xmm0,XMMWORD PTR [rdi+r8*1]
+ 145:	42 0f 10 4c 07 10    	movups xmm1,XMMWORD PTR [rdi+r8*1+0x10]
+ 14b:	42 0f 10 14 06       	movups xmm2,XMMWORD PTR [rsi+r8*1]
+ 150:	42 0f 10 5c 06 10    	movups xmm3,XMMWORD PTR [rsi+r8*1+0x10]
+ 156:	0f 58 c0             	addps  xmm0,xmm0
+ 159:	0f 58 c2             	addps  xmm0,xmm2
+ 15c:	0f 58 c9             	addps  xmm1,xmm1
+ 15f:	0f 58 cb             	addps  xmm1,xmm3
+ 162:	42 0f 11 04 07       	movups XMMWORD PTR [rdi+r8*1],xmm0
+ 167:	42 0f 11 4c 07 10    	movups XMMWORD PTR [rdi+r8*1+0x10],xmm1
+ 16d:	49 83 c0 20          	add    r8,0x20
+ 171:	4c 39 c2             	cmp    rdx,r8
+ 174:	75 ca                	jne    140 <loop+0xb0>
+ 176:	39 c1                	cmp    ecx,eax
+ 178:	0f 85 3b ff ff ff    	jne    b9 <loop+0x29>
+ 17e:	c3                   	ret
+ 17f:	90                   	nop
+
+0000000000000180 <evex>:
+ 180:	62 f1 7c 48 10 87 14 	vmovups zmm0,ZMMWORD PTR [rdi+0x48d14]
+ 187:	8d 04 00
+ 18a:	62 f1 7c 48 58 87 00 	vaddps zmm0,zmm0,ZMMWORD PTR [rdi+0x100000]
+ 191:	00 10 00
+ 194:	62 f1 7c 48 11 87 58 	vmovups ZMMWORD PTR [rdi+0x8d158],zmm0
+ 19b:	d1 08 00
+ 19e:	62 f1 fe 48 6f 07    	vmovdqu64 zmm0,ZMMWORD PTR [rdi]
+ 1a4:	62 f3 7d 48 25 47 01 	vpternlogd zmm0,zmm0,ZMMWORD PTR [rdi+0x40],0x96
+ 1ab:	96
+ 1ac:	62 f1 fe 48 7f 87 00 	vmovdqu64 ZMMWORD PTR [rdi+0xc0000],zmm0
+ 1b3:	00 0c 00
+ 1b6:	c5 f8 77             	vzeroupper
+ 1b9:	c3                   	ret
+ 1ba:	66 0f 1f 44 00 00    	nop    WORD PTR [rax+rax*1+0x0]
+
+00000000000001c0 <longenc>:
+ 1c0:	48 b8 88 77 66 55 44 	movabs rax,0x1122334455667788
+ 1c7:	33 22 11
+ 1ca:	64 f0 81 80 44 33 22 	lock add DWORD PTR fs:[rax+0x11223344],0x11223344
+ 1d1:	11 44 33 22 11
+ 1d6:	c7 84 98 44 33 22 11 	mov    DWORD PTR [rax+rbx*4+0x11223344],0x11223344
+ 1dd:	44 33 22 11
+ 1e1:	d8 c1                	fadd   st,st(1)
+ 1e3:	80 00 01             	add    BYTE PTR [rax],0x1
+ 1e6:	66 2e 66 0f 1f 04 00 	data16 cs nop WORD PTR [rax+rax*1]
+ 1ed:	f3 aa                	rep stos BYTE PTR [rdi],al
+ 1ef:	62 f3 75 48 25 54 98 	vpternlogd zmm2,zmm1,ZMMWORD PTR [rax+rbx*4+0x40],0x96
+ 1f6:	01 96
+ 1f8:	0f 0b                	ud2
+ 1fa:	c3                   	ret
+ 1fb:	0f 1f 44 00 00       	nop    DWORD PTR [rax+rax*1+0x0]
+
+0000000000000200 <x87>:
+ 200:	db 6c 24 18          	fld    TBYTE PTR [rsp+0x18]
+ 204:	db 6c 24 08          	fld    TBYTE PTR [rsp+0x8]
+ 208:	de c1                	faddp  st(1),st
+ 20a:	c3                   	ret

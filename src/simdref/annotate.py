@@ -12,6 +12,7 @@ import json
 import re
 import sqlite3
 import statistics
+import string
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Iterator
@@ -53,23 +54,131 @@ _INSTR_RE = re.compile(
     r"(?:[ \t]+(?P<operands>.*))?$"
 )
 _LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
-# objdump -d line shape: optional whitespace, hex VA, ':', hex bytes, mnemonic ops.
-# A byte column is either one 4- or 8-digit instruction-word token (ARM/RISC-V:
-# "a9bf7bfd", the word value) or a run of 2-digit memory-order byte tokens
-# (x86: "48 8b 45 f8"). objdump pads the byte column with spaces and ends it
-# on a TAB before the mnemonic; requiring that TAB keeps a hex-letter mnemonic
-# with no byte column ("fadd", "addb") out of the byte run (issue #61).
-_OBJDUMP_INSTR_RE = re.compile(
-    r"^\s*(?P<addr>[0-9a-fA-F]+):\s+"
-    r"(?P<bytes>(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}(?:\s+[0-9a-fA-F]{2}){0,9})\s+\t)?"
-    r"(?P<rest>\S.*?)\s*$"
-)
-# A tail of only hex byte groups is a wrapped encoding's byte-only
-# continuation line ("    423a:\tff ff 03 "), never a mnemonic (issue #61).
-_BYTE_GROUP_TAIL_RE = re.compile(
-    r"\s*(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2})"
-    r"(?:\s+(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{4}|[0-9a-fA-F]{2}))*\s*"
-)
+# objdump listings (issue #65): one format detection per listing, then one
+# rule per address line: the byte column holds next_address - address bytes.
+# objdump right-aligns the address with spaces; a TAB right before it marks a
+# relocation line ("-r") or a plain-asm label ("\tadd: ret"), not an address.
+_HEX_DIGITS = frozenset(string.hexdigits)
+_MNEMONIC_CHARS = frozenset(string.ascii_letters + string.digits + "._")
+
+
+def _addr_line(line: str) -> tuple[int, int] | None:
+    """An address line: ``(address, index after the ':')``, else None."""
+    i = 0
+    while i < len(line) and line[i] in " \t":
+        i += 1
+    if i and line[i - 1] == "\t":
+        return None  # a TAB right before the address: a relocation or label line
+    j = i
+    while j < len(line) and line[j] in _HEX_DIGITS:
+        j += 1
+    if j == i or line[j : j + 1] != ":" or line[j + 1 : j + 2].strip():
+        return None
+    return int(line[i:j], 16), j + 1
+
+
+def _is_hex_group(tok: str) -> bool:
+    """A byte group: 2-digit byte, 4-digit halfword or 8-digit word."""
+    return len(tok) in (2, 4, 8) and all(c in _HEX_DIGITS for c in tok)
+
+
+# A byte column: a hex run before objdump's TAB, or before 2+ spaces once a
+# terminal paste expanded the TAB. One group needs padding before the TAB
+# ("fadd\td0" has none); a full llvm x86 column of 10+ bytes has none either.
+def _padded_run(body: str) -> bool:
+    """The hex run before objdump's TAB closes the byte column."""
+    s = body.lstrip(" \t")
+    for k in range(2, min(8, len(s)) + 1):
+        if s[k : k + 1] == " " and all(c in _HEX_DIGITS for c in s[:k]) and _tab_tail(s[k:]):
+            return True
+    return False
+
+
+def _tab_tail(t: str) -> bool:
+    """Byte groups and padding after one space, then objdump's closing TAB."""
+    pos = 0
+    while True:
+        j = pos
+        while j < len(t) and t[j] == " ":
+            j += 1
+        if j < len(t) and t[j] == "\t":
+            return True
+        if t[pos : pos + 1] != " ":
+            return False
+        j = pos + 1
+        while j < len(t) and t[j] in _HEX_DIGITS:
+            j += 1
+        if not 2 <= j - pos - 1 <= 8 or t[j : j + 1] not in (" ", "\t"):
+            return False
+        pos = j
+
+
+def _pasted_run(body: str) -> bool:
+    """The hex run before the 2+ space gap that a pasted byte column leaves."""
+    s = body.lstrip(" ")
+    for k in range(2, min(8, len(s)) + 1):
+        if s[k : k + 1] == " " and all(c in _HEX_DIGITS for c in s[:k]) and _gap_tail(s[k:]):
+            return True
+    return False
+
+
+def _gap_tail(t: str) -> bool:
+    """Byte groups after one space, then a 2+ space gap and a non-space char."""
+    pos = 0
+    while True:
+        j = pos
+        while j < len(t) and t[j] == " ":
+            j += 1
+        if j - pos >= 2 and t[j : j + 1] and not t[j].isspace():
+            return True
+        if t[pos : pos + 1] != " ":
+            return False
+        j = pos + 1
+        while j < len(t) and t[j] in _HEX_DIGITS:
+            j += 1
+        if not 2 <= j - pos - 1 <= 8 or t[j : j + 1] != " ":
+            return False
+        pos = j
+
+
+def _token_starts(text: str) -> list[int]:
+    """Start offsets of the whitespace-separated tokens of ``text``."""
+    starts = []
+    pos = 0
+    for tok in text.split():
+        pos = text.find(tok, pos)
+        starts.append(pos)
+        pos += len(tok)
+    return starts
+
+
+def _is_instr_head(head: str) -> bool:
+    """An instruction head: a mnemonic, then optional whitespace operands."""
+    if not head or head[0] not in string.ascii_letters:
+        return False
+    i = 1
+    while i < len(head) and head[i] in _MNEMONIC_CHARS:
+        i += 1
+    return i == len(head) or head[i] in " \t"
+
+
+def _names_file_format(line: str) -> bool:
+    """The objdump ``file format NAME`` header phrase with its word boundaries."""
+    start = 0
+    while True:
+        i = line.find("file format", start)
+        if i < 0:
+            return False
+        start = i + 1
+        if i and (line[i - 1] == "_" or line[i - 1].isalnum()):
+            continue
+        j = k = i + len("file format")
+        while k < len(line) and line[k].isspace():
+            k += 1
+        if j < k < len(line):
+            return True
+
+
 # objdump -S injects "file:line" comment lines before the instruction block.
 _OBJDUMP_SRC_RE = re.compile(r"^\s*(?P<file>[^ \t/][^:]*):(?P<line>\d+)\s*$")
 
@@ -111,41 +220,142 @@ def _strip_prefix_tokens(head: str) -> str:
         rest = parts[1]
 
 
-def _parse_objdump_instr(line: str) -> tuple[int, str, str | None] | None:
-    """Match an ``objdump -d`` instruction line: ``<hexaddr>: [bytes] mnemonic ...``.
+def _objdump_body(line: str) -> str:
+    """The text after the address colon, or the whole line when it has no address."""
+    addr = _addr_line(line)
+    return line[addr[1] :] if addr else line
 
-    Returns ``(address, rest, bytehex)`` where ``rest`` starts at the mnemonic
-    and ``bytehex`` is the byte column's hex tokens, whitespace-normalized
-    (e.g. ``48 8b 45 f8``; ARM/RISC-V print one word-value token), or None
-    when the line is not objdump-shaped (e.g. a column-0 numeric local label
-    ``1:`` does not match).
+
+def _opens_byte_column(body: str) -> bool:
+    toks = body.split()
+    run = _padded_run if "\t" in body else _pasted_run
+    # A byte-only body is a GNU wrap continuation line, also a byte column.
+    return run(body) or (bool(toks) and all(map(_is_hex_group, toks)))
+
+
+def _objdump_shaped(body: str) -> bool:
+    """objdump's address-column form: a TAB or a byte column after the colon."""
+    return body.lstrip(" ")[:1] == "\t" or _opens_byte_column(body)
+
+
+def _group_bytes(group: str) -> bytes:
+    # shortcut: a 4-/8-digit group is a little-endian halfword/word value; upgrade for big-endian listings.
+    return int(group, 16).to_bytes(len(group) // 2, "little")
+
+
+_ObjdumpRecord = tuple[int | None, bytes | None, str, str | None]
+
+
+def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
+    """Parse an objdump listing: ``{line_index: (address, bytes, rest, bytehex)}``.
+
+    ``rest`` starts at the mnemonic (prefix tokens kept); ``bytes`` is the
+    encoding in memory order, or None when the listing has no byte column.
+    ``bytehex`` is the column in the asm_identity contract: one 4-/8-digit
+    group as printed (the word value), else memory-order 2-digit bytes.
+    Returns ``{}`` when the lines are not an objdump listing (plain asm).
+    Detection runs once per listing; then the byte column of each address
+    line is the run of hex groups that holds next_address - address bytes.
     """
-    # Cheap str gates before the regex (HOWTO: "use string methods"): objdump
-    # never starts an instruction line at column 0 (GAS local labels ``1:``
-    # do), addresses start with a hex char, and the mandatory ':' sits within
-    # the first 24 columns.
-    if not line or line[0] not in " \t":
-        return None
-    bare = line.lstrip(" \t")
-    if not bare or bare[0] not in "0123456789abcdefABCDEF" or ":" not in bare[:24]:
-        return None
-    obj_m = _OBJDUMP_INSTR_RE.match(line)
-    if not obj_m:
-        return None
-    # objdump always TABs the mnemonic off the address/bytes column; a plain
-    # space after the colon is a label with a same-line instruction
-    # ("\tadd: ret"), and a byte-group-only tail is a continuation line.
-    colon = obj_m.end("addr") + 1
-    if "\t" not in line[colon : obj_m.start("rest")]:
-        return None
-    if _BYTE_GROUP_TAIL_RE.fullmatch(line[colon:]):
-        return None
-    try:
-        addr = int(obj_m.group("addr"), 16)
-    except ValueError:
-        return None
-    byte_run = obj_m.group("bytes") or ""
-    return addr, obj_m.group("rest"), " ".join(byte_run.split()) or None
+    content = [line for line in lines if line[:1] in " \t" and line.strip()]
+    addr_lines = [line for line in content if _addr_line(line)]
+    # A pasted fragment has no header: it is objdump-shaped when most content
+    # lines are "addr:" lines with a TAB or a byte column after the colon (a
+    # label with a same-line instruction, "\tadd: ret", has neither).
+    shaped = [line for line in addr_lines if _objdump_shaped(_objdump_body(line))]
+    has_header = any(map(_names_file_format, lines[:10]))
+    if not has_header and not (content and len(shaped) * 2 > len(content)):
+        return {}
+    has_addr = len(addr_lines) * 2 > len(content)  # --no-leading-addr still prints data addresses
+    probe = [_objdump_body(line) for line in (addr_lines if has_addr else content)[:50]]
+    has_bytes = sum(map(_opens_byte_column, probe)) * 2 > len(probe)
+
+    rows: list[tuple[int, int | None, str]] = []
+    for index, line in enumerate(lines):
+        addr = _addr_line(line)
+        if addr:
+            body = line[addr[1] :]
+            toks = body.split()[:2]
+            # A pasted relocation or label line lost its TABs but has no byte column
+            # either; a pasted long llvm x86 column has no gap, so two groups count.
+            if (
+                not has_bytes
+                or _objdump_shaped(body)
+                or (len(toks) == 2 and all(map(_is_hex_group, toks)))
+            ):
+                rows.append((index, addr[0], body))
+        elif not has_addr and line[:1] in " \t" and line.strip() and not line.strip().endswith(":"):
+            rows.append((index, None, line))
+
+    records: dict[int, _ObjdumpRecord] = {}
+    last = None  # line index of the open instruction, for wrap folding
+    for k, (index, addr, text) in enumerate(rows):
+        starts = _token_starts(text)
+        toks = text.split()
+        run = []
+        for tok in toks:
+            if not _is_hex_group(tok):
+                break
+            run.append(tok)
+        cum = [0]
+        for tok in run:
+            cum.append(cum[-1] + len(tok) // 2)
+        nxt = rows[k + 1][1] if k + 1 < len(rows) else None
+        want = nxt - addr if addr is not None and nxt is not None and nxt > addr else None
+        # Without a byte column only data lines print bytes: the split must leave text.
+        if want in cum[1:] and (has_bytes or cum.index(want) < len(toks)):
+            n = cum.index(want)
+        elif not has_bytes:
+            n = 0
+        elif cum[-1] and len(run) == len(toks):
+            n = len(run)  # only hex groups: a continuation line or a last data line
+        elif "\t" in text.strip(" "):
+            # Last line of a block or no address: objdump ends the column with a TAB.
+            n = min(len(text.lstrip(" \t").split("\t")[0].split()), len(run))
+        else:
+            # Pasted text: the column ends at the padding gap; no gap, no bytes.
+            gap = len(text.lstrip(" ").split("  ")[0].split())
+            n = gap if gap <= len(run) else 0
+        # The split must leave a mnemonic or a directive: "fadd %st(1),%st" and
+        # "addb $1" have no byte column although "fadd" and "addb" are hex.
+        if n < len(toks) and not (toks[n].startswith(".") or _is_instr_head(toks[n])):
+            n = 0
+        col = b"".join(map(_group_bytes, run[:n])) if has_bytes else None
+        if n == len(toks):  # wrap continuation: fold into the open instruction when contiguous
+            if last is not None and addr is not None and col:
+                a0, b0, rest0, _hex0 = records[last]
+                if a0 is not None and a0 + len(b0 or b"") == addr:
+                    b0 = (b0 or b"") + col
+                    records[last] = (a0, b0, rest0, b0.hex(" "))
+            continue
+        rest = text[starts[n] :].rstrip()
+        if not _is_instr_head(_strip_prefix_tokens(_split_comment(rest)[0])):
+            last = None  # data (".word"), "(bad)", "...": no instruction
+            continue
+        word = n == 1 and len(run[0]) > 2
+        records[index] = (
+            addr,
+            col,
+            rest,
+            run[0].lower() if word else col.hex(" ") if col else None,
+        )
+        last = index
+    return records
+
+
+def _listing_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
+    """_objdump_records for a whole input; plain asm with pasted objdump lines parses per line."""
+    return _objdump_records(lines) or {
+        index: rec
+        for index, line in enumerate(lines)
+        if (rec := _objdump_records([line]).get(0)) is not None
+    }
+
+
+def _parse_objdump_instr(line: str) -> tuple[int | None, str, str | None] | None:
+    """One objdump line: ``(address, rest, bytehex)`` or None (single-line view of _objdump_records)."""
+    rec = _objdump_records([line]).get(0)
+    return None if rec is None else (rec[0], rec[2], rec[3])
 
 
 def _split_comment(text: str) -> tuple[str, str]:
@@ -156,6 +366,11 @@ def _split_comment(text: str) -> tuple[str, str]:
 
 def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
     stripped = line.rstrip("\n")
+    return _asm_line(stripped, _objdump_records([stripped]).get(0), track_positions)
+
+
+def _asm_line(stripped: str, obj: _ObjdumpRecord | None, track_positions: bool) -> AsmLine:
+    """Classify one line; ``obj`` is its _objdump_records entry, or None."""
     if not stripped.strip():
         return AsmLine(LineKind.BLANK, stripped)
     bare = stripped.lstrip()
@@ -167,36 +382,11 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
         # objdump section banner: "Disassembly of section .text:"
         return AsmLine(LineKind.COMMENT, stripped)
 
-    if track_positions:
-        obj = _parse_objdump_instr(stripped)
-        if obj is not None:
-            address, rest, _bytehex = obj
-            head, comment = _split_comment(rest)
-            m = _INSTR_RE.match(_strip_prefix_tokens(head))
-            if m:
-                return AsmLine(
-                    kind=LineKind.INSTRUCTION,
-                    raw=stripped,
-                    indent=(stripped[: stripped.find(rest)] if rest in stripped else ""),
-                    mnemonic=m.group("mnemonic") or "",
-                    operands=(m.group("operands") or "").strip(),
-                    trailing_comment=comment.strip(),
-                    address=address,
-                )
-        # In objdump mode, any non-matching line is an objdump header,
-        # `-S` source interleave, or an inline symbol annotation — never
-        # an AT&T instruction. Bailing out here avoids classifying C++
-        # source keywords ("return", "if", "for", ...) as mnemonics.
-        return AsmLine(LineKind.COMMENT, stripped)
-
-    # objdump-style input (workflow §1d: `objdump -d ... > file.s`) is a
-    # first-class input even without --track-positions: strip the leading
-    # "  <hexaddr>:\t" (and any raw bytes column) so the mnemonic parses.
-    # This runs before the label check: a hex-letter address ("b:", "c:")
-    # otherwise reads as a label name (issue #61).
-    obj = _parse_objdump_instr(stripped)
+    # objdump input (workflow §1d: `objdump -d ... > file.s`) is a first-class
+    # input. This runs before the label check: a hex-letter address ("b:",
+    # "c:") otherwise reads as a label name (issue #61).
     if obj is not None:
-        address, rest, _bytehex = obj
+        address, _bytes, rest, _hex = obj
         head, comment = _split_comment(rest)
         m = _INSTR_RE.match(_strip_prefix_tokens(head))
         if m:
@@ -209,6 +399,12 @@ def parse_asm_line(line: str, *, track_positions: bool = False) -> AsmLine:
                 trailing_comment=comment.strip(),
                 address=address,
             )
+    if track_positions:
+        # In objdump mode, any other line is an objdump header, `-S` source
+        # interleave, or an inline symbol annotation, never an AT&T
+        # instruction. Bailing out here avoids classifying C++ source
+        # keywords ("return", "if", "for", ...) as mnemonics.
+        return AsmLine(LineKind.COMMENT, stripped)
 
     if _LABEL_RE.match(stripped):
         return AsmLine(LineKind.LABEL, stripped)
@@ -665,16 +861,47 @@ class PerfSummary:
 def _per_arch_value(details: dict[str, Any], value_fn) -> float | None:
     for v in value_fn(details):
         try:
-            # Latency ranges render as "min-max" strings (simdref#50); the
-            # float view takes the min so aggregates stay numeric.
+            # A "min-max" string keeps its first number so the float stays numeric.
             return float(str(v).split("-", 1)[0])
         except (TypeError, ValueError):
             continue
     return None
 
 
-def _latency_for(details: dict[str, Any]) -> list[str]:
-    return perf.latency_cycle_values(details.get("latencies") or [])
+def _latency_for(
+    details: dict[str, Any], operands: list[dict[str, Any]] | None = None
+) -> list[str]:
+    # One value per row: the largest latency over the read-operand pairs
+    # (simdref#65), never the first listed pair.
+    # Without operands (arch_perf, aggregate_perf) the old first-value pick stays.
+    bounds = None if operands is None else perf.latency_bounds(details, operands)
+    if bounds is None:
+        # No read-start pair has data (KMOVQ (M64, K)): keep the old first value.
+        return perf.latency_cycle_values(details.get("latencies") or [])
+    return [bounds[1]]
+
+
+def arch_latency(record: InstructionRecord, arch: str) -> float | None:
+    """Latency of the row of *arch*, with the write-only-start pairs skipped."""
+    details = (record.arch_details or {}).get(arch) or {}
+    return _per_arch_value(details, lambda d: _latency_for(d, record.operand_details))
+
+
+def arch_latency_range(record: InstructionRecord, arch: str) -> tuple[float, float] | None:
+    """``(low, high)`` when the row of *arch* stores a min-max latency range, else None."""
+    details = (record.arch_details or {}).get(arch) or {}
+    bounds = perf.latency_bounds(details, record.operand_details)
+    if bounds is None or bounds[0] == bounds[1]:
+        return None
+    return float(bounds[0]), float(bounds[1])
+
+
+def fmt_arch_latency(record: InstructionRecord, arch: str, lat: float | None) -> str:
+    """The latency text of a pinned row: ``MIN-MAX`` for a stored range, else ``lat``."""
+    lat_range = arch_latency_range(record, arch)
+    if lat_range is None:
+        return _fmt_num(lat)
+    return f"{_fmt_num(lat_range[0])}-{_fmt_num(lat_range[1])}"
 
 
 def _cpi_for(details: dict[str, Any], iclass: str | None = None) -> list[str]:
@@ -899,6 +1126,8 @@ def format_annotation(
         uops_frag = ""
         if arch is not None:
             lat, cpi, kind = arch_perf(record, arch)
+            lat = arch_latency(record, arch)
+            lat_text = fmt_arch_latency(record, arch, lat)
             tag = arch_perf_tag(arch, lat, cpi, kind)
             uops_val, microcoded_val = _uops_for(
                 (record.arch_details or {}).get(arch) or {}, arch, perf.record_iclass(record)
@@ -920,7 +1149,8 @@ def format_annotation(
                 tag = f"[avg of {summary.n_archs} archs, {summary.source_kind}]"
             else:
                 tag = f"[{agg} of {summary.n_archs} archs, {summary.source_kind}]"
-        perf_frag = f"lat={_fmt_num(lat)}c cpi={_fmt_num(cpi)}{uops_frag} {tag}"
+            lat_text = _fmt_num(lat)
+        perf_frag = f"lat={lat_text}c cpi={_fmt_num(cpi)}{uops_frag} {tag}"
         parts.append(perf_frag)
     return " | ".join(parts)
 
@@ -1088,6 +1318,7 @@ def _annotate_instruction(
     )
     if opts.arch is not None:
         lat_val, cpi_val, _ = arch_perf(record, opts.arch)
+        lat_val = arch_latency(record, opts.arch)
         archs_used: list[str] = [opts.arch] if (opts.arch in (record.arch_details or {})) else []
     else:
         lat_val, cpi_val = summary.latency, summary.cpi
@@ -1104,6 +1335,10 @@ def _annotate_instruction(
         "ports": ports_val,
     }
     if opts.arch is not None:
+        lat_range = arch_latency_range(record, opts.arch)
+        if lat_range is not None:
+            # "latency" keeps the max; the stored min-max range rides beside it.
+            json_record["latency_min"], json_record["latency_max"] = lat_range
         # A single core is pinned, so its uop count is well defined. In the
         # aggregate case the count differs per core and both fields stay out.
         uops_val, microcoded_val = _uops_for(
@@ -1161,7 +1396,12 @@ def annotate_stream(
     identity_cache: dict[str, tuple[InstructionRecord, PerfSummary | None]] = {}
     arch_out: list[str] = []
 
-    parsed_lines = [parse_asm_line(line, track_positions=opts.track_positions) for line in lines]
+    stripped = [line.rstrip("\n") for line in lines]
+    records = _listing_records(stripped)
+    parsed_lines = [
+        _asm_line(line, records.get(index), opts.track_positions)
+        for index, line in enumerate(stripped)
+    ]
     # Byte identity per instruction line. llvm-mc sees the raw instruction
     # text after the objdump address and byte columns and the <sym> suffix
     # are stripped; the trailing comment stays so each assembler applies its
@@ -1171,10 +1411,10 @@ def annotate_stream(
     for index, parsed in enumerate(parsed_lines):
         if parsed.kind != LineKind.INSTRUCTION:
             continue
-        obj = _parse_objdump_instr(parsed.raw)
-        text = obj[1] if obj is not None else parsed.raw
+        obj = records.get(index)
+        text = obj[2] if obj is not None else parsed.raw
         items.append((index, _SYMBOL_TARGET_RE.sub(r"\1", text).strip()))
-        byte_columns.append(obj[2] if obj is not None else None)
+        byte_columns.append(obj[3] if obj is not None else None)
     identity = {
         index: key
         for (index, _text), key in zip(
