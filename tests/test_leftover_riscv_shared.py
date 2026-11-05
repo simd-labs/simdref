@@ -1,10 +1,12 @@
-"""RISC-V lines on shared register spellings must not hover an AArch64 form.
+"""RISC-V lines on shared register spellings must not hover a foreign form.
 
 s0-s11, sp and fp are register names RISC-V and AArch64 share. Such a name
 keeps an architecture in the running only when one of the mnemonic's forms in
 that architecture accepts the line's operands position by position; a line
 made only of shared names shows nothing when no architecture accepts it. Hover
-and inlay hints go through the same gate, so they agree on every row.
+and inlay hints go through the same gate, so they agree on every row. A line
+both architectures accept shows one form of the picker's choice: 'mul fp,
+fp, fp' assembles under both triples and hovers the arm MUL row.
 """
 
 import os
@@ -30,8 +32,19 @@ RISCV_SHARED_RISCV = [
     "sub s9, s10, s11",
     "mul s4, s5, s6",
     "add sp, sp, sp",
-    "mul fp, fp, fp",
     "addw s0, s1, s2",
+]
+
+# 'fp' is s0 (RISC-V) and x29 (AArch64): 'mul fp, fp, fp' assembles under
+# both triples (llvm-mc-23), and the arm MUL alias row keeps both in the
+# running. The picker then shows the arm row only: the bare riscv key 'mul'
+# carries no operand list, so the three-operand pool holds arm rows. The
+# hint and the hover name the same row. [ESCALATE-TO-MANAGER] this pick has
+# no ambiguity signal; see evidence/fix-arm-alias-round2.md.
+TWO_ISA_MUL = [
+    ("mul fp, fp, fp", "MUL"),
+    ("mul x0, fp, fp", "MUL"),
+    ("mul a0, fp, fp", "mul"),
 ]
 ARM_SCALAR_FP = [
     ("fneg d0, d1", "FNEG (D0, D1)"),
@@ -86,6 +99,14 @@ class RiscvSharedRegisterTests(unittest.TestCase):
                 else:
                     self.assertIsNone(hover)
                     self.assertIsNone(hint)
+
+    def test_mul_form_follows_the_line_register_isa(self):
+        for line, want in TWO_ISA_MUL:
+            with self.subTest(line=line):
+                hover, hint = self._hover_and_hint(line)
+                self.assertIsNotNone(hover, f"{line} got no hover")
+                self.assertEqual(hover.splitlines()[1], want)
+                self.assertIsNotNone(hint, f"{line} got no hint")
 
     def test_x86_line_never_shows_a_riscv_or_arm_form(self):
         # "%ax" and "%bx" are x86 registers: the w-strip resolves to the x86

@@ -50,6 +50,7 @@ from simdref.perf import (
     variant_perf_summary,
 )
 from simdref.pdfrefs import normalize_pdf_refs
+from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
 from simdref.storage import derive_arm_arch
 
 # Bumped whenever a JSON output's shape changes in a way the web repo's
@@ -77,11 +78,15 @@ def _web_measurements(item) -> list[dict]:
             "tpUnrolled": measurement.get("TP_unrolled", "-"),
             "tpPorts": measurement.get("TP_ports", "-"),
             "uops": measurement.get("uops", "-"),
-            "sourceKind": details.get("source_kind") or "measured",
+            "sourceKind": slot_kind(details),
             # Per-row source label. Entries without a stored source are
             # uops.info rows, the same default merge._entry_rank uses.
             "source": details.get("source") or "uops.info",
         }
+        for field, key in _FIELD_SOURCE_KEYS.items():
+            # A borrowed field keeps its own donor label (#65).
+            if details.get(key) and _has_field(details, field):
+                row[key.replace("_source", "Source")] = details[key]
         family = perf_family_label(uarch)
         if family:
             row["family"] = family

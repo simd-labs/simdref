@@ -18,6 +18,7 @@ Failure modes:
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -134,6 +135,134 @@ def parse_llvm_mca_json(
     )
 
 
+# RISC-V compressed rows carry no operand syntax (their catalog form is the
+# mnemonic), so their llvm-mca input line is the mnemonic plus the first
+# operand shape llvm-mca accepts. The feature string enables the compressed
+# families on top of the row's -mcpu, in the same "+ext,..." style as the
+# riscv entry of asm_identity._ARCH_CFG.
+_RISCV_MATTR = "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs,+zca,+zcb,+zcmop"
+_RISCV_ASM_FORMS: tuple[str, ...] = (
+    "",
+    " a0",
+    " ra",
+    " f0",
+    " 4",
+    " 0",
+    " 8",
+    " a0, 4",
+    " a0, 8",
+    " a0, a1",
+    " f0, 4",
+    " f0, 8",
+    " a0, 0(a1)",
+    " a0, 8(a1)",
+    " f0, 0(a1)",
+    " f0, 8(a1)",
+    " fs0, 0(a1)",
+    " fs0, 8(a1)",
+    " a0, 4(sp)",
+    " a0, 8(sp)",
+    " f0, 4(sp)",
+    " f0, 8(sp)",
+    " fs0, 4(sp)",
+    " fs0, 8(sp)",
+    " a0, sp, 4",
+    " a0, a1, 4",
+    " sp, 16",
+    " {ra}, -16",
+    " {ra, s0}, -16",
+    " a0, a1, 0(a2)",
+    " a0, 4, a1",
+    " a0, a1, a2",
+)
+
+
+def _mca_json(
+    asm: str, core: CoreSpec, *, executable: str, timeout: float = 15.0
+) -> dict[str, Any] | None:
+    """Run llvm-mca on one asm line. ``None`` when it rejects or crashes."""
+    cmd = [
+        executable,
+        "--instruction-tables=full",
+        "--json",
+        "--skip-unsupported-instructions=any",
+        f"--mtriple={core.llvm_triple}",
+        f"--mcpu={core.llvm_cpu}",
+        f"-mattr={_RISCV_MATTR}",
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            input=asm + "\n",
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def _scheduled_any(payload: dict[str, Any]) -> bool:
+    """True when the payload carries at least one scheduled instruction."""
+    for region in payload.get("CodeRegions") or []:
+        if (region.get("InstructionInfoView") or {}).get("InstructionList"):
+            return True
+        if region.get("Instructions"):
+            return True
+    return False
+
+
+def _compressed_payload(
+    mnemonic: str, core: CoreSpec, *, executable: str
+) -> tuple[str, dict[str, Any]] | None:
+    """First ``mnemonic + operands`` text llvm-mca schedules, with its payload."""
+    for form in _RISCV_ASM_FORMS:
+        line = mnemonic + form
+        payload = _mca_json(line, core, executable=executable)
+        if payload is not None and _scheduled_any(payload):
+            return line, payload
+    return None
+
+
+def ingest_compressed_rows(
+    records: Iterable[InstructionRecord],
+    core: CoreSpec,
+    *,
+    mca_version: str,
+    executable: str = "llvm-mca",
+) -> list[PerfRow]:
+    """Feed the riscv ``c.*`` / ``cm.*`` rows to llvm-mca as their own asm.
+
+    The row named stays the compressed encoding; the timing comes from
+    llvm-mca's model of that instruction itself (issue #65 item 27). Any
+    row llvm-mca rejects stays without timing.
+    """
+    if shutil.which(executable) is None:
+        raise LLVMMcaUnavailable(f"{executable!r} not found on PATH")
+    rows: list[PerfRow] = []
+    for record in records:
+        if record.architecture.casefold() != "riscv":
+            continue
+        mnemonic = record.mnemonic.strip()
+        if not mnemonic.casefold().startswith(("c.", "cm.")):
+            continue
+        found = _compressed_payload(mnemonic, core, executable=executable)
+        if found is None:
+            continue
+        _, payload = found
+        row = parse_llvm_mca_json(payload, core=core, mnemonic=mnemonic, mca_version=mca_version)
+        if row is not None and (row.latency or row.cpi):
+            rows.append(row)
+    return rows
+
+
 def ingest_llvm_mca(
     records: Iterable[InstructionRecord],
     *,
@@ -147,9 +276,10 @@ def ingest_llvm_mca(
     llvm-mc + llvm-mca pipeline, cached under ``vendor/perf-cache/``.
     x86 cores are skipped (scheduling models come from uops.info).
 
-    *records* is accepted for API symmetry with the previous implementation
-    but is no longer consumed — the pipeline reads LLVM's own InstrInfo
-    tables rather than the catalog.
+    *records* feeds the riscv compressed rows (``c.*`` / ``cm.*``) to
+    llvm-mca per core via :func:`ingest_compressed_rows`; the pipeline
+    labels those rows as their uncompressed aliases, so they need their
+    own pass.
 
     Raises :class:`LLVMMcaUnavailable` when a required binary is absent
     or too old. Raises :class:`LLVMMcaError` on any pipeline failure —
@@ -160,7 +290,7 @@ def ingest_llvm_mca(
     from simdref.perf_sources import llvm_scheduling  # noqa: PLC0415
 
     version = detect_llvm_mca_version(executable)
-    _ = list(records)  # drain iterator; kept for signature compatibility
+    records = list(records)
     target_cores = list(cores) if cores is not None else list(CANONICAL_CORES)
     rows: list[PerfRow] = []
     for core in target_cores:
@@ -172,5 +302,8 @@ def ingest_llvm_mca(
                 mca_version=version.raw,
                 cache_root=cache_root,
             )
+        )
+        rows.extend(
+            ingest_compressed_rows(records, core, mca_version=version.raw, executable=executable)
         )
     return rows, version.raw

@@ -1514,6 +1514,7 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
         if key is not None and key != NO_CATALOG_ROW
     }
     hints: dict[int, list[str]] = {}  # every instruction on the source line feeds its hint
+    names: dict[int, list[str]] = {}  # the instruction names behind empty labels
     labels: dict[str, str | None] = {}  # one matcher run per distinct segment, not per line
     for (line, segment), key in zip(candidates, keys):
         if not start <= line <= end:
@@ -1534,18 +1535,35 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
             )
         if label is not None:
             hints.setdefault(line, []).append(label)
-    return [
-        {
-            # LSP columns count UTF-16 code units.
-            "position": {
-                "line": line,
-                "character": _utf16_column(source_lines[line], len(source_lines[line])),
-            },
-            "label": _cut_label("; ".join(hints[line])),
-            "paddingLeft": True,
-        }
-        for line in sorted(hints)
-    ]
+            if not label:
+                # The name is the fallback text for an empty label: it is
+                # sourced data, never a generated placeholder.
+                if record is not None:
+                    name = record.mnemonic
+                else:
+                    parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
+                    name = parsed[0] if parsed else None
+                if name:
+                    names.setdefault(line, []).append(name)
+    out: list[dict] = []
+    for line in sorted(hints):
+        # Empty labels drop out of the join; when they are all empty the hint
+        # shows the instruction names, never an empty label.
+        text = "; ".join(label for label in hints[line] if label) or "; ".join(names.get(line, []))
+        if not text:
+            continue
+        out.append(
+            {
+                # LSP columns count UTF-16 code units.
+                "position": {
+                    "line": line,
+                    "character": _utf16_column(source_lines[line], len(source_lines[line])),
+                },
+                "label": _cut_label(text),
+                "paddingLeft": True,
+            }
+        )
+    return out
 
 
 def _open_catalog() -> sqlite3.Connection | None:
