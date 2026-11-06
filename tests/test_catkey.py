@@ -2,9 +2,11 @@
 
 from simdref.catkey import (
     IMMEDIATE_ACCEPT,
+    build_key,
     form_accept,
     key_operand_bits,
     operands_of_key,
+    split_isa_parts,
 )
 
 
@@ -44,3 +46,20 @@ def test_form_accept_maps_placeholders_to_line_classes():
     assert form_accept("D0") == frozenset({"d"})
     assert form_accept("<BT>") == frozenset({"b"})
     assert form_accept("<WORX_EXTEND>") == frozenset({"w", "x", "we", "xe"})
+
+
+def test_build_key_normalizes_name_and_form():
+    assert build_key(" add ", " m32,  i8 ") == "ADD (M32, I8)"
+    assert build_key("nop", "  ") == "NOP"
+    assert build_key(" ", "M32") == ""
+
+
+def test_split_isa_parts_splits_on_separators_and_space_runs():
+    assert split_isa_parts("SVE2 / SME, NEON||  Base  x ") == [
+        "SVE2",
+        "SME",
+        "NEON",
+        "Base",
+        "x",
+    ]
+    assert split_isa_parts("AArch64 Base") == ["AArch64 Base"]

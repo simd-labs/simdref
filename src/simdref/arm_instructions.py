@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from simdref.catkey import build_key, split_isa_parts
 from simdref.ingest_sources import read_local_arm_a64_xml_briefs
 from simdref.models import InstructionRecord
 
@@ -18,19 +19,8 @@ def _normalize_isa(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     if isinstance(value, str):
-        return [part.strip() for part in re.split(r"[,/|]\s*|\s{2,}", value) if part.strip()]
+        return split_isa_parts(value)
     return []
-
-
-def _canonical_instruction_key(name: str, form: str) -> str:
-    instruction_name = name.strip().upper()
-    instruction_form = re.sub(r"\s*,\s*", ", ", form.strip())
-    instruction_form = re.sub(r"\s+", " ", instruction_form)
-    if not instruction_name:
-        return ""
-    if not instruction_form:
-        return instruction_name
-    return f"{instruction_name} ({instruction_form.upper()})"
 
 
 # Arm ARM titles for mnemonics the AARCHMRS payload and the ACLE intrinsics
@@ -352,7 +342,7 @@ def _normalize_instruction_item(item: dict[str, Any]) -> InstructionRecord | Non
 
     operands = _strip_text(item.get("operands") or item.get("operand_form") or item.get("form"))
     form = (
-        _canonical_instruction_key(mnemonic, operands)
+        build_key(mnemonic, operands)
         if operands and not operands.upper().startswith(f"{mnemonic} (")
         else operands
     )
@@ -702,14 +692,21 @@ def _render_assembly(assembly: dict[str, Any]) -> str:
             if rule in _LITERAL_KEEP:
                 parts.append(_LITERAL_KEEP[rule])
                 continue
-            base = re.sub(r"__\d+$", "", rule)
+            end = rule.rfind("__")
+            if end >= 0 and rule[end + 2 :].isdigit():
+                base = rule[:end]
+            else:
+                base = rule
             if rule.casefold() in _RULE_PLACEHOLDER_BY_FOLD:
                 parts.append(_RULE_PLACEHOLDER_BY_FOLD[rule.casefold()])
             elif base.casefold() in _RULE_PLACEHOLDER_BY_FOLD:
                 parts.append(_RULE_PLACEHOLDER_BY_FOLD[base.casefold()])
-            elif re.search(r"imm|offset|off|lsb|width|shift|amount|rot", rule, re.IGNORECASE):
+            elif any(
+                keyword in rule.casefold()
+                for keyword in ("imm", "off", "lsb", "width", "shift", "amount", "rot")
+            ):
                 parts.append("#0")
-            elif re.search(r"label|addr", rule, re.IGNORECASE):
+            elif "label" in rule.casefold() or "addr" in rule.casefold():
                 parts.append(".")
             else:
                 parts.append(f"<{rule}>")
@@ -755,6 +752,54 @@ def _aarchmrs_title(node: dict[str, Any], operations: dict[str, Any]) -> str:
     if isinstance(operation, dict):
         return _strip_text(operation.get("title") or operation.get("brief")).rstrip(".")
     return ""
+
+
+def _form_for(mnemonic: str, operand_form: str) -> str:
+    """Key form for a mnemonic: the canonical "(operands)" key when the
+    rendered line carries operands, the bare mnemonic otherwise."""
+    return build_key(mnemonic, operand_form) if operand_form else mnemonic
+
+
+def _mnemonic_head(rendered: str) -> tuple[str, str] | None:
+    """Split a rendered A64 line into (mnemonic, operand form).
+
+    The head token can glue a literal or rule placeholder onto the
+    mnemonic (RET<Rn_option>, DCPS1#0, B.<cond_option>); take the
+    leading alphanumeric run instead of dropping the whole node.
+    """
+    head, _, tail = rendered.partition(" ")
+    up = head.strip().upper()
+    end = 0
+    while end < len(up) and up[end].isalnum():
+        end += 1
+    if not end or not up[0].isalpha():
+        return None
+    return up[:end], tail.strip()
+
+
+def _claim_form(
+    seen_keys: dict[tuple[str, str], tuple[int, int]],
+    mnemonic: str,
+    form: str,
+    enc: tuple[int, int],
+    name: str,
+) -> tuple[str, str]:
+    """Claim a (mnemonic, form) key against the seen-key table.
+
+    Returns (status, form): "duplicate" when the key is already held by the
+    same encoding, "disambiguated" when a sibling encoding holds the key and
+    the form takes a "[name]" suffix, or "new". Sibling encodings of one
+    rendered form stay separate rows; their keys are never merged (spec K4).
+    """
+    key = (mnemonic, form.casefold())
+    seen_enc = seen_keys.get(key)
+    if seen_enc is not None:
+        if seen_enc == enc:
+            return "duplicate", form
+        form = f"{form} [{name}]"
+        key = (mnemonic, form.casefold())
+    seen_keys[key] = enc
+    return ("disambiguated" if seen_enc is not None else "new"), form
 
 
 def _alias_children(
@@ -805,16 +850,11 @@ def _alias_children(
         rendered = _render_assembly(assembly) if isinstance(assembly, dict) else ""
         if not rendered:
             continue
-        head, _, tail = rendered.partition(" ")
-        up = head.strip().upper()
-        end = 0
-        while end < len(up) and up[end].isalnum():
-            end += 1
-        if not end or not up[0].isalpha():
+        split = _mnemonic_head(rendered)
+        if split is None:
             continue
-        mnemonic = up[:end]
-        operand_form = tail.strip()
-        form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
+        mnemonic, operand_form = split
+        form = _form_for(mnemonic, operand_form)
         row_isa = list(isa)
         for tag in _alias_feature_tags(alias.get("condition")):
             if tag not in row_isa:
@@ -826,16 +866,11 @@ def _alias_children(
         summary = target_title or _generated_summary(mnemonic, row_isa, alias_opid)
         if not summary.endswith("."):
             summary += "."
-        key = (mnemonic, form.casefold())
-        seen_enc = seen_keys.get(key)
-        if seen_enc is not None:
-            if seen_enc == (mask, match):
-                continue
-            # Sibling encodings of one rendered form stay separate rows;
-            # their keys are never merged (spec K4).
-            form = f"{form} [{str(alias.get('name') or '').strip()}]"
-            key = (mnemonic, form.casefold())
-        seen_keys[key] = (mask, match)
+        status, form = _claim_form(
+            seen_keys, mnemonic, form, (mask, match), str(alias.get("name") or "").strip()
+        )
+        if status == "duplicate":
+            continue
         metadata = {
             "operation_id": alias_opid,
             "instruction_set": group_path[0] if group_path else "A64",
@@ -894,17 +929,12 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
             rendered = _render_assembly(assembly)
             if not rendered:
                 return
-            head, _, tail = rendered.partition(" ")
-            # Head tokens can glue a literal or rule placeholder onto the
-            # mnemonic (RET<Rn_option>, DCPS1#0, B.<cond_option>): take the
-            # leading alphanumeric run instead of dropping the whole node.
-            mnemonic_match = re.match(r"[A-Z][A-Z0-9]*", head.strip().upper())
-            if not mnemonic_match:
+            split = _mnemonic_head(rendered)
+            if split is None:
                 return
-            mnemonic = mnemonic_match.group(0)
+            mnemonic, operand_form = split
             isa = _infer_aarchmrs_isa(group_path)
-            operand_form = tail.strip()
-            form = _canonical_instruction_key(mnemonic, operand_form) if operand_form else mnemonic
+            form = _form_for(mnemonic, operand_form)
             node_opid = str(node.get("operation_id") or "").strip()
             metadata = {
                 "operation_id": node_opid,
@@ -924,11 +954,7 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                     records.append(
                         InstructionRecord(
                             mnemonic=cond_mnemonic,
-                            form=(
-                                _canonical_instruction_key(cond_mnemonic, operand_form)
-                                if operand_form
-                                else cond_mnemonic
-                            ),
+                            form=_form_for(cond_mnemonic, operand_form),
                             summary="Branch conditionally.",
                             architecture="arm",
                             isa=isa,
@@ -942,19 +968,18 @@ def _records_from_aarchmrs_tree(payload: Any) -> list[InstructionRecord]:
                 # shortcut: a B.cond alias keeps no aliasof link (the family
                 # names no single target row), upgrade if the data gains one
                 return
-            key = (mnemonic, form.casefold())
-            seen_enc = seen_keys.get(key)
-            if seen_enc is not None:
-                if seen_enc == (enc_mask, enc_match):
-                    # The earlier same-key row is the aliases' target too.
-                    for alias_row in alias_rows:
-                        alias_row.metadata["aliasof"] = form
-                    return
-                # Sibling encodings of one rendered form stay separate rows;
-                # their keys are never merged (spec K4).
-                form = f"{form} [{str(node.get('name') or '').strip()}]"
-                key = (mnemonic, form.casefold())
-            seen_keys[key] = (enc_mask, enc_match)
+            status, form = _claim_form(
+                seen_keys,
+                mnemonic,
+                form,
+                (enc_mask, enc_match),
+                str(node.get("name") or "").strip(),
+            )
+            if status == "duplicate":
+                # The earlier same-key row is the aliases' target too.
+                for alias_row in alias_rows:
+                    alias_row.metadata["aliasof"] = form
+                return
             summary = _aarchmrs_title(node, operations) or _generated_summary(
                 mnemonic, isa, node_opid
             )

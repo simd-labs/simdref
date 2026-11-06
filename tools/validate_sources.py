@@ -17,10 +17,10 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from simdref.arm_instructions import parse_arm_instruction_payload
+from simdref.catkey import build_key
 from simdref.display import strip_instruction_decorators
 from simdref.ingest_catalog import (
     _arm_live_instruction_refs,
-    _canonical_instruction_key,
     _iter_xml_elements,
     _normalize_arm_intrinsic_name,
     _normalize_uops_form,
@@ -249,7 +249,7 @@ def _raw_intel_intrinsic_records(text: str) -> list[dict[str, Any]]:
                 inst_form = _strip(inst.attrib.get("form"))
                 if not inst_name:
                     continue
-                instructions.append(_canonical_instruction_key(inst_name, inst_form) or inst_name)
+                instructions.append(build_key(inst_name, inst_form) or inst_name)
             records.append(
                 {
                     "name": name,

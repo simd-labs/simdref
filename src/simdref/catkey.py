@@ -15,6 +15,62 @@ LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
 X86_VECTOR_WIDTHS = {"xmm": "v128", "ymm": "v256", "zmm": "v512"}
 
 
+def build_key(name: str, form: str) -> str:
+    """One catalog key for an instruction form: "ADD (M32, I8)".
+
+    Comma parts rejoin as ", " and whitespace collapses to single spaces;
+    an empty form gives the uppercased name alone.
+    """
+    instruction_name = name.strip().upper()
+    instruction_form = " ".join(", ".join(part.strip() for part in form.strip().split(",")).split())
+    if not instruction_name:
+        return ""
+    if not instruction_form:
+        return instruction_name
+    return f"{instruction_name} ({instruction_form.upper()})"
+
+
+def split_isa_parts(value: str) -> list[str]:
+    """The ISA tags of one source field: "SVE2 / SME" gives ["SVE2", "SME"].
+
+    Splits at comma, slash and pipe, and at runs of two or more spaces;
+    parts are stripped and empty parts dropped.
+    """
+    parts: list[str] = []
+    start = 0
+    index = 0
+    length = len(value)
+    while index < length:
+        char = value[index]
+        if char in ",/|":
+            parts.append(value[start:index])
+            start = index + 1
+        elif char.isspace():
+            end = index + 1
+            while end < length and value[end].isspace():
+                end += 1
+            if end - index >= 2:
+                parts.append(value[start:index])
+                start = end
+            index = end - 1
+        index += 1
+    parts.append(value[start:])
+    return [part.strip() for part in parts if part.strip()]
+
+
+def parse_key(key: str) -> tuple[str, str]:
+    """Split a catalog key into (name, form).
+
+    "ADD (vectors, predicated)" gives ("ADD", "vectors, predicated"); a bare
+    key gives its first token and an empty form.
+    """
+    head, sep, tail = key.partition("(")
+    tokens = head.split()
+    name = tokens[0] if tokens else ""
+    form = tail.rsplit(")", 1)[0].strip() if sep else ""
+    return name, form
+
+
 def operands_of_key(key: str) -> list[str]:
     """The operands of a catalog key, split at top-level commas.
 

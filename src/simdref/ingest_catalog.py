@@ -16,6 +16,7 @@ from typing import Any, Callable
 from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
+from simdref.catkey import build_key, parse_key, split_isa_parts
 from simdref.display import _LEADING_INSTR_TAG_RE, strip_instruction_decorators
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
@@ -72,19 +73,7 @@ def _normalize_isa(value: Any) -> list[str]:
 
 @lru_cache(maxsize=512)
 def _normalize_isa_string(value: str) -> tuple[str, ...]:
-    parts = re.split(r"[,/|]\s*|\s{2,}", value)
-    return tuple(_intern_small(part.strip()) for part in parts if part.strip())
-
-
-def _canonical_instruction_key(name: str, form: str) -> str:
-    instruction_name = name.strip().upper()
-    instruction_form = re.sub(r"\s*,\s*", ", ", form.strip())
-    instruction_form = re.sub(r"\s+", " ", instruction_form)
-    if not instruction_name:
-        return ""
-    if not instruction_form:
-        return instruction_name
-    return f"{instruction_name} ({instruction_form.upper()})"
+    return tuple(_intern_small(part) for part in split_isa_parts(value))
 
 
 # Register roles used by Arm vendor ref operands. Values match the
@@ -154,17 +143,35 @@ def _normalize_operand_xtype(value: str, width: str = "") -> str:
     if xtype == "int":
         # uops.info marks every scalar integer operand xtype=int; the width holds the size
         return f"i{width}" if width in {"8", "16", "32", "64"} else "i32"
-    match = re.fullmatch(r"\d+([iu]\d+)", xtype)
-    if match:
-        return match.group(1)
+    index = 0
+    length = len(xtype)
+    while index < length and xtype[index].isdigit():
+        index += 1
+    if index and length - index >= 2 and xtype[index] in "iu" and xtype[index + 1 :].isdigit():
+        return xtype[index:]
     return xtype
+
+
+def _word_tokens(text: str) -> list[str]:
+    """Runs of [A-Za-z0-9+-]; "Add/Subtract" gives ["Add", "Subtract"]."""
+    words: list[str] = []
+    run: list[str] = []
+    for char in text:
+        if char.isascii() and (char.isalnum() or char in "+-"):
+            run.append(char)
+        elif run:
+            words.append("".join(run))
+            run = []
+    if run:
+        words.append("".join(run))
+    return words
 
 
 def _summary_too_terse(summary: str, mnemonic: str) -> bool:
     text = summary.strip().strip(".")
     if not text:
         return True
-    words = re.findall(r"[A-Za-z0-9+\-]+", text)
+    words = _word_tokens(text)
     if len(words) <= 1:
         return True
     if text.casefold() == mnemonic.casefold():
@@ -311,18 +318,24 @@ def _generated_instruction_summary(
     return f"{_verb_for_mnemonic(mnemonic, architecture=architecture)} {_shared_operand_phrase(operand_details)}".strip()
 
 
-_SUMMARY_CAMEL_SEAM_RE = re.compile(r"(?<=[a-z])(?=[A-Z])")
-
 # Mixed-case Intel terms of art that stay joined; they are not dropped-space typos.
 _SUMMARY_CAMEL_KEEP = frozenset({"InvMixColumn", "OpMask"})
+
+
+def _split_camel_seam(word: str) -> str:
+    parts = [word[0]] if word else []
+    for prev, char in zip(word, word[1:]):
+        if prev.islower() and char.isupper():
+            parts.append(" ")
+        parts.append(char)
+    return "".join(parts)
 
 
 def _split_summary_camel_seams(text: str) -> str:
     # uops.info summary attributes drop the space at CamelCase seams, for
     # example "SinglePrecision" and "ExtractPacked".
     return " ".join(
-        word if word in _SUMMARY_CAMEL_KEEP else _SUMMARY_CAMEL_SEAM_RE.sub(" ", word)
-        for word in text.split(" ")
+        word if word in _SUMMARY_CAMEL_KEEP else _split_camel_seam(word) for word in text.split(" ")
     )
 
 
@@ -343,16 +356,21 @@ def unwrap_intel_payload(text: str) -> str:
     """Strip the JS wrapper of a fetched Intel payload; raw XML or JSON comes back."""
     stripped = text.strip()
     if stripped.startswith("var data_js"):
-        match = re.search(r'var\s+data_js\s*=\s*"(?P<body>.*)";\s*$', stripped, re.DOTALL)
-        if not match:
+        _head, sep, rest = stripped.partition('var data_js = "')
+        if not sep or not rest.endswith('";'):
             raise ValueError("could not locate Intel XML payload in data.js")
-        xml_blob = match.group("body").replace("\\\n", "")
+        xml_blob = rest.rsplit('";', 1)[0].replace("\\\n", "")
         return bytes(xml_blob, "utf-8").decode("unicode_escape").strip()
     if stripped.startswith("var ") or stripped.startswith("window."):
-        match = re.search(r"(\{.*\}|\[.*\])", stripped, re.DOTALL)
-        if not match:
+        brace = stripped.find("{")
+        bracket = stripped.find("[")
+        if 0 <= bracket < brace:
+            start, close = bracket, stripped.rfind("]")
+        else:
+            start, close = brace, stripped.rfind("}")
+        if start < 0 or close <= start:
             raise ValueError("could not locate JSON payload in Intel data")
-        return match.group(1)
+        return stripped[start : close + 1]
     return stripped
 
 
@@ -408,7 +426,7 @@ def parse_intel_payload(text: str) -> list[IntrinsicRecord]:
                 if not inst_name:
                     continue
                 instruction_refs.append({"name": inst_name, "form": inst_form, "xed": inst_xed})
-                instructions.append(_canonical_instruction_key(inst_name, inst_form) or inst_name)
+                instructions.append(build_key(inst_name, inst_form) or inst_name)
             records.append(
                 IntrinsicRecord(
                     name=name,
@@ -529,7 +547,7 @@ def parse_arm_intrinsics_payload(text: str) -> list[IntrinsicRecord]:
             ref_form = str(ref.get("form") or "").strip()
             if not ref_name:
                 continue
-            rendered = _canonical_instruction_key(ref_name, ref_form) or ref_name
+            rendered = build_key(ref_name, ref_form) or ref_name
             instructions.append(rendered)
             instruction_refs.append(
                 {
@@ -583,22 +601,35 @@ def _intel_intrinsic_url(name: str) -> str:
 
 
 def _arm_slug(text: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", text.casefold()).strip("-")
+    parts: list[str] = []
+    for char in text.casefold():
+        if char.isascii() and char.isalnum():
+            parts.append(char)
+        elif parts and parts[-1] != "-":
+            parts.append("-")
+    slug = "".join(parts).strip("-")
     return slug or "intrinsics"
 
 
 def _parse_c_signature(signature: str) -> tuple[str, str, list[str]]:
-    match = re.match(
-        r"^(?P<ret>.+?)\s+(?P<name>[A-Za-z0-9_]+)\((?P<params>.*)\)$", signature.strip()
-    )
-    if not match:
+    text = signature.strip()
+    if not text.endswith(")"):
         raise ValueError(f"could not parse C signature: {signature}")
-    params = [
-        part.strip()
-        for part in match.group("params").split(",")
-        if part.strip() and part.strip() != "void"
-    ]
-    return match.group("ret").strip(), match.group("name").strip(), params
+    parts = text[:-1].rsplit("(", 1)
+    if len(parts) != 2:
+        raise ValueError(f"could not parse C signature: {signature}")
+    head, params = parts
+    end = len(head)
+    while end > 0 and head[end - 1].isascii() and (head[end - 1].isalnum() or head[end - 1] == "_"):
+        end -= 1
+    name = head[end:]
+    if not name or end == 0 or not head[end - 1].isspace():
+        raise ValueError(f"could not parse C signature: {signature}")
+    ret = head[:end].strip()
+    if not ret:
+        raise ValueError(f"could not parse C signature: {signature}")
+    params = [part.strip() for part in params.split(",") if part.strip() and part.strip() != "void"]
+    return ret, name, params
 
 
 def _arm_instruction_refs_from_field(value: str) -> list[dict[str, str]]:
@@ -765,8 +796,7 @@ def parse_arm_intrinsics_json_bundle(payload: dict[str, Any]) -> list[IntrinsicR
                 category=category,
                 subcategory=subcategory,
                 instructions=[
-                    _canonical_instruction_key(ref["name"], ref["form"]) or ref["name"]
-                    for ref in instruction_refs
+                    build_key(ref["name"], ref["form"]) or ref["name"] for ref in instruction_refs
                 ],
                 instruction_refs=instruction_refs,
                 metadata={
@@ -812,10 +842,18 @@ def _parse_neon_markdown_docs(markdown: str) -> dict[str, dict[str, str]]:
         cells = [cell.strip() for cell in raw_line.strip().split("|")[1:-1]]
         if len(cells) < 5:
             continue
-        name_match = re.search(r">([A-Za-z0-9_]+)</a>", cells[0])
-        if not name_match:
+        name = ""
+        rest = cells[0]
+        while True:
+            _before, sep, rest = rest.partition(">")
+            if not sep:
+                break
+            head, close, _after = rest.partition("</a>")
+            if close and head and all(c.isascii() and (c.isalnum() or c == "_") for c in head):
+                name = head
+                break
+        if not name:
             continue
-        name = name_match.group(1)
         section_path = " / ".join(text for level, text in headings if level >= 4)
         docs[name] = {
             "ACLE Documentation": "\n".join(
@@ -867,7 +905,26 @@ def _parse_sve_markdown_docs(markdown: str) -> dict[str, dict[str, str]]:
             block = "\n".join(block_lines).strip()
             section_path = " / ".join(text for level, text in headings if level >= 3)
             notes = "\n".join(line for line in paragraph if line.strip()).strip()
-            families = sorted(set(re.findall(r"\b(sv[a-z0-9]+)(?=\[|_|\()", block)))
+            families: list[str] = []
+            start = 0
+            while True:
+                found = block.find("sv", start)
+                if found < 0:
+                    break
+                if found and (block[found - 1].isalnum() or block[found - 1] == "_"):
+                    start = found + 1
+                    continue
+                end = found + 2
+                while (
+                    end < len(block)
+                    and block[end].isascii()
+                    and (block[end].islower() or block[end].isdigit())
+                ):
+                    end += 1
+                if end > found + 2 and end < len(block) and block[end] in "[_(":
+                    families.append(block[found:end])
+                start = end if end > found + 2 else found + 2
+            families = sorted(set(families))
             for family in families:
                 docs.setdefault(family, {})
                 if notes:
@@ -942,8 +999,7 @@ def parse_arm_neon_intrinsics_bundle(payload: dict[str, Any]) -> list[IntrinsicR
                 category=category,
                 subcategory=subcategory,
                 instructions=[
-                    _canonical_instruction_key(ref["name"], ref["form"]) or ref["name"]
-                    for ref in instruction_refs
+                    build_key(ref["name"], ref["form"]) or ref["name"] for ref in instruction_refs
                 ],
                 instruction_refs=instruction_refs,
                 metadata={
@@ -974,7 +1030,7 @@ def parse_arm_neon_intrinsics_bundle(payload: dict[str, Any]) -> list[IntrinsicR
             if not ref_name:
                 continue
             instruction_refs.append({"name": ref_name, "form": ref_form, "architecture": "arm"})
-            instructions.append(_canonical_instruction_key(ref_name, ref_form) or ref_name)
+            instructions.append(build_key(ref_name, ref_form) or ref_name)
         records.append(
             IntrinsicRecord(
                 name=name,
@@ -1024,24 +1080,34 @@ def parse_arm_sve_instruction_map(
     lines = markdown[table_start:].splitlines()
     records: list[IntrinsicRecord] = []
     seen: set[str] = set()
-    row_re = re.compile(
-        r"^\|\s*(?P<instruction>[^|]+?)\s*\|\s*\[`(?P<name>[^`]+)`\]\((?P<url>[^)]+)\)\s*\|$"
-    )
     for line in lines[2:]:
         if not line.startswith("|"):
             break
-        match = row_re.match(line.strip())
-        if not match:
+        row = line.strip()
+        if not row.endswith("|"):
             continue
-        instruction = match.group("instruction").strip()
-        name = match.group("name").strip()
-        url = match.group("url").strip()
+        inner = row[1:-1]
+        instruction, sep, cell = inner.partition("|")
+        if not sep:
+            continue
+        instruction = instruction.strip()
+        cell = cell.strip()
+        open_bracket, backtick, after = cell.partition("`")
+        if not backtick or open_bracket != "[":
+            continue
+        name, backtick, rest = after.partition("`")
+        if not backtick:
+            continue
+        _close, bracket_paren, url = rest.partition("](")
+        url = url.rstrip()
+        if not bracket_paren or not url.endswith(")"):
+            continue
+        url = url[:-1].strip()
+        name = name.strip()
         if name in seen or not name.startswith("sv"):
             continue
         seen.add(name)
-        instruction_head, _, instruction_tail = instruction.partition("(")
-        instruction_name = instruction_head.strip().split()[0]
-        instruction_form = instruction_tail.rsplit(")", 1)[0].strip() if instruction_tail else ""
+        instruction_name, instruction_form = parse_key(instruction)
         isa = (
             "SVE2"
             if any(
@@ -1088,7 +1154,10 @@ def _normalize_uops_form(form: str) -> str:
     """
     head, sep, tail = form.partition(" ")
     head = _LEADING_INSTR_TAG_RE.sub("", head)
-    head = re.sub(r"_[0-9A-F]{2,4}$", "", head)
+    index = head.rfind("_")
+    suffix = head[index + 1 :] if index >= 0 else ""
+    if 2 <= len(suffix) <= 4 and all(c in "0123456789ABCDEF" for c in suffix):
+        head = head[:index]
     return f"{head}{sep}{tail}".strip()
 
 
@@ -1236,11 +1305,11 @@ def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], 
         for record, node_raw_form, node_indices in partitions[1:]:
             head, sep, tail = node_raw_form.partition(" ")
             candidate = f"{_LEADING_INSTR_TAG_RE.sub('', head)}{sep}{tail}".strip()
-            if not candidate or _uops_form_db_key(record, candidate) in used_keys:
+            if not candidate or replace(record, form=candidate).db_key in used_keys:
                 candidate = f"{record.form} [{record.metadata.get('iform', '')}]"
-            while _uops_form_db_key(record, candidate) in used_keys:
+            while replace(record, form=candidate).db_key in used_keys:
                 candidate += "~"
-            candidate_key = _uops_form_db_key(record, candidate)
+            candidate_key = replace(record, form=candidate).db_key
             used_keys.add(candidate_key)
             records.append(replace(record, form=candidate))
             for node_index in node_indices:
@@ -1250,13 +1319,6 @@ def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], 
 
 def parse_uops_xml(source: str | Path) -> list[InstructionRecord]:
     return _parse_uops_xml_keyed(source)[0]
-
-
-def _uops_form_db_key(record: InstructionRecord, form: str) -> str:
-    key = form.strip() or record.mnemonic
-    if not key.casefold().startswith(record.mnemonic.casefold()):
-        key = f"{record.mnemonic} {key}".strip()
-    return f"{record.architecture}:{key.casefold()}"
 
 
 def _instruction_indexes(
@@ -1299,7 +1361,7 @@ def _resolve_instruction_ref(
         if matched:
             resolution = "xed"
     if not matched and name and form:
-        key_candidates = [(_canonical_instruction_key(name, form) or name).casefold()]
+        key_candidates = [(build_key(name, form) or name).casefold()]
         if ref_arch == "riscv":
             key_candidates.insert(0, form.casefold())
         if ref_arch == "arm":
@@ -1307,7 +1369,7 @@ def _resolve_instruction_ref(
             # records store the instantiated registers (v0/v1/v2). Try the
             # instantiated key so a vector ref resolves to its own form.
             instantiated = (
-                _canonical_instruction_key(name, _arm_instantiate_register_roles(form)) or name
+                build_key(name, _arm_instantiate_register_roles(form)) or name
             ).casefold()
             if instantiated not in key_candidates:
                 key_candidates.insert(0, instantiated)
@@ -1461,10 +1523,7 @@ def link_records(intrinsics: list[IntrinsicRecord], instructions: list[Instructi
             )
             ref_arch = resolved["architecture"]
             if not matched:
-                fallback = (
-                    _canonical_instruction_key(resolved["name"], resolved["form"])
-                    or resolved["name"]
-                )
+                fallback = build_key(resolved["name"], resolved["form"]) or resolved["name"]
                 if fallback:
                     linked.append(fallback)
                     resolved_refs.append(dict(ref) | resolved)
