@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -51,7 +50,6 @@ INTEL_SDM_SIGNATURE_PATHS = (
 
 # Title pattern: mnemonic (with optional / or , separators) before em-dash.
 # Lowercase is allowed only at the end of the mnemonic (CMOVcc, PREFETCHh).
-_TITLE_RE = re.compile(r"^([A-Za-z][A-Za-z0-9/,_\s]{0,80})\s*—\s*(.+)")
 
 # Words that indicate a chapter/section heading, not an instruction.
 _SKIP_WORDS = frozenset({"CHAPTER", "CONTENTS", "APPENDIX", "VOLUME", "INSTRUCTION SET REFERENCE"})
@@ -100,8 +98,27 @@ _SECTION_ALIASES: dict[str, str] = {
     "floating-point exceptions": "Floating-Point Exceptions",
 }
 
+
 # Footer pattern: "MNEMONIC—... Vol. 2X N-NN" (space between volume and page optional)
-_FOOTER_RE = re.compile(r"^.+Vol\.\s*2[A-D]?\s*\d+-\d+$")
+def _is_footer_line(text: str) -> bool:
+    head, sep, tail = text.rpartition("Vol.")
+    while sep:
+        if head and _is_footer_tail(tail):
+            return True
+        head, sep, tail = head.rpartition("Vol.")
+    return False
+
+
+def _is_footer_tail(tail: str) -> bool:
+    rest = tail.lstrip()
+    if rest[:1] != "2":
+        return False
+    rest = rest[1:]
+    if rest[:1] in ("A", "B", "C", "D"):
+        rest = rest[1:]
+    digits, sep, pages = rest.lstrip().partition("-")
+    return bool(sep) and digits.isdecimal() and pages.isdecimal()
+
 
 # Sections to discard (tabular data that doesn't render well as text).
 _DISCARD_SECTIONS: frozenset[str] = frozenset(
@@ -126,36 +143,178 @@ _CODE_SECTIONS: frozenset[str] = frozenset(
 # extraction cannot keep them (they have no heading), so they get their own
 # parser over the title page lines. Column layout text has two or more spaces
 # between cells; PyMuPDF page prep joins cells with single spaces, which the
-# opcode-row regex accepts. Operand encoding rows need the wide gaps, so the
+# opcode-row scan accepts. Operand encoding rows need the wide gaps, so the
 # PyMuPDF fast path may skip that table.
 OPCODE_MODES_SECTION = "Opcode & Modes"
 OPERAND_ENCODING_SECTION = "Operand Encoding"
 
-_MODE_TOKEN_RE = r"V|I|N\.E\.|N\.N\.|N\.P\.|N\.S\.|N\."
 # Longest alternative first, so RM does not shadow RMI etc.
-_OP_EN_TOKEN_RE = (
-    r"M1T|MIT|RMI|MRI|RVM|MVR|VRM|RVM|RM|M1|MI|MR|AM|MA|"
-    r"ZO|XO|OI|IO|TT|TI|NP|A|B|C|D|E|I|M|O|P|S|T"
+_OP_EN_TOKENS = tuple(
+    "M1T MIT RMI MRI RVM MVR VRM RM M1 MI MR AM MA "
+    "ZO XO OI IO TT TI NP A B C D E I M O P S T".split()
 )
-_OP_EN_FULL_RE = re.compile(rf"(?:{_OP_EN_TOKEN_RE})")
-_HEX_BYTE_RE = r"[0-9A-Fa-f]{2}"
-_IMM_SUFFIX_RE = r"(?:cb|cw|cd|cp|co|ct|ib|iw|id|io|is4)"
-_PREFIX_OPCODE_RE = (
-    rf"(?:VEX|EVEX|XOP)\.[0-9A-Za-z.]+(?:\s+{_HEX_BYTE_RE})+"
-    rf"(?:\s*/[0-7a-z]+)?(?:\s+{_IMM_SUFFIX_RE})*"
-)
-_OPCODE_TOK_RE = rf"(?:NP|NFx|RNE|REX\.?[Ww]?|F2|F3|\+|{_HEX_BYTE_RE})"
-_LEGACY_OPCODE_RE = (
-    rf"(?:{_OPCODE_TOK_RE}\s+)*{_OPCODE_TOK_RE}"
-    rf"(?:\s*/[0-7a-z]+)?(?:\s+{_IMM_SUFFIX_RE})*"
-)
-_OPCODE_ROW_RE = re.compile(
-    rf"^\s*(?P<opcode>{_PREFIX_OPCODE_RE}|{_LEGACY_OPCODE_RE})\s+"
-    rf"(?P<op_en>{_OP_EN_TOKEN_RE})\s+"
-    rf"(?P<mode_64>{_MODE_TOKEN_RE})\s?/\s?(?P<mode_32>{_MODE_TOKEN_RE})"
-    rf"(?:\s+(?P<cpuid>.*))?$"
-)
-_OPERAND_ENCODING_CAPTION_RE = re.compile(r"Instruction Operand Encoding")
+_MODE_TOKENS = ("V", "I", "N.E.", "N.N.", "N.P.", "N.S.", "N.")
+_OPCODE_TOKENS = tuple("NP NFx RNE REX REX. REXW REXw REX.W REX.w F2 F3 +".split())
+_IMM_SUFFIXES = ("cb", "cw", "cd", "cp", "co", "ct", "ib", "iw", "id", "io", "is4")
+_HEX_CHARS = "0123456789abcdefABCDEF"
+_SLASH_TAIL_CHARS = "01234567abcdefghijklmnopqrstuvwxyz"
+
+
+def _skip_ws(line: str, pos: int) -> int:
+    while pos < len(line) and line[pos].isspace():
+        pos += 1
+    return pos
+
+
+def _is_hex_byte(word: str) -> bool:
+    return len(word) == 2 and all(char in _HEX_CHARS for char in word)
+
+
+def _opcode_token_lengths(line: str, start: int) -> list[int]:
+    """Opcode token match lengths at `start`, longest alternative first."""
+    lengths: list[int] = []
+    if line.startswith("NP", start):
+        lengths.append(2)
+    if line.startswith("NFx", start):
+        lengths.append(3)
+    if line.startswith("RNE", start):
+        lengths.append(3)
+    if line.startswith("REX", start):
+        if line[start + 3 : start + 4] == ".":
+            if line[start + 4 : start + 5] in ("W", "w"):
+                lengths.append(5)
+            lengths.append(4)
+        if line[start + 3 : start + 4] in ("W", "w"):
+            lengths.append(4)
+        lengths.append(3)
+    if line.startswith("F2", start) or line.startswith("F3", start):
+        lengths.append(2)
+    if line.startswith("+", start):
+        lengths.append(1)
+    if _is_hex_byte(line[start : start + 2]):
+        lengths.append(2)
+    return lengths
+
+
+def _imm_ends(line: str, start: int) -> list[int]:
+    """Row ends after the imm-suffix loop, longest parse first."""
+    ends = [start]
+    pos = start
+    while True:
+        nxt = _skip_ws(line, pos)
+        if nxt == pos:
+            break
+        for suffix in _IMM_SUFFIXES:
+            if line.startswith(suffix, nxt):
+                pos = nxt + len(suffix)
+                ends.append(pos)
+                break
+        else:
+            break
+    return ends[::-1]
+
+
+def _tail_ends(line: str, start: int) -> list[int]:
+    """Row ends after the optional /digit tail and the imm suffixes."""
+    slash = _skip_ws(line, start)
+    if line[slash : slash + 1] == "/":
+        end = slash + 1
+        while end < len(line) and line[end] in _SLASH_TAIL_CHARS:
+            end += 1
+        if end > slash + 1:
+            return _imm_ends(line, end) + _imm_ends(line, start)
+    return _imm_ends(line, start)
+
+
+def _legacy_opcode_ends(line: str, start: int) -> list[int]:
+    """Row ends for the legacy opcode column (NP 0F 58 /r ...)."""
+    tokens: list[tuple[int, int]] = []
+    pos = start
+    while pos < len(line) and not line[pos].isspace():
+        end = pos
+        while end < len(line) and not line[end].isspace():
+            end += 1
+        tokens.append((pos, end))
+        pos = _skip_ws(line, end)
+    ends: list[int] = []
+    for count in range(len(tokens), 0, -1):
+        head = [line[a:b] for a, b in tokens[: count - 1]]
+        if not all(word in _OPCODE_TOKENS or _is_hex_byte(word) for word in head):
+            continue
+        tok_start, tok_end = tokens[count - 1]
+        for stop in _opcode_token_lengths(line, tok_start):
+            stop += tok_start
+            if stop == tok_end or line[stop : stop + 1] == "/":
+                ends.extend(_tail_ends(line, stop))
+    return ends
+
+
+def _prefix_opcode_ends(line: str, start: int) -> list[int]:
+    """Row ends for the VEX./EVEX./XOP. opcode column."""
+    for head in ("VEX.", "EVEX.", "XOP."):
+        if line.startswith(head, start):
+            break
+    else:
+        return []
+    pos = start + len(head)
+    while pos < len(line) and (line[pos] == "." or line[pos].isascii() and line[pos].isalnum()):
+        pos += 1
+    if pos == start + len(head):
+        return []
+    ends: list[int] = []
+    while True:
+        nxt = _skip_ws(line, pos)
+        if nxt == pos or not _is_hex_byte(line[nxt : nxt + 2]):
+            break
+        pos = nxt + 2
+        ends.append(pos)
+    out: list[int] = []
+    for end in ends[::-1]:
+        out.extend(_tail_ends(line, end))
+    return out
+
+
+def _row_tail(line: str, pos: int) -> tuple[str, str, str, str | None] | None:
+    """Op/En, the V / V mode pair and the CPUID tail of an opcode row."""
+    pos = _skip_ws(line, pos)
+    for op_en in _OP_EN_TOKENS:
+        if not line.startswith(op_en, pos):
+            continue
+        mode_at = _skip_ws(line, pos + len(op_en))
+        if mode_at == pos + len(op_en):
+            continue
+        for mode_64 in _MODE_TOKENS:
+            if not line.startswith(mode_64, mode_at):
+                continue
+            mid = mode_at + len(mode_64)
+            if line[mid : mid + 1].isspace():
+                mid += 1
+            if line[mid : mid + 1] != "/":
+                continue
+            stop = mid + 1
+            if line[stop : stop + 1].isspace():
+                stop += 1
+            for mode_32 in _MODE_TOKENS:
+                if not line.startswith(mode_32, stop):
+                    continue
+                cpuid_at = stop + len(mode_32)
+                rest = _skip_ws(line, cpuid_at)
+                if rest > cpuid_at:
+                    return op_en, mode_64, mode_32, line[rest:]
+                if cpuid_at == len(line):
+                    return op_en, mode_64, mode_32, None
+    return None
+
+
+def _match_opcode_row(line: str) -> tuple[str, str, str, str, str | None] | None:
+    """Scan one opcode table row: opcode, Op/En, modes and CPUID."""
+    start = _skip_ws(line, 0)
+    for ends in (_prefix_opcode_ends, _legacy_opcode_ends):
+        for end in ends(line, start):
+            tail = _row_tail(line, end)
+            if tail is not None:
+                return (line[start:end],) + tail
+    return None
 
 
 def _oe_header_shape(cells: list[str]) -> tuple[bool, bool]:
@@ -169,7 +328,9 @@ def _oe_header_shape(cells: list[str]) -> tuple[bool, bool]:
         return False, False
     if texts[0].startswith("Op/En"):
         return True, any("Tuple Type" in cell for cell in texts)
-    has_operand_columns = all(re.fullmatch(r"Operand \d+", text) for text in texts)
+    has_operand_columns = all(
+        text.startswith("Operand ") and text[8:].isdecimal() for text in texts
+    )
     if has_operand_columns:
         return True, False
     if "Tuple Type" in texts and any(text.startswith("Operand") for text in texts):
@@ -215,28 +376,29 @@ def parse_opcode_table(lines: list[str]):
     while idx < len(lines):
         line = lines[idx]
         stripped = line.strip().rstrip(":")
-        if _OPERAND_ENCODING_CAPTION_RE.search(line) or stripped in stop_captions:
+        if "Instruction Operand Encoding" in line or stripped in stop_captions:
             break
-        match = _OPCODE_ROW_RE.match(line)
+        match = _match_opcode_row(line)
         if match is None:
             idx += 1
             continue
+        opcode, op_en, mode_64, mode_32, cpuid = match
         row = {
-            "opcode": " ".join(match["opcode"].split()),
-            "op_en": match["op_en"],
-            "mode_64": match["mode_64"],
-            "mode_32": match["mode_32"],
-            "cpuid": _isa_prefix(match["cpuid"] or ""),
+            "opcode": " ".join(opcode.split()),
+            "op_en": op_en,
+            "mode_64": mode_64,
+            "mode_32": mode_32,
+            "cpuid": _isa_prefix(cpuid or ""),
         }
         # Follow-on lines carry the wrapped CPUID cells (and the operand
         # form, kept in uops, not here).
         idx += 1
         while idx < len(lines):
             follow = lines[idx]
-            if not follow.strip() or _OPCODE_ROW_RE.match(follow):
+            if not follow.strip() or _match_opcode_row(follow) is not None:
                 break
             follow_stripped = follow.strip()
-            if _OPERAND_ENCODING_CAPTION_RE.search(follow) or follow_stripped in stop_captions:
+            if "Instruction Operand Encoding" in follow or follow_stripped in stop_captions:
                 break
             follow_cells = split_cells(follow_stripped)
             if _oe_header_shape(follow_cells)[0]:
@@ -266,7 +428,7 @@ def parse_operand_encoding_table(lines: list[str]):
         cells = split_cells(line.strip())
         is_header, header_has_tuple = _oe_header_shape(cells)
         if not active:
-            if is_header or _OPERAND_ENCODING_CAPTION_RE.search(line):
+            if is_header or "Instruction Operand Encoding" in line:
                 active = True
             else:
                 continue
@@ -286,7 +448,7 @@ def parse_operand_encoding_table(lines: list[str]):
             continue
         if line.strip().lower() in _ALL_HEADING_NAMES:
             break
-        if _OP_EN_FULL_RE.fullmatch(first) is None:
+        if first not in _OP_EN_TOKENS:
             break
         offset = 2 if has_tuple else 1
         operands = [
@@ -363,11 +525,28 @@ _ALL_HEADING_NAMES: frozenset[str] = frozenset(
 # Discard headings (Instruction Operand Encoding) still count as table noise.
 _NOISE_EXEMPT_HEADINGS: frozenset[str] = _ALL_HEADING_NAMES - {s.lower() for s in _DISCARD_SECTIONS}
 
+
 # Minimal safety-net for junk lines that appear outside table bounding boxes.
-_JUNK_LINE_RE = re.compile(
-    r"^\d+\.\s+See note "  # footnote references (1. See note ...)
-    r"|^NOTES:\s*$"  # trailing NOTES: line
-)
+def _is_junk_line(text: str) -> bool:
+    """Footnote references ('1. See note ...') and the trailing 'NOTES:' line."""
+    if text.startswith("NOTES:"):
+        return not text[6:].strip()
+    cut = 0
+    while cut < len(text) and text[cut].isdecimal():
+        cut += 1
+    return (
+        cut > 0
+        and text[cut : cut + 1] == "."
+        and text[cut + 1 : cut + 2].isspace()
+        and text[cut + 1 :].lstrip().startswith("See note ")
+    )
+
+
+def _is_numbered_item(line: str) -> bool:
+    cut = 0
+    while cut < len(line) and line[cut].isdecimal():
+        cut += 1
+    return cut > 0 and line[cut : cut + 1] == "." and line[cut + 1 : cut + 2].isspace()
 
 
 # Maximum fraction of page area a single table can cover before we
@@ -384,14 +563,38 @@ class _PreparedPage:
     fallback_reason: str | None = None
 
 
-_FASTPATH_TABULAR_LINE_RE = re.compile(
-    r"^(Opcode|Op/En|64/32-Bit Mode|64-Bit Mode|32-Bit Mode|CPUID Feature Flag)\b",
-    re.IGNORECASE,
+_TABULAR_LINE_HEADS = (
+    "Opcode",
+    "Op/En",
+    "64/32-Bit Mode",
+    "64-Bit Mode",
+    "32-Bit Mode",
+    "CPUID Feature Flag",
 )
-_FASTPATH_TABULAR_CAPTION_RE = re.compile(
-    r"^(Table\s+\d+-\d+\.|Instruction Operand Encoding\b)",
-    re.IGNORECASE,
-)
+
+
+def _has_tabular_head(text: str, heads: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    for head in heads:
+        after = text[len(head) : len(head) + 1]
+        if lowered.startswith(head.lower()) and not (after.isalnum() or after == "_"):
+            return True
+    return False
+
+
+def _is_tabular_caption(text: str) -> bool:
+    if _has_tabular_head(text, ("Instruction Operand Encoding",)):
+        return True
+    if text[:5].lower() != "table":
+        return False
+    rest = text[5:].lstrip()
+    if rest == text[5:]:
+        return False
+    digits, sep, pages = rest.partition("-")
+    cut = 0
+    while cut < len(pages) and pages[cut].isdecimal():
+        cut += 1
+    return bool(sep) and digits.isdecimal() and cut > 0 and pages[cut : cut + 1] == "."
 
 
 def _resolve_outline_page_number(pdf, dest) -> int | None:
@@ -504,9 +707,7 @@ def _line_is_tabular_noise(text: str) -> bool:
     # prefix with the opcode-table column headers. Keep the heading.
     if stripped.lower() in _NOISE_EXEMPT_HEADINGS:
         return False
-    return bool(
-        _FASTPATH_TABULAR_LINE_RE.match(stripped) or _FASTPATH_TABULAR_CAPTION_RE.match(stripped)
-    )
+    return _has_tabular_head(stripped, _TABULAR_LINE_HEADS) or _is_tabular_caption(stripped)
 
 
 def _prepare_page_pdfplumber(page) -> _PreparedPage:
@@ -613,25 +814,49 @@ def normalize_section_name(raw: str) -> str:
     return stripped
 
 
+def _is_title_head_char(char: str) -> bool:
+    return char.isascii() and char.isalnum() or char in "/,_" or char.isspace()
+
+
+def _is_mnemonic_shape(mnemonic: str) -> bool:
+    idx = 0
+    while idx < len(mnemonic) and (
+        "A" <= mnemonic[idx] <= "Z"
+        or "0" <= mnemonic[idx] <= "9"
+        or mnemonic[idx] in "/,_"
+        or mnemonic[idx].isspace()
+    ):
+        idx += 1
+    return idx >= 1 and all("a" <= char <= "z" for char in mnemonic[idx:])
+
+
 def parse_instruction_title(text: str) -> tuple[str, str] | None:
     """Parse an instruction title into (mnemonic, summary).
 
     Returns None if the text is not an instruction title.
     """
     text = text.strip()
-    m = _TITLE_RE.match(text)
-    if m is None:
+    if not ("A" <= text[:1] <= "Z" or "a" <= text[:1] <= "z"):
         return None
-    mnemonic = m.group(1).strip()
-    summary = m.group(2).strip()
+    head = 1
+    while head < len(text) and head <= 80 and _is_title_head_char(text[head]):
+        head += 1
+    # The em-dash closes the head run; past 81 head chars only whitespace
+    # may still reach it, and summary must keep at least one character.
+    if head > 81 and text[81:head].strip():
+        return None
+    if text[head : head + 1] != "\u2014" or head + 1 == len(text):
+        return None
+    mnemonic = text[:head].strip()
+    summary = text[head + 1 :].strip()
     if any(word in mnemonic for word in _SKIP_WORDS):
         return None
     # PyMuPDF splits tight letter groups into spans with artificial spaces
     # ("CMOV cc"). Mnemonics contain no spaces, so drop them.
-    mnemonic = re.sub(r"\s+", "", mnemonic)
+    mnemonic = "".join(mnemonic.split())
     # A lowercase letter is valid only in a trailing run (CMOVcc, PREFETCHh).
     # The check rejects mixed-case prose at title size (chapter blurbs).
-    if not re.fullmatch(r"[A-Z0-9/,_\s]+[a-z]*", mnemonic):
+    if not _is_mnemonic_shape(mnemonic):
         return None
     return mnemonic, summary
 
@@ -650,7 +875,7 @@ def _mnemonic_variants(mnemonic: str) -> list[str]:
             if not part:
                 continue
             if idx and part[0].isdigit():
-                part = re.sub(r"[0-9]+$", "", parts[0]) + part
+                part = parts[0].rstrip("0123456789") + part
             variants.append(part.upper())
     return variants
 
@@ -784,7 +1009,7 @@ def parse_intel_sdm(
             filtered = [
                 (x0, text)
                 for x0, text in line_tuples
-                if not _FOOTER_RE.match(text) and not _JUNK_LINE_RE.match(text)
+                if not _is_footer_line(text) and not _is_junk_line(text)
             ]
             if not filtered:
                 continue
@@ -815,7 +1040,7 @@ def parse_intel_sdm(
                         paragraphs.append(line)
                     elif paragraphs[-1][-1:] in ".):;":
                         paragraphs.append(line)
-                    elif line[:1] in ("\u2022", "\u2013") or re.match(r"^\d+\.\s", line):
+                    elif line[:1] in ("\u2022", "\u2013") or _is_numbered_item(line):
                         # Bullet points or numbered list items.
                         paragraphs.append(line)
                     elif paragraphs[-1].endswith("-"):

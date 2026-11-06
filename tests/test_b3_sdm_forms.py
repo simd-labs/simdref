@@ -78,6 +78,18 @@ class OpcodeTableTests(unittest.TestCase):
     def test_no_table_lines_give_no_rows(self):
         self.assertEqual(intel.parse_opcode_table(["Description", "plain prose."]), [])
 
+    def test_opcode_column_takes_the_longest_split(self):
+        # "NP" is both an opcode token and an Op/En name. The opcode side
+        # keeps its tokens until a shorter split still completes the row.
+        rows = intel.parse_opcode_table(
+            ["NP 0F 58 NP V/V SSE", "NP 0F 58 /r is4 RM V/N.E. AVX", "VEX.0F38.W0 66 /r A V/V"]
+        )
+        self.assertEqual((rows[0]["opcode"], rows[0]["op_en"]), ("NP 0F 58", "NP"))
+        self.assertEqual(rows[0]["cpuid"], "SSE")
+        self.assertEqual((rows[1]["opcode"], rows[1]["op_en"]), ("NP 0F 58 /r is4", "RM"))
+        self.assertEqual((rows[1]["mode_64"], rows[1]["mode_32"]), ("V", "N.E."))
+        self.assertEqual((rows[2]["opcode"], rows[2]["op_en"]), ("VEX.0F38.W0 66 /r", "A"))
+
 
 class OperandEncodingTableTests(unittest.TestCase):
     def test_addps_operand_roles_and_tuple_type(self):
