@@ -54,7 +54,6 @@ isa VPADDD           # exact instruction -> detailed view
 isa _mm_add          # fuzzy -> ranked search results
 isa mm add           # tokenized query -> intrinsic-biased search
 isa ADD              # mnemonic-like -> instruction-biased search
-isa VADDPS 2         # pick variant #2 from the last result list
 isa                  # open the TUI
 ```
 
@@ -83,13 +82,13 @@ Editor clients, one for each editor:
 Each client shows a one-line brief at the end of each instruction line and
 the full manpage on hover, from the local catalog.
 
-The LLM interface writes JSON and NDJSON with exit codes 0 (match), 1 (bad
-flag), 2 (no match), 3 (ambiguous):
+The LLM interface writes JSON and NDJSON with exit codes 0 (match), 1 (usage
+error), 2 (no match or parser error), 3 (ambiguous):
 
 ```bash
-isa llm query _mm_add_ps --source-kind measured
+isa llm query vaddps --source-kind measured
 echo -e "_mm_add_ps\nVPADDD" | isa llm batch
-isa llm list --pattern "*gather*" --isa Intel
+isa llm list --pattern "*gather*"
 ```
 
 See [docs/LLM.md](docs/LLM.md) for the payload shape.
@@ -110,19 +109,19 @@ each instruction line. The output stays valid assembly.
 
 Commands
 
-| Command                 | Description                                                               |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `isa`                   | Open the TUI                                                              |
-| `isa <query>`           | Open the TUI with the query in a TTY, else print ranked results to stdout |
-| `isa doctor`            | Check the install, non-zero exit on failure                               |
-| `isa update`            | Download the pre-built catalog, `--from-release` for the GitHub Release   |
-| `isa annotate <file.s>` | Annotate a `.s` file with summaries and latency/CPI, writes `<file>.sa`   |
-| `isa man <name>`        | Show a manpage, made on demand                                            |
-| `isa install-manpages`  | Pre-generate man7 pages so plain `man vpaddd` works                       |
-| `isa llm query <q>`     | Strict lookup to JSON, NDJSON, or Markdown                                |
-| `isa llm batch`         | Resolve many queries from stdin in one invocation                         |
-| `isa llm list`          | Write the FilterSpec or stream matching catalog entries                   |
-| `isa llm schema`        | Print the JSON schema for `llm` payloads                                  |
+| Command                 | Description                                                             |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `isa`                   | Open the TUI                                                            |
+| `isa <query>`           | Fuzzy queries open the TUI in a TTY, else print results to stdout       |
+| `isa doctor`            | Check the install, non-zero exit on failure                             |
+| `isa update`            | Download the pre-built catalog, `--from-release` for the GitHub Release |
+| `isa annotate <file.s>` | Annotate a `.s` file with summaries and latency/CPI, writes `<file>.sa` |
+| `isa man <name>`        | Show a manpage, made on demand                                          |
+| `isa install-manpages`  | Pre-generate man7 pages so plain `man vpaddd` works                     |
+| `isa llm query <q>`     | Strict lookup to JSON, NDJSON, or Markdown                              |
+| `isa llm batch`         | Resolve many queries from stdin in one invocation                       |
+| `isa llm list`          | Write the FilterSpec or stream matching catalog entries                 |
+| `isa llm schema`        | Print the JSON schema for `llm` payloads                                |
 
 Dev commands
 
@@ -164,7 +163,10 @@ Each perf row carries a `(measured, <core>)` or `(modeled, <core>)` tag.
 
 ### Scope
 
-- Performance data covers x86, AArch64 and RISC-V: measured rows from uops.info and InstLatX64, vendor-guide rows from Intel, AMD and Arm, and modeled rows from the LLVM scheduling models.
+- Performance data covers x86, AArch64 and RISC-V. Measured rows come from
+  uops.info, InstLatX64 and the Intel Optimization Ref. Modeled rows come
+  from the Intel Intrinsics Guide, AMD and Arm vendor guides, and the LLVM
+  scheduling models.
 - RISC-V coverage is RVV only, not scalar or privileged ISA.
 
 ## Development

@@ -12,14 +12,14 @@ Each subcommand gives stable JSON or NDJSON on stdout. Diagnostics go to stderr.
 
 Resolve one query (intrinsic name, mnemonic, free-form search) and give one payload.
 
-| Flag                                   | Default | Description                                                                  |
-| -------------------------------------- | ------- | ---------------------------------------------------------------------------- |
-| `--format, -F json\|ndjson\|markdown`  | `json`  | Pretty JSON, one-record-per-line NDJSON, Markdown.                           |
-| `--limit N`                            | `8`     | Search-results cap when the query falls through to search mode.              |
-| `--isa FAM` (repeatable)               | all     | Filter by ISA family (`Intel`, `Arm`, `RISC-V`, …).                          |
-| `--preset NAME`                        | none    | Preset name (`default`, `intel`, `arm32`, `arm64`, `riscv`, `none`, `all`).  |
-| `--source-kind measured\|modeled\|any` | `any`   | Perf-row provenance. `measured` = uops.info rows. `modeled` = llvm-mca rows. |
-| `--arch CORE`                          | none    | Pin lat/cpi/ports to one core (`znver4`, `skylake-x`).                       |
+| Flag                                   | Default | Description                                                                                                     |
+| -------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `--format, -F json\|ndjson\|markdown`  | `json`  | Pretty JSON, one-record-per-line NDJSON, Markdown.                                                              |
+| `--limit N`                            | `8`     | Search-results cap when the query falls through to search mode.                                                 |
+| `--isa FAM` (repeatable)               | all     | Filter by ISA family (`x86`, `SSE`, `AVX`, `Arm`, `RISC-V`, …).                                                 |
+| `--preset NAME`                        | none    | Preset name (`default`, `intel`, `arm32`, `arm64`, `riscv`, `none`, `all`).                                     |
+| `--source-kind measured\|modeled\|any` | `any`   | Perf-row provenance. `measured` = uops.info, InstLatX64, Intel OptRef. `modeled` = Intel guide, AMD, Arm, LLVM. |
+| `--arch CORE`                          | none    | Pin lat/cpi/ports to one core (`znver4`, `skylake-x`).                                                          |
 
 Payload shape (abridged):
 
@@ -53,7 +53,7 @@ echo -e "_mm_add_ps\nVPADDD\n_does_not_exist" | isa llm batch
 
 Each output record: `{"query": ..., "status": ..., "payload": {...}}`. `status` is `match`, `no_match`, `ambiguous`, or `error`. On `error` the record has an `error` field.
 
-Accepts the same flags as `query`.
+Takes the same filter flags as `query` (no `--format`: output is always NDJSON).
 
 ### `isa llm list`
 
@@ -64,10 +64,10 @@ isa llm list --format json
 isa llm list --format markdown
 ```
 
-With `--pattern GLOB [--isa FAM]`, streams NDJSON `{name, kind, isa, category}` for each entry name that agrees with the glob. `fnmatch` semantics (`*`, `?`, `[...]`), case-insensitive, on the entry name and `db_key`.
+With `--pattern GLOB [--isa FAM]`, streams NDJSON `{name, kind, isa, category}` for each entry name that agrees with the glob. `fnmatch` semantics (`*`, `?`, `[...]`), case-insensitive on the entry name, case-sensitive on `db_key`.
 
 ```bash
-isa llm list --pattern "*gather*" --isa "Intel"
+isa llm list --pattern "*gather*"
 ```
 
 ### `isa llm schema`
@@ -76,20 +76,20 @@ JSON Schema for the `query` and `batch` payload shape, with `generated_at`, `sou
 
 ## Exit codes
 
-| Code | Meaning                                                    |
-| ---- | ---------------------------------------------------------- |
-| `0`  | Match (intrinsic, instruction, minimum one search result). |
-| `1`  | Usage error: bad flag, unknown preset, missing argument.   |
-| `2`  | Query correct, no catalog hit.                             |
-| `3`  | Ambiguous: multiple exact hits on the same mnemonic.       |
-| `10` | Internal error (exception in resolution).                  |
+| Code | Meaning                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------- |
+| `0`  | Match (intrinsic, instruction, minimum one search result).                                |
+| `1`  | Usage error: unknown preset, --format, or --arch, empty query.                            |
+| `2`  | Query correct, no catalog hit. The parser also exits 2 on a bad flag or missing argument. |
+| `3`  | Ambiguous: multiple exact hits on the same mnemonic.                                      |
+| `10` | Internal error (exception in resolution).                                                 |
 
 ## Skill recipe
 
 Agent loop on assembly or codegen:
 
 1. Parse the assembly, pull mnemonics.
-1. Pre-filter: `isa llm list --pattern "VPADD*" --isa "Intel"`.
+1. Pre-filter: `isa llm list --pattern "VPADD*" --isa "AVX"`.
 1. Resolve in one batch, measured perf only: `printf '%s\n' "${mnemonics[@]}" | isa llm batch --source-kind measured`.
 1. Consume NDJSON. Each record gives `lat`, `cpi`, linked intrinsic, `summary`, enough to propose a swap and cite latency.
 1. Use `generated_at` and `source_versions` to flag stale catalogs.

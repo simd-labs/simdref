@@ -24,7 +24,7 @@ class SourceUnavailableError(RuntimeError):
     """Raised when every candidate source for a feed is unreachable.
 
     The installer / CI surfaces this with a hint to use the pre-built
-    release catalog via ``simdref update`` instead of ``--build``.
+    release catalog via ``simdref update``.
     """
 
 
@@ -278,7 +278,7 @@ def fetch_intel_data() -> tuple[str, SourceVersion]:
 
     raise SourceUnavailableError(
         "Intel intrinsics data is unreachable (network + local archives + upstream cache all failed). "
-        "Install llvm-mca + a working network, or run `simdref update` (no --build) to "
+        "Install llvm-mca + a working network, or run `simdref update` to "
         "use the pre-built release catalog."
     )
 

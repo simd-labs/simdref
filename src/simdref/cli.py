@@ -421,7 +421,7 @@ def _refresh_runtime_from_existing_catalog() -> None:
 
     Falls back to rebuilding from the existing database itself when the
     msgpack snapshot was pruned. Manpages and the static web bundle are no
-    longer materialized here — they are ~150k small files; ``simdref man``
+    longer materialized here — they are ~130k small files; ``simdref man``
     renders pages on demand and ``simdref install-manpages`` / ``simdref
     web`` remain explicit opt-ins.
     """
@@ -470,7 +470,7 @@ def _download_release_or_fallback() -> None:
     """Prefer pre-built assets. Fall back to the existing on-disk catalog.
 
     When the download fails and no catalog is cached, the caller must
-    run ``simdref update --build`` — there is no longer a bundled-fixture
+    run ``simdref build`` — there is no longer a bundled-fixture
     fallback.
     """
     try:
@@ -489,9 +489,7 @@ def _download_release_or_fallback() -> None:
             "[bold red]downloaded runtime schema is not current[/bold red] and no local catalog exists",
             style="yellow",
         )
-        err_console.print(
-            "run `simdref update --build` to build from upstream sources (requires llvm-mca)"
-        )
+        err_console.print("run `simdref build` to build from upstream sources (requires llvm-mca)")
         raise typer.Exit(code=1)
     except typer.Exit:
         if CATALOG_PATH.exists():
@@ -504,9 +502,7 @@ def _download_release_or_fallback() -> None:
         err_console.print(
             "[bold red]no pre-built catalog available and no local cache[/bold red]", style="yellow"
         )
-        err_console.print(
-            "run `simdref update --build` to build from upstream sources (requires llvm-mca)"
-        )
+        err_console.print("run `simdref build` to build from upstream sources (requires llvm-mca)")
         raise
 
 
@@ -1352,7 +1348,7 @@ def man(
 ) -> None:
     """Show the manpage for an intrinsic/instruction, rendered on demand.
 
-    Pipes through ``man -l`` when available; otherwise prints the roff
+    Pipes through ``man`` when available; otherwise prints the roff
     source so it can be piped manually. No pre-generated pages needed.
     """
     ensure_runtime()
@@ -1389,7 +1385,7 @@ def man(
 def install_manpages(
     man_dir: Path = typer.Option(DEFAULT_MAN_DIR, help="Target man root directory."),
 ) -> None:
-    """Pre-generate man7 pages for every intrinsic/instruction (~150k files).
+    """Pre-generate man7 pages for every intrinsic/instruction (~130k files).
 
     The default target is the XDG data-root man dir (``~/.local/share/man``),
     which man-db auto-discovers on Linux — so plain ``man vpaddd`` works with
@@ -1435,8 +1431,8 @@ def _integrate_manpath(man_dir: Path) -> None:
 def _require_llvm_mca_or_hint() -> None:
     """Abort with an install hint when ``llvm-mca`` is missing on PATH.
 
-    ``--build`` needs it to generate modeled ARM/RISC-V perf rows.
-    Users who only want pre-built data can drop the flag.
+    ``simdref build`` needs it to generate modeled ARM/RISC-V perf rows.
+    Users who only want pre-built data can run ``simdref update``.
     """
     from simdref.perf_sources.llvm_mca import LLVMMcaUnavailable, detect_llvm_mca_version
 
@@ -1444,7 +1440,7 @@ def _require_llvm_mca_or_hint() -> None:
         detect_llvm_mca_version()
     except LLVMMcaUnavailable as exc:
         err_console.print(
-            f"[bold red]llvm-mca is required for --build[/bold red]: {exc}",
+            f"[bold red]llvm-mca is required for `simdref build`[/bold red]: {exc}",
         )
         err_console.print(LLVMMcaUnavailable.install_hint)
         raise typer.Exit(code=1) from exc
@@ -1960,7 +1956,8 @@ def llm_query(
 ) -> None:
     """Resolve a query and emit an LLM-friendly payload.
 
-    Exit codes: 0 match, 2 no-match, 3 ambiguous, 1 usage error, 10 internal.
+    Exit codes: 0 match, 2 no-match (parser errors, e.g. a bad flag, also
+    exit 2), 3 ambiguous, 1 usage error, 10 internal.
     """
     _llm_query_impl(query, limit, fmt, isa, None, preset=preset, source_kind=source_kind, arch=arch)
 
@@ -2270,7 +2267,7 @@ def doctor() -> None:
             warn_icon,
             "sqlite index",
             "[yellow]outdated schema[/]",
-            "rebuild with `simdref update --build`",
+            "rebuild with `simdref build`",
         )
         warnings += 1
     else:
