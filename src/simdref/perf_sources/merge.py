@@ -6,7 +6,9 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from fractions import Fraction
 from functools import lru_cache
+import json
 import re
+from pathlib import Path
 from typing import Any, Iterable
 
 from simdref.models import InstructionRecord
@@ -80,6 +82,14 @@ def ipc_value(raw: str) -> Fraction | None:
 def cpi_for(ipc: Fraction) -> str:
     """Invert ops-per-cycle into the cycles-per-instruction text."""
     return fmt_cycles(float(1 / ipc))
+
+
+def write_json(payload: Any, target: Path) -> None:
+    """Write one vendored perf JSON document: sorted keys, compact separators."""
+    target.write_text(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 # One provenance key per merged field, written only when the value comes

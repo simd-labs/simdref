@@ -159,3 +159,23 @@ def test_arm_a64_extractor_scopes_to_a64_instruction_set():
 
 def test_arm_a64_extractor_returns_empty_on_unparseable():
     assert audit_coverage._extract_arm_a64_mnemonics("not json") == set()
+
+
+def test_intel_extractor_reads_datajs_wrapper():
+    """A data.js wrapper (backslash-continued JS string) yields the names the
+    catalog ingest parser reads."""
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<intrinsics_list version="3.6.4">',
+        '  <intrinsic name="_mm_add_ps" rettype="__m128"/>',
+        '  <intrinsic name="no_underscore"/>',
+        "</intrinsics_list>",
+    ]
+    text = 'var data_js = "' + "\\n".join(lines) + '";'
+    assert audit_coverage._extract_intel_names(text) == {"_mm_add_ps"}
+
+
+def test_intel_extractor_reads_json_and_ignores_garbage():
+    text = json.dumps([{"name": "_mm256_add_pd"}, {"name": "other"}])
+    assert audit_coverage._extract_intel_names(text) == {"_mm256_add_pd"}
+    assert audit_coverage._extract_intel_names("not a payload") == set()

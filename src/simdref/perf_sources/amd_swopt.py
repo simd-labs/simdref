@@ -43,7 +43,7 @@ from typing import Any, Iterable
 import xml.etree.ElementTree as ET
 
 from simdref.perf_sources.cores import canonical_core_id
-from simdref.perf_sources.merge import SOURCE_AMD_SWOPT, PerfRow, cpi_for, ipc_value
+from simdref.perf_sources.merge import SOURCE_AMD_SWOPT, PerfRow, cpi_for, ipc_value, write_json
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_VENDOR_DIR = _REPO_ROOT / "vendor" / "amd_swopt"
@@ -438,11 +438,7 @@ def write_vendored(
         "rows": [_row_payload(row) for row in rows],
     }
     outdir.mkdir(parents=True, exist_ok=True)
-    target = outdir / spec.output
-    target.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    write_json(payload, outdir / spec.output)
     return len(rows)
 
 

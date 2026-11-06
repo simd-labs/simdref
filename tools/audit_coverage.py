@@ -37,6 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from simdref import ingest_sources as src  # noqa: E402
+from simdref.ingest_catalog import parse_intel_payload  # noqa: E402
 from simdref.storage import load_catalog  # noqa: E402
 
 DEFAULT_THRESHOLD = 0.95
@@ -50,12 +51,12 @@ THRESHOLDS_PATH = REPO_ROOT / "docs" / "coverage" / "thresholds.toml"
 
 
 def _extract_intel_names(text: str) -> set[str]:
-    """Intel data.js/XML has ``<intrinsic name="_mm_...">`` entries."""
-    names = set(re.findall(r'<intrinsic\b[^>]*\bname\s*=\s*\\?["\']([^"\'\\]+)', text))
-    if not names:
-        # JSON form: "name":"_mm_..."
-        names = set(re.findall(r'"name"\s*:\s*"([^"]+)"', text))
-    return {n for n in names if n and (n.startswith("_") or n.startswith("__"))}
+    """Intrinsic names from one Intel payload, via the catalog ingest parser."""
+    try:
+        records = parse_intel_payload(text)
+    except (ValueError, TypeError, KeyError, AttributeError, ET.ParseError):
+        return set()
+    return {record.name for record in records if record.name.startswith("_")}
 
 
 def _extract_uops_mnemonics(text_or_path: Any) -> set[str]:

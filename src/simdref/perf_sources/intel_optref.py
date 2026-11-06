@@ -27,7 +27,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from simdref.perf_sources.merge import SOURCE_INTEL_OPTREF, PerfRow
+from simdref.perf_sources.merge import SOURCE_INTEL_OPTREF, PerfRow, write_json
 from simdref.tablecols import value_shape, word_spans
 
 SOURCE_VERSION = "356477-051US, October 2026"
@@ -527,10 +527,7 @@ def refresh(rawdir: Path) -> None:
         "rows": [asdict(row) for row in rows],
     }
     target = _VENDOR_DIR / "rows.json"
-    target.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    write_json(payload, target)
     print(f"pdf: {', '.join(pdf.name for pdf in pdfs)}")
     print(f"wrote: {target} ({target.stat().st_size} bytes)")
     print(f"rows: {stats.rows}")

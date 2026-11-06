@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from simdref.perf_sources.cores import canonical_core_id
-from simdref.perf_sources.merge import SOURCE_INTEL_GUIDE, PerfRow
+from simdref.perf_sources.merge import SOURCE_INTEL_GUIDE, PerfRow, write_json
 
 SOURCE_VERSION = "3.6.9"
 CITATION_URL = "https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html"
@@ -228,13 +228,9 @@ def refresh(rawdir: str | Path, outdir: str | Path | None = None) -> IntelGuideP
             "core": core,
             "rows": sorted(entries, key=lambda e: e["form"]),
         }
-        (outdir / f"{core}.json").write_text(
-            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
-        )
+        write_json(payload, outdir / f"{core}.json")
     notes = parse_notes_json((rawdir / "notes.json").read_text())
-    (outdir / "notes.json").write_text(
-        json.dumps(notes, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
-    )
+    write_json(notes, outdir / "notes.json")
     return result
 
 

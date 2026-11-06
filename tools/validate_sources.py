@@ -32,6 +32,7 @@ from simdref.ingest_catalog import (
     parse_riscv_intrinsics_payload,
     parse_uops_xml,
     link_records,
+    unwrap_intel_payload,
 )
 from simdref.riscv import _NO_SYNOPSIS
 from simdref.ingest_sources import (
@@ -217,19 +218,10 @@ _RISCV_MIN_LINK_COVERAGE = 1.0
 
 
 def _unwrap_intel_source_text(text: str) -> str:
-    stripped = text.strip()
-    if stripped.startswith("var data_js"):
-        match = re.search(r'var\s+data_js\s*=\s*"(?P<body>.*)";\s*$', stripped, re.DOTALL)
-        if not match:
-            _fail("could not locate Intel XML payload in data.js")
-        xml_blob = match.group("body").replace("\\\n", "")
-        return bytes(xml_blob, "utf-8").decode("unicode_escape").strip()
-    if stripped.startswith("var ") or stripped.startswith("window."):
-        match = re.search(r"(\{.*\}|\[.*\])", stripped, re.DOTALL)
-        if not match:
-            _fail("could not locate JSON payload in Intel source data")
-        return match.group(1)
-    return stripped
+    try:
+        return unwrap_intel_payload(text)
+    except ValueError as err:
+        _fail(str(err))
 
 
 def _raw_intel_intrinsic_records(text: str) -> list[dict[str, Any]]:

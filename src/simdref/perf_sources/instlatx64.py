@@ -30,7 +30,7 @@ import json
 import sys
 from pathlib import Path
 
-from simdref.perf_sources.merge import SOURCE_INSTLATX64, PerfRow
+from simdref.perf_sources.merge import SOURCE_INSTLATX64, PerfRow, write_json
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_VENDOR_DIR = _REPO_ROOT / "vendor" / "instlatx64"
@@ -339,10 +339,7 @@ def refresh(rawdir: Path, outdir: Path | None = None) -> dict[str, object]:
         stale.unlink()
     for core, rows in sorted(by_core.items()):
         payload = [dataclasses.asdict(row) for row in rows]
-        (outdir / f"{core}.json").write_text(
-            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        write_json(payload, outdir / f"{core}.json")
     return {"per_core": {core: len(rows) for core, rows in sorted(by_core.items())}, **totals}
 
 

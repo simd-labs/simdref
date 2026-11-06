@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from simdref.perf_sources.cores import canonical_core_id
-from simdref.perf_sources.merge import SOURCE_ARM_SWOPT, PerfRow, cpi_for, ipc_value
+from simdref.perf_sources.merge import SOURCE_ARM_SWOPT, PerfRow, cpi_for, ipc_value, write_json
 from simdref.tablecols import row_tail, strip_footnote, word_spans
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -416,9 +416,7 @@ def write_vendored(groups: list[dict], cpu: str, vendor_dir: Path | None = None)
         "groups": store,
     }
     path = vendor_dir / f"{cpu}.json"
-    path.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
-    )
+    write_json(payload, path)
     return path
 
 

@@ -339,14 +339,25 @@ def _instruction_summary(
     return f"{prefix}{_generated_instruction_summary(mnemonic, operand_details, architecture=architecture)}.".strip()
 
 
-def parse_intel_payload(text: str) -> list[IntrinsicRecord]:
+def unwrap_intel_payload(text: str) -> str:
+    """Strip the JS wrapper of a fetched Intel payload; raw XML or JSON comes back."""
     stripped = text.strip()
     if stripped.startswith("var data_js"):
         match = re.search(r'var\s+data_js\s*=\s*"(?P<body>.*)";\s*$', stripped, re.DOTALL)
         if not match:
             raise ValueError("could not locate Intel XML payload in data.js")
         xml_blob = match.group("body").replace("\\\n", "")
-        stripped = bytes(xml_blob, "utf-8").decode("unicode_escape").strip()
+        return bytes(xml_blob, "utf-8").decode("unicode_escape").strip()
+    if stripped.startswith("var ") or stripped.startswith("window."):
+        match = re.search(r"(\{.*\}|\[.*\])", stripped, re.DOTALL)
+        if not match:
+            raise ValueError("could not locate JSON payload in Intel data")
+        return match.group(1)
+    return stripped
+
+
+def parse_intel_payload(text: str) -> list[IntrinsicRecord]:
+    stripped = unwrap_intel_payload(text)
     if stripped.startswith("<?xml") or stripped.startswith("<intrinsics_list"):
         records: list[IntrinsicRecord] = []
         for node in _iter_xml_elements(stripped, "intrinsic"):
@@ -425,14 +436,7 @@ def parse_intel_payload(text: str) -> list[IntrinsicRecord]:
             )
         return records
 
-    json_blob = stripped
-    if stripped.startswith("var ") or stripped.startswith("window."):
-        match = re.search(r"(\{.*\}|\[.*\])", stripped, re.DOTALL)
-        if not match:
-            raise ValueError("could not locate JSON payload in Intel data")
-        json_blob = match.group(1)
-
-    payload = json.loads(json_blob)
+    payload = json.loads(stripped)
     candidates = (
         payload.get("intrinsics") or payload.get("data") or payload.get("records") or []
         if isinstance(payload, dict)
