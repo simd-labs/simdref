@@ -1,5 +1,8 @@
 """catkey.py: catalog-key parsing for the form matcher."""
 
+import json
+
+from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.catkey import (
     IMMEDIATE_ACCEPT,
     build_key,
@@ -8,6 +11,8 @@ from simdref.catkey import (
     operands_of_key,
     split_isa_parts,
 )
+from simdref.ingest_catalog import link_records
+from simdref.models import IntrinsicRecord
 
 
 def test_operands_of_key_splits_at_top_level_commas():
@@ -63,3 +68,48 @@ def test_split_isa_parts_splits_on_separators_and_space_runs():
         "x",
     ]
     assert split_isa_parts("AArch64 Base") == ["AArch64 Base"]
+
+
+def test_ba_placeholder_row_resolves():
+    # Pin the one row class the merged placeholder table fixes: a ref key
+    # naming the Ba role resolves to the row that renders b3. Dropping "Ba"
+    # from RULE_PLACEHOLDER leaves the row as "<BA>" and the ref unresolved.
+    payload = {
+        "instructions": [
+            {
+                "_type": "Instruction.InstructionSet",
+                "name": "A64",
+                "children": [
+                    {
+                        "_type": "Instruction.Instruction",
+                        "operation_id": "test_ba_row",
+                        "assembly": {
+                            "_type": "Instruction.Assembly",
+                            "symbols": [
+                                {"_type": "Instruction.Symbols.Literal", "value": "FMLA "},
+                                {"_type": "Instruction.Symbols.RuleReference", "rule_id": "Bd"},
+                                {"_type": "Instruction.Symbols.Literal", "value": ", "},
+                                {"_type": "Instruction.Symbols.RuleReference", "rule_id": "Bn"},
+                                {"_type": "Instruction.Symbols.Literal", "value": ", "},
+                                {"_type": "Instruction.Symbols.RuleReference", "rule_id": "Ba"},
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+    }
+    rows = parse_arm_instruction_payload(json.dumps(payload))
+    assert [row.key for row in rows] == ["FMLA (B0, B1, B3)"]
+    intrinsic = IntrinsicRecord(
+        name="vtest_ba",
+        signature="float8_t vtest_ba(float8_t, float8_t, float8_t)",
+        description="Test intrinsic for the Ba placeholder row.",
+        header="arm_neon.h",
+        architecture="arm",
+        instruction_refs=[{"name": "FMLA", "form": "Bd, Bn, Ba"}],
+    )
+    link_records([intrinsic], rows)
+    ref = intrinsic.instruction_refs[0]
+    assert ref["resolution"] == "key"
+    assert ref["display_key"] == rows[0].key

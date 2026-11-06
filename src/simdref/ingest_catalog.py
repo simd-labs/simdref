@@ -16,7 +16,7 @@ from typing import Any, Callable
 from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
-from simdref.catkey import build_key, parse_key, split_isa_parts
+from simdref.catkey import build_key, parse_key, split_isa_parts, substitute_placeholders
 from simdref.display import _LEADING_INSTR_TAG_RE, strip_instruction_decorators
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
@@ -74,65 +74,6 @@ def _normalize_isa(value: Any) -> list[str]:
 @lru_cache(maxsize=512)
 def _normalize_isa_string(value: str) -> tuple[str, ...]:
     return tuple(_intern_small(part) for part in split_isa_parts(value))
-
-
-# Register roles used by Arm vendor ref operands. Values match the
-# instantiation policy in arm_instructions._RULE_PLACEHOLDER so a ref key
-# can equal the instruction key that ingest stored.
-_ARM_REGISTER_ROLES: dict[str, str] = {
-    "Xd": "x0",
-    "Xn": "x1",
-    "Xm": "x2",
-    "Xa": "x3",
-    "Xt": "x0",
-    "Wd": "w0",
-    "Wn": "w1",
-    "Wm": "w2",
-    "Wa": "w3",
-    "Wt": "w0",
-    "Vd": "v0",
-    "Vn": "v1",
-    "Vm": "v2",
-    "Va": "v3",
-    "Vt": "v0",
-    "Dd": "d0",
-    "Dn": "d1",
-    "Dm": "d2",
-    "Da": "d3",
-    "Sd": "s0",
-    "Sn": "s1",
-    "Sm": "s2",
-    "Sa": "s3",
-    "Hd": "h0",
-    "Hn": "h1",
-    "Hm": "h2",
-    "Ha": "h3",
-    "Bd": "b0",
-    "Bn": "b1",
-    "Bm": "b2",
-    "Ba": "b3",
-    "Qd": "q0",
-    "Qn": "q1",
-    "Qm": "q2",
-    "Qt": "q0",
-    "Zd": "z0",
-    "Zn": "z1",
-    "Zm": "z2",
-    "Za": "z3",
-    "Zdn": "z0",
-    "Zt": "z0",
-    "Pd": "p0",
-    "Pn": "p1",
-    "Pm": "p2",
-    "Pg": "p0",
-}
-_ARM_REGISTER_ROLE_TOKEN = re.compile(
-    r"\b(" + "|".join(sorted(_ARM_REGISTER_ROLES, key=len, reverse=True)) + r")\b"
-)
-
-
-def _arm_instantiate_register_roles(text: str) -> str:
-    return _ARM_REGISTER_ROLE_TOKEN.sub(lambda match: _ARM_REGISTER_ROLES[match.group(0)], text)
 
 
 @lru_cache(maxsize=128)
@@ -1368,9 +1309,7 @@ def _resolve_instruction_ref(
             # Arm vendor refs name register roles (Vd/Vn/Vm); the AARCHMRS
             # records store the instantiated registers (v0/v1/v2). Try the
             # instantiated key so a vector ref resolves to its own form.
-            instantiated = (
-                build_key(name, _arm_instantiate_register_roles(form)) or name
-            ).casefold()
+            instantiated = (build_key(name, substitute_placeholders(form)) or name).casefold()
             if instantiated not in key_candidates:
                 key_candidates.insert(0, instantiated)
         for candidate_key in key_candidates:

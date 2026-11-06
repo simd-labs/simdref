@@ -238,3 +238,136 @@ def _z_element(name: str) -> str | None:
                 return name[letter].lower()
         index = name.find("Z", index + 1)
     return None
+
+
+# Placeholder instances for AARCHMRS rule ids, shared by the arm row render
+# (arm_instructions) and the vendor ref key instantiation (ingest_catalog).
+# The vendored revisions mix case in rule ids (T_OPTION__4 in one, T_option__4
+# in FAT-2025-09), so the lookup folds case. "Ba" must stay: a ref key with Ba
+# resolves to the rendered b3 row only while both sides share this table.
+RULE_PLACEHOLDER: dict[str, str] = {
+    # Scalar
+    "Xd": "x0",
+    "Xn": "x1",
+    "Xm": "x2",
+    "Xa": "x3",
+    "Xt": "x0",
+    "Xt2": "x1",
+    "Xs": "x1",
+    "Xt1": "x0",
+    "Wd": "w0",
+    "Wn": "w1",
+    "Wm": "w2",
+    "Wa": "w3",
+    "Wt": "w0",
+    "Wt2": "w1",
+    "Ws": "w1",
+    "Wt1": "w0",
+    # Advanced SIMD vector registers
+    "Vd": "v0",
+    "Vn": "v1",
+    "Vm": "v2",
+    "Va": "v3",
+    "Vt": "v0",
+    "Vt2": "v1",
+    "Vt3": "v2",
+    "Vt4": "v3",
+    "Dd": "d0",
+    "Dn": "d1",
+    "Dm": "d2",
+    "Da": "d3",
+    # FP accumulator register operands; t/s letters follow the Xt/Xs numbering.
+    "fpfar_dt": "d0",
+    "fpfar_ds": "d1",
+    "fpfar_st": "s0",
+    "fpfar_ss": "s1",
+    "fpfar_ht": "h0",
+    "fpfar_hs": "h1",
+    "Sd": "s0",
+    "Sn": "s1",
+    "Sm": "s2",
+    "Sa": "s3",
+    "Hd": "h0",
+    "Hn": "h1",
+    "Hm": "h2",
+    "Ha": "h3",
+    "Bd": "b0",
+    "Bn": "b1",
+    "Bm": "b2",
+    "Ba": "b3",
+    "Qd": "q0",
+    "Qn": "q1",
+    "Qm": "q2",
+    "Qt": "q0",
+    "Qt2": "q1",
+    # SVE predicate / vector
+    "Zd": "z0",
+    "Zn": "z1",
+    "Zm": "z2",
+    "Za": "z3",
+    "Zdn": "z0",
+    "Zt": "z0",
+    "Pd": "p0",
+    "Pn": "p1",
+    "Pm": "p2",
+    "Pg": "p0",
+    "Pt": "p0",
+    # SME
+    "ZAd": "za0",
+    "ZAn": "za0",
+    "ZAt": "za0",
+    # Stack pointer / zero register
+    "SP": "sp",
+    "XZR": "xzr",
+    "WZR": "wzr",
+    "XSP": "sp",
+    "WSP": "wsp",
+    # Condition codes / misc commonly referenced
+    "cond": "eq",
+    "nzcv": "0",
+    # Arrangement specifiers and element size hints
+    "T": "4S",
+    "Ta": "4S",
+    "Tb": "4S",
+    "Ts": "4S",
+    "T__1": "4S",
+    "T__2": "4S",
+    "T__3": "4S",
+    "T__4": "4S",
+    # Parameterised arrangement rules carry the element-size options in the
+    # name (T_FMUL_HSD = H/S/D floats, T_OPTION = AdvSIMD options). The 4S
+    # instance matches the width policy of the plain T rule above.
+    "T_FMUL_HSD": "4S",
+    "T_OPTION": "4S",
+    "size": "4S",
+    "size__1": "4S",
+}
+
+RULE_PLACEHOLDER_BY_FOLD = {
+    name.casefold(): instance for name, instance in RULE_PLACEHOLDER.items()
+}
+
+
+def substitute_placeholders(text: str) -> str:
+    """Replace whole placeholder tokens in ``text`` with their instances.
+
+    Scans runs of [A-Za-z0-9_] and looks each up casefolded, so a ref key
+    gets the same instances the arm rows render.
+    """
+    parts: list[str] = []
+    run: list[str] = []
+
+    def flush() -> None:
+        if run:
+            token = "".join(run)
+            parts.append(RULE_PLACEHOLDER_BY_FOLD.get(token.casefold(), token))
+            run.clear()
+
+    for char in text:
+        if char.isascii() and (char.isalnum() or char == "_"):
+            run.append(char)
+        else:
+            flush()
+            parts.append(char)
+    flush()
+    return "".join(parts)
