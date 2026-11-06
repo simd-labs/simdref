@@ -55,11 +55,10 @@ CLASS_MAP = {
         "ZPR": ("z", None),
         "PPR": ("p", None),
         "PNR": ("pn", None),
-        "GPR64sponly": ("sp", None),
-        "GPR32sponly": ("sp", None),
     },
     "riscv": {
-        "GPR": ("gpr", "rvabi"),
+        # The x0-x31 AsmNames are not ABI spellings; only the first alias is.
+        "GPR": (None, "rvabi"),
         "VR": ("v", None),
         "VRM2": ("v", None),
         "VRM4": ("v", None),
@@ -122,6 +121,24 @@ def arm32_spelling_ok(spelling):
     return spelling.startswith("r") and spelling[1:].isdigit()
 
 
+def x86_spelling_ok(spelling):
+    """x86 operand spellings the matcher classifies.
+
+    rip is an address operand and r16-r31 are APX names the matcher does not
+    class; lsp._x86_gpr_width keeps the same rule at lookup time.
+    """
+    if spelling == "rip":
+        return False
+    tail = spelling[1:]
+    if spelling.startswith("r") and tail[:1].isdigit():
+        index = 0
+        while tail[index : index + 1].isdigit():
+            index += 1
+        if tail[index:] not in ("", "d", "w", "b") or not 8 <= int(tail[:index]) <= 15:
+            return False
+    return True
+
+
 def collect(data, family, rows):
     """Add every class-mapped spelling of one target dump to rows."""
     wanted = CLASS_MAP[family]
@@ -131,7 +148,7 @@ def collect(data, family, rows):
         if "RegisterClass" not in (record.get("!superclasses") or []):
             continue
         klass, alias_klass = wanted.get(name, (None, None))
-        if klass is None:
+        if klass is None and alias_klass is None:
             continue
         width = class_width(record, data)
         members = set()
@@ -146,7 +163,11 @@ def collect(data, family, rows):
                 if not spelling:
                     continue
                 kind = klass if index == 0 else alias_klass
+                if kind is None:
+                    continue
                 if family == "arm32" and not arm32_spelling_ok(spelling):
+                    continue
+                if family == "x86" and not x86_spelling_ok(spelling):
                     continue
                 rows.setdefault(spelling, {})
                 key = (kind, family)
