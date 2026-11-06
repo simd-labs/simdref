@@ -24,6 +24,27 @@ from simdref import ingest_sources as src
 from simdref.storage import derive_arm_arch
 
 
+def test_files_asset_links_finds_quoted_asset_paths():
+    html = (
+        '<script src="files/data.js"></script>'
+        '<a href="files/data.xml">x</a>'
+        "<i>files/skip.txt</i>"
+        "xfiles/yfiles/z.xml"
+    )
+    assert src._files_asset_links(html) == [
+        "files/data.js",
+        "files/data.xml",
+        "files/skip.txt</i>xfiles/yfiles/z.xml",
+    ]
+
+
+def test_files_asset_links_stops_at_quotes_and_backslashes():
+    assert src._files_asset_links("files/.js") == []
+    assert src._files_asset_links("files/a.js files/b.jpg") == ["files/a.js"]
+    assert src._files_asset_links("files/a.xml\\junk") == ["files/a.xml"]
+    assert src._files_asset_links('"files/data.json"') == ["files/data.json"]
+
+
 @pytest.mark.parametrize(
     "supported, isa, expected",
     [

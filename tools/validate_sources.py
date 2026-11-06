@@ -18,7 +18,6 @@ if str(SRC_DIR) not in sys.path:
 
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.display import strip_instruction_decorators
-from simdref.ingest import load_or_parse_intel_sdm
 from simdref.ingest_catalog import (
     _arm_live_instruction_refs,
     _canonical_instruction_key,
@@ -43,7 +42,7 @@ from simdref.ingest_sources import (
     fetch_riscv_unified_db_data,
     fetch_uops_xml,
 )
-from simdref.ingest_pdf import find_pdf_source_path
+from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source
 from simdref.pdfparse.intel import INTEL_SDM_CACHE_PATH
 
 
@@ -875,7 +874,8 @@ def validate_riscv_semantics_and_coverage() -> tuple[int, int]:
 def _load_sdm_descriptions() -> dict[str, dict[str, Any]] | None:
     pdf_path = find_pdf_source_path("intel-sdm")
     if pdf_path is not None and pdf_path.exists():
-        return load_or_parse_intel_sdm(pdf_path)
+        result = load_or_parse_pdf_source("intel-sdm", pdf_path)
+        return {key: value.to_dict() for key, value in result.descriptions.items()}
     if INTEL_SDM_CACHE_PATH.exists():
         payload = msgpack.unpackb(INTEL_SDM_CACHE_PATH.read_bytes(), raw=False)
         if "descriptions" in payload and isinstance(payload["descriptions"], dict):

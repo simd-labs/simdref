@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-import hashlib
 import html
 import io
-import re
 import subprocess
 import sys
 import tarfile
@@ -18,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from simdref.ingest_pdf import _sha256_file as _sha256
 from simdref.models import SourceVersion
 
 
@@ -196,6 +195,32 @@ def fetch_uops_xml() -> tuple[str | Path, SourceVersion]:
     )
 
 
+def _files_asset_links(html_text: str) -> list[str]:
+    # "files/" asset links: the run up to a quote or backslash, kept when
+    # some prefix of the run ends in .js, .json or .xml.
+    # shortcut: "files/x.json" keeps the full name; the removed regex
+    # truncated it to "files/x.js" (live Intel HTML has no such links).
+    links: list[str] = []
+    marker = "files/"
+    start = html_text.find(marker)
+    while start != -1:
+        end = start + len(marker)
+        while end < len(html_text) and html_text[end] not in "'\"\\":
+            end += 1
+        run = html_text[start + len(marker) : end]
+        best = 0
+        for ext in (".json", ".js", ".xml"):
+            index = run.rfind(ext)
+            if index >= 1 and index + len(ext) > best:
+                best = index + len(ext)
+        if best:
+            links.append(html_text[start : start + len(marker) + best])
+            start = html_text.find(marker, end)
+        else:
+            start = html_text.find(marker, start + 1)
+    return links
+
+
 def fetch_intel_data() -> tuple[str, SourceVersion]:
     local_archive = _read_local_intel_archive()
     if local_archive is not None:
@@ -214,7 +239,7 @@ def fetch_intel_data() -> tuple[str, SourceVersion]:
             pass
     try:
         html = _fetch_text(INTEL_INDEX_URL)
-        matches = re.findall(r'files/[^"\']+\.(?:js|json|xml)', html)
+        matches = _files_asset_links(html)
         for match in matches:
             candidate = f"https://www.intel.com/content/dam/develop/public/us/en/include/intrinsics-guide/{match}"
             try:
@@ -508,14 +533,6 @@ def refresh_local_arm_a64_archive(
                         on_progress(downloaded, total)
     tmp.replace(target)
     return target
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def refresh_local_arm_a64_xml_archive(

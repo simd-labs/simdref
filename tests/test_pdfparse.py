@@ -1,3 +1,4 @@
+import dataclasses
 from pathlib import Path
 
 import pytest
@@ -93,10 +94,10 @@ from simdref.pdfparse.intel import (
     normalize_section_name,
     parse_instruction_title,
 )
-from simdref.pdfparse.registry import get_pdf_source
-from simdref.ingest import _merge_descriptions
-from simdref import ingest
+from simdref.ingest_pdf import load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.models import InstructionRecord
+from simdref.pdfparse.registry import _PDF_SOURCES, get_pdf_source
+from simdref.pdfparse.types import PdfDescriptionPayload, PdfEnrichmentResult
 
 
 def test_parse_instruction_title_basic():
@@ -239,7 +240,7 @@ def test_whitelist_drops_heading_size_garbage():
     assert "IF (COUNT" not in all_body
 
 
-def test_merge_descriptions_adds_sections_and_pdf_reference():
+def test_merge_pdf_enrichment_adds_sections_and_pdf_reference():
     instructions = [
         InstructionRecord(
             mnemonic="VADDPD",
@@ -248,18 +249,21 @@ def test_merge_descriptions_adds_sections_and_pdf_reference():
             isa=["AVX"],
         )
     ]
-    descriptions = {
-        "ADDPD": {
-            "sections": {
-                "Description": "Add packed double-precision floating-point values.",
-                "Operation": "DEST := SRC1 + SRC2",
-            },
-            "page_start": 123,
-            "page_end": 125,
+    result = PdfEnrichmentResult(
+        descriptions={
+            "ADDPD": PdfDescriptionPayload(
+                sections={
+                    "Description": "Add packed double-precision floating-point values.",
+                    "Operation": "DEST := SRC1 + SRC2",
+                },
+                source_url=INTEL_SDM_URL,
+                page_start=123,
+                page_end=125,
+            )
         }
-    }
+    )
 
-    _merge_descriptions(instructions, descriptions)
+    merge_pdf_enrichment(instructions, "intel-sdm", result)
 
     item = instructions[0]
     assert item.description["Description"].startswith("Add packed")
@@ -268,7 +272,7 @@ def test_merge_descriptions_adds_sections_and_pdf_reference():
     assert item.metadata["intel-sdm-url"] == f"{INTEL_SDM_URL}#page=123"
 
 
-def test_load_or_parse_intel_sdm_uses_cache(tmp_path, monkeypatch):
+def test_load_or_parse_pdf_source_uses_cache(tmp_path, monkeypatch):
     pdf_path = tmp_path / "intel-sdm.pdf"
     cache_path = tmp_path / "intel-sdm-cache.msgpack"
     pdf_path.write_bytes(b"fake-pdf")
@@ -279,18 +283,22 @@ def test_load_or_parse_intel_sdm_uses_cache(tmp_path, monkeypatch):
         calls.append(path)
         if status is not None:
             status("parsed")
-        return {
-            "ADDPD": {
-                "sections": {"Description": "Add packed doubles."},
-                "page_start": 10,
-                "page_end": 11,
+        return PdfEnrichmentResult(
+            descriptions={
+                "ADDPD": PdfDescriptionPayload(
+                    sections={"Description": "Add packed doubles."},
+                    source_url=INTEL_SDM_URL,
+                    page_start=10,
+                    page_end=11,
+                )
             }
-        }
+        )
 
-    monkeypatch.setattr(ingest, "parse_intel_sdm", _fake_parse)
+    spec = get_pdf_source("intel-sdm")
+    monkeypatch.setitem(_PDF_SOURCES, "intel-sdm", dataclasses.replace(spec, parser=_fake_parse))
 
-    first = ingest.load_or_parse_intel_sdm(pdf_path, cache_path=cache_path)
-    second = ingest.load_or_parse_intel_sdm(pdf_path, cache_path=cache_path)
+    first = load_or_parse_pdf_source("intel-sdm", pdf_path, cache_path=cache_path)
+    second = load_or_parse_pdf_source("intel-sdm", pdf_path, cache_path=cache_path)
 
     assert first == second
     assert calls == [pdf_path]
