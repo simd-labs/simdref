@@ -22,9 +22,7 @@ from simdref.perf import (
     latency_cycle_values,
     latency_pair_text,
     perf_row_values,
-    record_iclass,
     variant_perf_summary,
-    variant_perf_summary_labeled,
 )
 from simdref.pdfrefs import normalize_pdf_refs, pdf_ref_label
 from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
@@ -180,8 +178,6 @@ X86_BASE_ISAS: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 # Compiled patterns (simple helpers avoid regex where possible)
 # ---------------------------------------------------------------------------
-
-_NORMALIZE_TEXT_RE = re.compile(r"[^a-z0-9]+")
 
 # Matches display-only instruction decorators like ``{evex}``, ``{load}``,
 # ``{disp8}``, etc. at the beginning of a form/mnemonic.
@@ -666,10 +662,6 @@ def instruction_variant_items(items):
             item.key,
         ),
     )
-
-
-def normalized_sentence(text: str) -> str:
-    return _NORMALIZE_TEXT_RE.sub(" ", text.casefold()).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -1257,58 +1249,6 @@ def render_instruction(catalog, item, conn=None, short: bool = False, full: bool
     render_instruction_sections(
         catalog, item, include_title=True, conn=conn, short=short, full=full
     )
-
-
-def render_instruction_variants(query: str, items, show_fp16: bool = False) -> None:
-    """Render a variant selection table for a mnemonic with multiple forms."""
-    all_items = instruction_variant_items(items)
-    visible_items = [item for item in all_items if isa_visible(item.isa, show_fp16=show_fp16)]
-    items = visible_items or all_items
-    table = Table(header_style="bold cyan")
-    table.add_column("#", width=3, style="cyan")
-    table.add_column("query", style="cyan")
-    table.add_column("arch", width=6)
-    table.add_column("isa", width=14)
-    table.add_column("lat", width=5)
-    table.add_column("cpi", width=5)
-    table.add_column("summary")
-    for index, item in enumerate(items, start=1):
-        lat, cpi = variant_perf_summary_labeled(item.arch_details, record_iclass(item))
-        table.add_row(
-            str(index),
-            instruction_query_text(item),
-            display_architecture(item.architecture),
-            display_isa(item.isa),
-            _label_perf(lat),
-            _label_perf(cpi),
-            item.summary or "-",
-        )
-
-
-def _label_perf(value) -> str:
-    """Render a :class:`PerfValue` as ``"val (measured, core)"`` for tables.
-
-    Empty / missing values render as ``"-"`` to match the legacy behaviour
-    the unit tests depend on.
-    """
-    raw = getattr(value, "value", value)
-    if not raw or raw == "-":
-        return "-"
-    kind = getattr(value, "source_kind", "")
-    core = getattr(value, "core", "")
-    if kind and core:
-        return f"{raw} ({kind[0]}, {core})"
-    return str(raw)
-    console.print(Panel(table, title=f"instruction variants: {query}", border_style="magenta"))
-    base_query = query.split()[0] if query.split() else query
-    if items:
-        hidden_count = len(all_items) - len(items)
-        hidden_note = (
-            f" Hidden {hidden_count} APX/FP16/BF16 forms by default." if hidden_count > 0 else ""
-        )
-        console.print(
-            f"[dim]Open one with `simdref {instruction_query_text(items[0])}` or `simdref {base_query} <index>`. Showing {len(items)} forms.{hidden_note}[/dim]"
-        )
 
 
 def render_search_results(

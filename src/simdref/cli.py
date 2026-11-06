@@ -61,7 +61,6 @@ from simdref.display import (
     normalize_instruction_query,
     render_intrinsic,
     render_instruction,
-    render_instruction_variants,
     render_search_results,
 )
 from simdref import __version__
