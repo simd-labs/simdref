@@ -6,10 +6,10 @@ from the GitHub mirror:
 
 https://raw.githubusercontent.com/InstLatx64/InstLatx64/master/AuthenticAMD/AuthenticAMD0800F11_K17_Zen3_InstLatX64.txt
 https://raw.githubusercontent.com/InstLatx64/InstLatx64/master/AuthenticAMD/AuthenticAMD0830F10_K17_Rome_InstLatX64.txt
-https://raw.githubusercontent.com/InstLatx64/InstLatx64/master/AuthenticAMD/AuthenticAMD0A20F10_K19_Vermeer_InstLatX64.txt
-https://raw.githubusercontent.com/InstLatx64/InstLatx64/master/AuthenticAMD/AuthenticAMD0A60F12_K19_Raphael_04_InstLatX64.txt
-https://raw.githubusercontent.com/InstLatx64/InstLatx64/master/AuthenticAMD/AuthenticAMD0B40F40_K20_GraniteRidge_02_512b_InstLatX64.txt
-https://raw.githubusercontent.com/InstLatx64/InstLatx64/master/GenuineIntel/GenuineIntel00C0662_ArrowLake_08_BC_InstLatX64.txt
+https://raw.githubusercontent.com/InstLatx64/InstLatX64/master/AuthenticAMD/AuthenticAMD0A20F10_K19_Vermeer_InstLatX64.txt
+https://raw.githubusercontent.com/InstLatx64/InstLatX64/master/AuthenticAMD/AuthenticAMD0A60F12_K19_Raphael_04_InstLatX64.txt
+https://raw.githubusercontent.com/InstLatx64/InstLatX64/master/AuthenticAMD/AuthenticAMD0B40F40_K20_GraniteRidge_02_512b_InstLatX64.txt
+https://raw.githubusercontent.com/InstLatx64/InstLatX64/master/GenuineIntel/GenuineIntel00C0662_ArrowLake_08_BC_InstLatX64.txt
 
 The file name does not always name the measured CPU: the K17_Zen3 file
 measures a Zen 1 Ryzen 5 1500X. The CPU therefore comes from the dump
@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -41,67 +40,149 @@ _SOURCE_KIND = "measured"
 
 _CITATION_BASE = "https://github.com/InstLatx64/InstLatx64/blob/master"
 
+_TAGS = ("{EVEX}", "{REX}", "{VEX}", "{XOP}")
+# The lead digit of the parsed marketing model number names the Zen
+# generation. When no number matches, the refresh drops the dump.
+_ZEN_BY_MODEL = {"1": "ZEN1", "2": "ZEN+", "3": "ZEN2", "5": "ZEN3", "7": "ZEN4", "9": "ZEN5"}
+
+
+def _skip_ws(text: str, i: int) -> int:
+    while i < len(text) and text[i].isspace():
+        i += 1
+    return i
+
+
 # Two row layouts occur. Layout A is one row per line. Layout B (the
 # Raphael dump) starts each row with "Inst".
-_ROW_LAYOUT_A = re.compile(r"^\s*(\d+) (\S+)\s*:(.*?)\s+L:\s*(\S.*?)\s+T:\s*(\S.*)$")
-_ROW_LAYOUT_B = re.compile(r"^Inst\s+(\d+) (\S+)\s*:\s*(.*?)\s+L:\s*(\S.*?)\s+T:\s*(\S.*)$")
+def _row_fields(line: str) -> tuple[str, str, str] | None:
+    """Split one dump row into (instruction, L field, T field)."""
+    # shortcut: a colon inside the ISA token or tabs before L:/T: parse
+    # wrong, upgrade when a dump ever shows one
+    if line.startswith("Inst") and line[4:5].isspace():
+        line = line[4:]
+    index, space, rest = line.lstrip().partition(" ")
+    if not space or not index.isdecimal() or not rest or rest[0].isspace():
+        return None
+    isa, colon, rest = rest.partition(":")
+    if not colon or len(isa.split()) != 1:
+        return None
+    instruction, lmark, rest = rest.partition(" L:")
+    latency, tmark, throughput = rest.partition(" T:")
+    if not lmark or not tmark or not latency.strip() or not throughput.strip():
+        return None
+    return instruction.strip(), latency.strip(), throughput.strip()
 
-_USED_CPUS = re.compile(r"Instruction Latency: Used CPUs:\s*\d+ ProcMask:\s*0x([0-9A-Fa-f:]+)")
-_CPU_TYPE = re.compile(r'CPU#(\d+) Type: "([^"]+)"')
-_CPUID_NAME = re.compile(r"^CPUID CPU Name\s+:\s*(.+?)\s*$", re.MULTILINE)
-_BUILD = re.compile(r"aida_bench64\.dll build:\s*(\S+)\s+([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{4})")
-_AIDA64_VERSION = re.compile(r"AIDA64 Engineer (v[0-9.]+)")
 
-_NUMERIC_FIELD = re.compile(r"[-\d.]+\s*ns=\s*([-\d.]+)c")
-_TAG = re.compile(r"^(?:\{(?:EVEX|REX|VEX|XOP)\}\s*)+")
-_JUNK_TOKEN = re.compile(r"(?:\d+x|0x[0-9A-Fa-f]+)$")
+def _proc_mask(text: str) -> str | None:
+    """The ProcMask hex field of the first latency section, if any."""
+    marker = "Instruction Latency: Used CPUs:"
+    # shortcut: the marker must start its line, upgrade when a dump moves it
+    for line in text.splitlines():
+        head, sep, rest = line.partition(" ProcMask:")
+        if not sep or not head.startswith(marker):
+            continue
+        if not head[len(marker) :].strip().isdecimal():
+            continue
+        mask = rest.lstrip().removeprefix("0x")
+        end = 0
+        while end < len(mask) and (mask[end].isdecimal() or mask[end] in "abcdefABCDEF:"):
+            end += 1
+        if end:
+            return mask[:end]
+    return None
 
-# Ordered (regex on the CPU type string, canonical core id). The first
-# match wins. The marketing name maps to the microarchitecture generation.
-# When no pattern matches, the refresh drops the dump and counts it.
-_CPU_PATTERNS: tuple[tuple[str, str], ...] = (
-    (r"Ryzen [3579] 1\d{3}", "ZEN1"),
-    (r"Ryzen [3579] 2\d{3}", "ZEN+"),
-    (r"Ryzen [3579] 3\d{3}|EPYC 7\d{2}2", "ZEN2"),
-    (r"Ryzen [3579] 5\d{3}", "ZEN3"),
-    (r"Ryzen [3579] 7\d{3}|EPYC 9\d{2}4", "ZEN4"),
-    (r"Ryzen [3579] 9\d{3}", "ZEN5"),
-    (r"Core\(TM\) Ultra \w+ 2\d\dK", "ARL-P"),
-)
+
+def _cpu_types(text: str) -> list[tuple[str, str]]:
+    """The ``CPU#`` index and type string of each CPU in the dump."""
+    # shortcut: the marker must start its line, upgrade when a dump moves it
+    found: list[tuple[str, str]] = []
+    for line in text.splitlines():
+        if not line.startswith("CPU#"):
+            continue
+        number, sep, rest = line.partition(' Type: "')
+        name, close, _ = rest.partition('"')
+        if sep and close and name and number[4:].isdecimal():
+            found.append((number[4:], name))
+    return found
+
+
+def _cpuid_name(text: str) -> str | None:
+    """The ``CPUID CPU Name`` field of the dump, if present."""
+    for line in text.splitlines():
+        if line.startswith("CPUID CPU Name"):
+            i = _skip_ws(line, 14)
+            if i > 14 and line[i : i + 1] == ":":
+                name = line[i + 1 :].strip()
+                if name:
+                    return name
+    return None
 
 
 def _measured_cpu_name(text: str) -> str | None:
     """Return the type string of the CPU the dump actually measured."""
-    match = _USED_CPUS.search(text)
-    if match:
-        mask = 0
-        for group in match.group(1).split(":"):
-            mask = (mask << 64) | int(group, 16)
+    mask = _proc_mask(text)
+    if mask is not None:
+        value = 0
+        for group in mask.split(":"):
+            value = (value << 64) | int(group, 16)
         # The dump is single-CPU; the lowest set bit selects the CPU#
         # block whose ``Type:`` line names the measured part.
-        idx = (mask & -mask).bit_length() - 1 if mask else None
-        for number, name in _CPU_TYPE.findall(text):
+        idx = (value & -value).bit_length() - 1 if value else None
+        for number, name in _cpu_types(text):
             if int(number) == idx:
                 return " ".join(name.split())
-    match = _CPUID_NAME.search(text)
-    return match.group(1) if match else None
+    return _cpuid_name(text)
 
 
 def _core_for_cpu(cpu_name: str) -> str | None:
-    for pattern, core_id in _CPU_PATTERNS:
-        if re.search(pattern, cpu_name):
-            return core_id
+    """Map the marketing name's model numbers to a canonical core id."""
+    words = cpu_name.split()
+    for i, word in enumerate(words):
+        tail = words[i + 1 :]
+        if word == "Ryzen" and len(tail) > 1 and tail[0] in ("3", "5", "7", "9"):
+            model = tail[1][:4]
+            if len(model) == 4 and model.isdecimal() and model[0] in _ZEN_BY_MODEL:
+                return _ZEN_BY_MODEL[model[0]]
+        elif word == "EPYC":
+            model = tail[0][:4] if tail else ""
+            if len(model) == 4 and model.isdecimal():
+                if model[0] == "7" and model[3] == "2":
+                    return "ZEN2"
+                if model[0] == "9" and model[3] == "4":
+                    return "ZEN4"
+        elif (
+            word == "Core(TM)"
+            and len(tail) > 2
+            and tail[0] == "Ultra"
+            and all(c.isalnum() or c == "_" for c in tail[1])
+        ):
+            model = tail[2][:4]
+            if len(model) == 4 and model[0] == "2" and model[1:3].isdecimal() and model[3] == "K":
+                return "ARL-P"
     return None
 
 
 def _source_version(text: str) -> str:
-    match = _BUILD.search(text)
-    if match:
-        version, month, day, year = match.groups()
-        return f"aida_bench64.dll build: {version} {month} {int(day)} {year}"
-    match = _AIDA64_VERSION.search(text)
-    if match:
-        return f"AIDA64 Engineer {match.group(1)}"
+    # shortcut: only the first build marker counts, upgrade when a dump has two
+    _, sep, rest = text.partition("aida_bench64.dll build:")
+    if sep:
+        version, month, day, year = (rest.split() + [""] * 4)[:4]
+        if (
+            len(month) == 3
+            and month[:1].isupper()
+            and month[1:].islower()
+            and 0 < len(day) <= 2
+            and day.isdecimal()
+            and len(year) == 4
+            and year.isdecimal()
+        ):
+            return f"aida_bench64.dll build: {version} {month} {int(day)} {year}"
+    _, sep, rest = text.partition("AIDA64 Engineer v")
+    end = 0
+    while end < len(rest) and (rest[end].isdecimal() or rest[end] == "."):
+        end += 1
+    if sep and end:
+        return f"AIDA64 Engineer v{rest[:end]}"
     return "unknown"
 
 
@@ -111,8 +192,22 @@ def _cycles(field: str) -> str:
     Non-numeric fields are markers such as ``[no true dep.]`` and give
     an empty string.
     """
-    match = _NUMERIC_FIELD.search(field)
-    return match.group(1) if match else ""
+    # shortcut: only the first ns= in a field counts, upgrade when a field has two
+    before, sep, after = field.partition("ns=")
+    run = after.lstrip()
+    end = 0
+    while end < len(run) and (run[end].isdecimal() or run[end] in "-."):
+        end += 1
+    tail = before.rstrip()
+    if (
+        sep
+        and end
+        and tail
+        and run[end : end + 1] == "c"
+        and (tail[-1].isdecimal() or tail[-1] in "-.")
+    ):
+        return run[:end]
+    return ""
 
 
 def _has_fused(text: str) -> bool:
@@ -128,21 +223,39 @@ def _has_fused(text: str) -> bool:
     return False
 
 
+def _strip_tags(text: str) -> str:
+    for tag in _TAGS:
+        if text.startswith(tag):
+            return _strip_tags(text[len(tag) :].lstrip())
+    return text
+
+
+def _is_junk(token: str) -> bool:
+    """True for repetition counts (``2x``) and numeric prefixes (``0x66``)."""
+    if token.endswith("x"):
+        return token[:-1].isdecimal()
+    return (
+        len(token) > 2
+        and token.startswith("0x")
+        and all(c in "0123456789abcdefABCDEF" for c in token[2:])
+    )
+
+
 def _split_instruction(text: str) -> tuple[str, str]:
     """Split the instruction text into (mnemonic, operand form).
 
-    Encoding tags (``{EVEX}``, ``{REX}``, ``{VEX}``, ``{XOP}``),
+    Encoding tags (``{EVEX}``, ``{REX}``, ``{VEX}``, ``{XOP}``), the
     repetition counts like ``2x``, and numeric prefixes like ``0x66``
     carry no mnemonic. When one is dropped the row maps to the mnemonic
     alone, so the form is empty.
     """
-    text = _TAG.sub("", text, count=1).lstrip()
+    text = _strip_tags(text).lstrip()
     if text.startswith("V{EVEX}"):
         # ``V{EVEX} PMOVZXBW`` is the EVEX encoding of VPMOVZXBW.
         text = "V" + text[text.index("}") + 1 :].lstrip()
     tokens = text.split()
     original = list(tokens)
-    while len(tokens) > 1 and _JUNK_TOKEN.fullmatch(tokens[0]):
+    while len(tokens) > 1 and _is_junk(tokens[0]):
         tokens.pop(0)
     if len(tokens) < len(original):
         # A repetition or numeric prefix was dropped: the operand form is
@@ -169,14 +282,14 @@ def parse_dump(text: str, citation_url: str) -> tuple[list[PerfRow], dict[str, i
     stats = {"rows": 0, "fused": 0, "dropped": 0}
     rows: list[PerfRow] = []
     for line in text.splitlines():
-        match = _ROW_LAYOUT_B.match(line) or _ROW_LAYOUT_A.match(line)
-        if match is None:
+        fields = _row_fields(line)
+        if fields is None:
             continue
         stats["rows"] += 1
         if core is None:
             stats["dropped"] += 1
             continue
-        instruction = match.group(3).strip()
+        instruction, latency, throughput = fields
         if _has_fused(instruction):
             stats["fused"] += 1
             continue
@@ -193,8 +306,8 @@ def parse_dump(text: str, citation_url: str) -> tuple[list[PerfRow], dict[str, i
                 source_version=version,
                 architecture=_ARCHITECTURE,
                 form=form,
-                latency=_cycles(match.group(4)),
-                cpi=_cycles(match.group(5)),
+                latency=_cycles(latency),
+                cpi=_cycles(throughput),
                 citation_url=citation_url,
             )
         )
