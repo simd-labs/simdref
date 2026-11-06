@@ -85,7 +85,6 @@ def intrinsic_page(
         "\n".join(_instruction_perf_lines(linked_instructions))
         or "No performance metrics available."
     )
-    parts.append(_section("PERFORMANCE SUMMARY", perf_text))
     parts.append(_section("PERFORMANCE DETAILS", perf_text))
     parts.append(_section("NOTES", _roff_escape("; ".join(record.notes) or "None")))
     parts.append(

@@ -75,6 +75,11 @@ def test_intrinsic_manpage_has_required_sections(catalog: Catalog):
     assert ".SH CATEGORY" in page
 
 
+def test_intrinsic_manpage_has_single_performance_section(catalog: Catalog):
+    page = intrinsic_page(catalog.intrinsics[0], catalog)
+    assert page.count(".SH PERFORMANCE") == 1
+
+
 def test_instruction_manpage_has_required_sections(catalog: Catalog):
     page = instruction_page(catalog.instructions[0])
     assert ".TH" in page
