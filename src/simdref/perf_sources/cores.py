@@ -170,6 +170,13 @@ def core_architecture(canonical_id: str) -> str | None:
     return core.architecture if core is not None else None
 
 
+def perf_architecture(family: str | None) -> str:
+    """Architecture label perf rows carry: ``arm`` where the family is ``aarch64``."""
+    if family == "aarch64":
+        return "arm"
+    return family or ""
+
+
 def supported_core_ids() -> list[str]:
     """Return the sorted list of canonical core ids carried in the catalog."""
     return sorted(core.canonical_id for core in CANONICAL_CORES)

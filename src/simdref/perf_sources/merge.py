@@ -450,11 +450,6 @@ def merge_perf_rows(
 
 def _arch_guess(core: str) -> str:
     """Best-effort architecture lookup used when :class:`PerfRow` lacks one."""
-    from simdref.perf_sources.cores import core_architecture
+    from simdref.perf_sources.cores import core_architecture, perf_architecture
 
-    arch = core_architecture(core)
-    if arch == "aarch64":
-        return "arm"
-    if arch == "riscv":
-        return "riscv"
-    return arch or ""
+    return perf_architecture(core_architecture(core))

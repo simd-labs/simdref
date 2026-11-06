@@ -20,7 +20,7 @@ from typing import Any
 
 import yaml
 
-from simdref.perf_sources.cores import CoreSpec
+from simdref.perf_sources.cores import CoreSpec, perf_architecture
 from simdref.perf_sources.llvm_mca import (
     LLVM_MCA_CITATION,
     LLVMMcaError,
@@ -480,7 +480,7 @@ def _build_perf_rows(
         labels = list(payload_insts)
     else:
         labels = list(asm_lines)
-    arch_label = "arm" if core.architecture == "aarch64" else core.architecture
+    arch_label = perf_architecture(core.architecture)
     pressure_by_index = _pressure_by_index(payload, region)
 
     rows: list[PerfRow] = []

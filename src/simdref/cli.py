@@ -988,6 +988,21 @@ def _smart_lookup(
     return _run_tui(initial_query=query, initial_preset=preset)
 
 
+def _print_unknown_arch(raw: str, *, bold: bool = False, note: str | None = None) -> None:
+    """Error lines for an --arch value the core table does not know."""
+    from simdref.perf_sources.cores import supported_core_ids
+
+    if bold:
+        err_console.print(
+            f"[bold red]arch {raw!r} is not in the local catalog.[/bold red]", style="red"
+        )
+    else:
+        err_console.print(f"arch {raw!r} is not in the local catalog.", style="red")
+    err_console.print(f"supported cores: {', '.join(supported_core_ids())}", style="yellow")
+    if note:
+        err_console.print(note, style="dim")
+
+
 def _print_non_interactive_summary(
     query: str,
     *,
@@ -1010,16 +1025,13 @@ def _print_non_interactive_summary(
         _fmt_num,
         fmt_arch_latency,
     )
-    from simdref.perf_sources.cores import canonical_core_id, supported_core_ids
+    from simdref.perf_sources.cores import canonical_core_id
     from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
 
-    canonical_arch: str | None = None
-    if arch is not None:
-        canonical_arch = canonical_core_id(arch)
-        if canonical_arch is None:
-            err_console.print(f"arch {arch!r} is not in the local catalog.", style="red")
-            err_console.print(f"supported cores: {', '.join(supported_core_ids())}", style="yellow")
-            return 1
+    canonical_arch = canonical_core_id(arch) if arch is not None else None
+    if arch is not None and canonical_arch is None:
+        _print_unknown_arch(arch)
+        return 1
 
     if records is None:
         records = _find_instructions_fast(query)
@@ -1206,19 +1218,14 @@ def annotate(
     ensure_runtime()
 
     if arch is not None:
-        from simdref.perf_sources.cores import canonical_core_id, supported_core_ids
+        from simdref.perf_sources.cores import canonical_core_id
 
         canonical = canonical_core_id(arch)
         if canonical is None:
-            supported = ", ".join(supported_core_ids())
-            err_console.print(
-                f"[bold red]arch {arch!r} is not in the local catalog.[/bold red]",
-                style="red",
-            )
-            err_console.print(f"supported cores: {supported}", style="yellow")
-            err_console.print(
-                "x86 (Skylake/Sapphire Rapids/Zen) perf ingest is tracked as a separate issue.",
-                style="dim",
+            _print_unknown_arch(
+                arch,
+                bold=True,
+                note="x86 (Skylake/Sapphire Rapids/Zen) perf ingest is tracked as a separate issue.",
             )
             raise typer.Exit(code=1)
         arch = canonical
@@ -1986,56 +1993,33 @@ def _emit_filtered_names(
     from simdref.display import isa_family as _isa_family
 
     glob_pat = pattern
+    glob_fold = pattern.casefold()
     isa_set = {f.strip() for f in (isa or []) if f and f.strip()}
+    rows = [
+        ("intrinsic", row["name"], None, row["isa"], row["category"])
+        for row in conn.execute(
+            "SELECT name, isa, category FROM intrinsics_data ORDER BY name"
+        ).fetchall()
+    ]
+    rows += [
+        ("instruction", row["key"], row["db_key"], row["isa"], row["category"])
+        for row in conn.execute(
+            "SELECT key, db_key, isa, category FROM instructions_data ORDER BY key"
+        ).fetchall()
+    ]
     emitted = 0
-
-    intrinsic_rows = conn.execute(
-        "SELECT name, isa, category FROM intrinsics_data ORDER BY name"
-    ).fetchall()
-    for row in intrinsic_rows:
-        name = row["name"]
-        if not fnmatch.fnmatchcase(name, glob_pat) and not fnmatch.fnmatch(
-            name.casefold(), glob_pat.casefold()
-        ):
+    for kind, name, alt, isa_str, category in rows:
+        hit = fnmatch.fnmatchcase(name, glob_pat) or fnmatch.fnmatch(name.casefold(), glob_fold)
+        if not hit and alt is not None:
+            hit = fnmatch.fnmatchcase(alt, glob_pat)
+        if not hit:
             continue
-        isas = [s.strip() for s in (row["isa"] or "").split(",") if s.strip()]
-        if isa_set:
-            families = {_isa_family(s) for s in isas}
-            if not families & isa_set:
-                continue
+        isas = [s.strip() for s in (isa_str or "").split(",") if s.strip()]
+        if isa_set and not {_isa_family(s) for s in isas} & isa_set:
+            continue
         typer.echo(
             json.dumps(
-                {"name": name, "kind": "intrinsic", "isa": isas, "category": row["category"] or ""},
-                sort_keys=True,
-            )
-        )
-        emitted += 1
-
-    instruction_rows = conn.execute(
-        "SELECT key, db_key, isa, category FROM instructions_data ORDER BY key"
-    ).fetchall()
-    for row in instruction_rows:
-        key = row["key"]
-        db_key = row["db_key"]
-        if (
-            not fnmatch.fnmatchcase(key, glob_pat)
-            and not fnmatch.fnmatch(key.casefold(), glob_pat.casefold())
-            and not fnmatch.fnmatchcase(db_key, glob_pat)
-        ):
-            continue
-        isas = [s.strip() for s in (row["isa"] or "").split(",") if s.strip()]
-        if isa_set:
-            families = {_isa_family(s) for s in isas}
-            if not families & isa_set:
-                continue
-        typer.echo(
-            json.dumps(
-                {
-                    "name": key,
-                    "kind": "instruction",
-                    "isa": isas,
-                    "category": row["category"] or "",
-                },
+                {"name": name, "kind": kind, "isa": isas, "category": category or ""},
                 sort_keys=True,
             )
         )

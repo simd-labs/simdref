@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from simdref.models import InstructionRecord
-from simdref.perf_sources.cores import CANONICAL_CORES, CoreSpec
+from simdref.perf_sources.cores import CANONICAL_CORES, CoreSpec, perf_architecture
 from simdref.perf_sources.merge import PerfRow, fmt_cycles
 
 LLVM_MCA_MIN_VERSION: int = 18  # JSON output stabilised in LLVM 18.
@@ -127,7 +127,7 @@ def parse_llvm_mca_json(
         source="llvm-mca",
         source_kind="modeled",
         source_version=mca_version,
-        architecture="arm" if core.architecture == "aarch64" else core.architecture,
+        architecture=perf_architecture(core.architecture),
         latency=str(latency) if latency is not None else "",
         cpi=cpi,
         applies_to="mnemonic",
