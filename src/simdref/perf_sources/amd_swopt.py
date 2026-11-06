@@ -44,7 +44,7 @@ from typing import Any, Iterable
 import xml.etree.ElementTree as ET
 
 from simdref.perf_sources.cores import canonical_core_id
-from simdref.perf_sources.merge import SOURCE_AMD_SWOPT, PerfRow
+from simdref.perf_sources.merge import SOURCE_AMD_SWOPT, PerfRow, cpi_for, ipc_value
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_VENDOR_DIR = _REPO_ROOT / "vendor" / "amd_swopt"
@@ -258,17 +258,8 @@ def form_classes(form: str) -> tuple[frozenset[str], ...]:
         operand = operand.strip()
         if not operand:
             continue
-        # Trailing width alternatives take the family of the first token:
-        # "reg8/16/32" reads as "reg8/reg16/reg32".
-        widen = re.fullmatch(r"([a-z\[\]_]*[a-z_\]])(\d+)((?:/\d+)+)", operand)
-        if widen:
-            alts = [
-                f"{widen.group(1)}{w}" for w in [widen.group(2), *widen.group(3)[1:].split("/")]
-            ]
-        else:
-            alts = operand.split("/")
         allowed: set[str] = set()
-        for alt in alts:
+        for alt in _operand_alts(operand):
             allowed |= _vendor_alt_classes(alt)
         out.append(frozenset(allowed))
     return tuple(out)
@@ -280,14 +271,46 @@ def _cpi(throughput: str) -> str:
     Ranges ("0.25-0.5"), "variable" and "?" give an empty string; the raw
     text stays in ``amd_ops_per_cycle``.
     """
-    try:
-        ops = float(throughput)
-    except ValueError:
+    ipc = ipc_value(throughput)
+    if ipc is None or ipc <= 0:
         return ""
-    if ops <= 0:
-        return ""
-    cpi = 1 / ops
-    return f"{cpi:.3f}".rstrip("0").rstrip(".")
+    return cpi_for(ipc)
+
+
+def _row(
+    mnemonic: str,
+    form: str,
+    core: str,
+    source_version: str,
+    citation_url: str,
+    latency: str,
+    throughput: str,
+    cpuid: str,
+    *,
+    source: str = SOURCE_AMD_SWOPT,
+    source_kind: str = _SOURCE_KIND,
+    architecture: str = "x86",
+) -> PerfRow:
+    """One perf row for a workbook line, raw values kept verbatim."""
+    measurement: dict[str, str] = {}
+    if cpuid:
+        measurement[CPUID_KEY] = cpuid
+    if throughput:
+        measurement[THROUGHPUT_KEY] = throughput
+    return PerfRow(
+        mnemonic=mnemonic,
+        core=core,
+        source=source,
+        source_kind=source_kind,
+        source_version=source_version,
+        architecture=architecture,
+        form=form,
+        latency=latency,
+        cpi=_cpi(throughput),
+        citation_url=citation_url,
+        extra_measurement=measurement,
+        form_classes=form_classes(form),
+    )
 
 
 def parse_workbook(
@@ -336,26 +359,16 @@ def parse_workbook(
             form = cell(row, form_at)
         else:
             form = ",".join(_clean(row[i]) for i in operand_at if i < len(row) and _clean(row[i]))
-        measurement = {}
-        cpuid = cell(row, cpuid_at)
-        if cpuid:
-            measurement[CPUID_KEY] = cpuid
-        if throughput:
-            measurement[THROUGHPUT_KEY] = throughput
         parsed.append(
-            PerfRow(
-                mnemonic=mnemonic,
-                core=canonical,
-                source=SOURCE_AMD_SWOPT,
-                source_kind=_SOURCE_KIND,
-                source_version=source_version,
-                architecture="x86",
-                form=form,
-                latency=latency,
-                cpi=_cpi(throughput),
-                citation_url=citation_url,
-                extra_measurement=measurement,
-                form_classes=form_classes(form),
+            _row(
+                mnemonic,
+                form,
+                canonical,
+                source_version,
+                citation_url,
+                latency,
+                throughput,
+                cell(row, cpuid_at),
             )
         )
         stats.kept += 1
@@ -404,25 +417,19 @@ def load_vendored(path: Path | str | None = None) -> list[PerfRow]:
     for file in sorted(vendor_dir.glob("*.json")):
         data = json.loads(file.read_text(encoding="utf-8"))
         for raw in data["rows"]:
-            measurement = {}
-            if raw.get(CPUID_KEY):
-                measurement[CPUID_KEY] = raw[CPUID_KEY]
-            if raw.get(THROUGHPUT_KEY):
-                measurement[THROUGHPUT_KEY] = raw[THROUGHPUT_KEY]
             rows.append(
-                PerfRow(
-                    mnemonic=raw["mnemonic"],
-                    core=data["core"],
+                _row(
+                    raw["mnemonic"],
+                    raw.get("form", ""),
+                    data["core"],
+                    data["source_version"],
+                    data["citation_url"],
+                    raw.get("latency", ""),
+                    raw.get(THROUGHPUT_KEY, ""),
+                    raw.get(CPUID_KEY, ""),
                     source=data["source"],
                     source_kind=data["source_kind"],
-                    source_version=data["source_version"],
                     architecture=data.get("architecture", "x86"),
-                    form=raw.get("form", ""),
-                    latency=raw.get("latency", ""),
-                    cpi=_cpi(raw.get(THROUGHPUT_KEY, "")),
-                    citation_url=data["citation_url"],
-                    extra_measurement=measurement,
-                    form_classes=form_classes(raw.get("form", "")),
                 )
             )
     return rows
@@ -491,8 +498,8 @@ _IMM = ("2", "0x1234", "0x12345678")
 
 
 def _operand_alts(operand: str) -> list[str]:
-    # Same tokenization as form_classes: trailing width alternatives take
-    # the family of the first token ("reg8/16/32" reads "reg8/reg16/reg32").
+    # Trailing width alternatives take the family of the first token:
+    # "reg8/16/32" reads as "reg8/reg16/reg32".
     widen = re.fullmatch(r"([a-z\[\]_]*[a-z_\]])(\d+)((?:/\d+)+)", operand)
     if widen:
         return [f"{widen.group(1)}{w}" for w in [widen.group(2), *widen.group(3)[1:].split("/")]]

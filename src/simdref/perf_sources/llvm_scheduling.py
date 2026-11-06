@@ -25,8 +25,9 @@ from simdref.perf_sources.llvm_mca import (
     LLVM_MCA_CITATION,
     LLVMMcaError,
     LLVMMcaUnavailable,
+    mca_command,
 )
-from simdref.perf_sources.merge import PerfRow
+from simdref.perf_sources.merge import PerfRow, fmt_cycles
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CACHE_ROOT = _REPO_ROOT / "vendor" / "perf-cache"
@@ -232,22 +233,6 @@ def _run_disassemble(hex_lines: list[str], core: CoreSpec, *, executable: str) -
     return proc.stdout
 
 
-def _mca_command(core: CoreSpec, executable: str) -> list[str]:
-    return [
-        executable,
-        "--instruction-tables=full",
-        "--json",
-        # llvm-exegesis legally emits encodings that are architecturally
-        # "unpredictable" (LDP with Rt2==Rt, writeback with base in
-        # destination, etc.). llvm-mca refuses to schedule them by default
-        # — skip them so a handful of exotic corner cases don't fail the
-        # whole core.
-        "--skip-unsupported-instructions=any",
-        f"--mtriple={core.llvm_triple}",
-        f"--mcpu={core.llvm_cpu}",
-    ]
-
-
 def _try_mca_once(
     asm_text: str, core: CoreSpec, executable: str, timeout: float
 ) -> tuple[int, str, str]:
@@ -255,7 +240,7 @@ def _try_mca_once(
     _require(executable)
     try:
         proc = subprocess.run(
-            _mca_command(core, executable),
+            mca_command(core, executable),
             input=asm_text,
             check=False,
             capture_output=True,
@@ -511,7 +496,7 @@ def _build_perf_rows(
         rthroughput = info.get("RThroughput")
         cpi = ""
         if isinstance(rthroughput, (int, float)):
-            cpi = f"{float(rthroughput):.3f}".rstrip("0").rstrip(".")
+            cpi = fmt_cycles(rthroughput)
         extra: dict[str, str] = {}
         num_uops = info.get("NumMicroOpcodes")
         if isinstance(num_uops, (int, float)) and num_uops > 0:

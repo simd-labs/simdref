@@ -26,7 +26,7 @@ from typing import Any, Iterable
 
 from simdref.models import InstructionRecord
 from simdref.perf_sources.cores import CANONICAL_CORES, CoreSpec
-from simdref.perf_sources.merge import PerfRow
+from simdref.perf_sources.merge import PerfRow, fmt_cycles
 
 LLVM_MCA_MIN_VERSION: int = 18  # JSON output stabilised in LLVM 18.
 LLVM_MCA_CITATION = "https://llvm.org/docs/CommandGuide/llvm-mca.html"
@@ -120,7 +120,7 @@ def parse_llvm_mca_json(
             rthroughput = 1.0 / float(ipc)
     cpi = ""
     if isinstance(rthroughput, (int, float)):
-        cpi = f"{float(rthroughput):.3f}".rstrip("0").rstrip(".")
+        cpi = fmt_cycles(float(rthroughput))
     return PerfRow(
         mnemonic=mnemonic,
         core=core.canonical_id,
@@ -177,19 +177,31 @@ _RISCV_ASM_FORMS: tuple[str, ...] = (
 )
 
 
-def _mca_json(
-    asm: str, core: CoreSpec, *, executable: str, timeout: float = 15.0
-) -> dict[str, Any] | None:
-    """Run llvm-mca on one asm line. ``None`` when it rejects or crashes."""
+def mca_command(core: CoreSpec, executable: str, *, mattr: str | None = None) -> list[str]:
+    """Base llvm-mca flags for one asm run; *mattr* adds an opt-in -mattr."""
     cmd = [
         executable,
         "--instruction-tables=full",
         "--json",
+        # llvm-exegesis legitimately emits encodings that are architecturally
+        # "unpredictable" (LDP with Rt2==Rt, writeback with the base in the
+        # destination, etc.). llvm-mca refuses to schedule these by default
+        # — skip them so a small number of special corner cases don't fail
+        # the whole core.
         "--skip-unsupported-instructions=any",
         f"--mtriple={core.llvm_triple}",
         f"--mcpu={core.llvm_cpu}",
-        f"-mattr={_RISCV_MATTR}",
     ]
+    if mattr is not None:
+        cmd.append(f"-mattr={mattr}")
+    return cmd
+
+
+def _mca_json(
+    asm: str, core: CoreSpec, *, executable: str, timeout: float = 15.0
+) -> dict[str, Any] | None:
+    """Run llvm-mca on one asm line. ``None`` when it rejects or crashes."""
+    cmd = mca_command(core, executable, mattr=_RISCV_MATTR)
     try:
         proc = subprocess.run(
             cmd,

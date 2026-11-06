@@ -25,7 +25,6 @@ rebuilds ``vendor/intel_guide/*.json`` from a raw extract of the bundle
 from __future__ import annotations
 
 import json
-import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
@@ -69,12 +68,59 @@ _CPU_RANK = {name: rank for rank, name in enumerate(_CPU_PREFERENCE)}
 if any(canonical_core_id(core) != core for core in _CPU_CORE.values()):
     raise RuntimeError("_CPU_CORE holds a non-canonical core id")
 
-_FORM_RE = re.compile(r'"(?P<key>[^"]+)":\[\s*(?P<rows>.*?)\]', re.S)
-_ROW_RE = re.compile(r'\{"(?P<cpu>[^"]+)":\{l:"(?P<l>[^"]*)",t:"(?P<t>[^"]*)"\}\}')
 
-# shortcut: perf2.js is machine-generated with fixed quoting (no escapes,
-# field order always l then t), so two regexes suffice; upgrade to a real
-# JS parser if a future release adds escaping or reorders the fields.
+def _perf_entries(text: str):
+    """Yield ``(form_key, cpu, latency, throughput)`` for each perf2.js row.
+
+    shortcut: perf2.js is machine-generated, one row per line with fixed
+    quoting (no escapes, fields always l then t), so a line scan replaces
+    the two regexes this used to be; upgrade to a real JS parser if a
+    future release adds escaping or reorders the fields.
+    """
+    current: str | None = None
+    for line in text.splitlines():
+        s = line.strip()
+        if s.endswith('":['):
+            current = s[1:-3]
+            continue
+        if current is None or not s.startswith('{"'):
+            continue
+        cp_close = s.find('"', 2)
+        if cp_close < 2:
+            continue
+        cpu = s[2:cp_close]
+        l_at = s.find('l:"', cp_close)
+        if l_at < 0:
+            continue
+        l_open = l_at + 3
+        l_close = s.find('"', l_open)
+        t_at = s.find('t:"', l_close)
+        if t_at < 0:
+            continue
+        t_open = t_at + 3
+        t_close = s.find('"', t_open)
+        if t_close < 0:
+            continue
+        yield current, cpu, s[l_open:l_close], s[t_open:t_close]
+
+
+def _row(
+    mnemonic: str, form: str, core: str, source_version: str, latency: str, cpi: str
+) -> PerfRow:
+    """One form-scoped perf row from the guide's per-core table."""
+    return PerfRow(
+        mnemonic=mnemonic,
+        form=form,
+        core=core,
+        source=SOURCE_INTEL_GUIDE,
+        source_kind="modeled",
+        source_version=source_version,
+        architecture="x86",
+        latency=latency,
+        cpi=cpi,
+        applies_to="form",
+        citation_url=CITATION_URL,
+    )
 
 
 @dataclass(frozen=True)
@@ -100,37 +146,23 @@ def parse_perf_js(text: str) -> IntelGuideParse:
     kept: list[PerfRow] = []
     seen: Counter[str] = Counter()
     kept_label: Counter[str] = Counter()
-    for form_match in _FORM_RE.finditer(text):
-        key = form_match.group("key")
+    # form key -> canonical core -> (cpu label, latency, throughput); the
+    # label that sorts first in _CPU_PREFERENCE wins a two-label collision.
+    per_form: dict[str, dict[str, tuple[str, str, str]]] = {}
+    for key, cpu, latency, cpi in _perf_entries(text):
+        seen[cpu] += 1
+        core = _CPU_CORE.get(cpu)
+        if core is None:
+            continue
+        per_core = per_form.setdefault(key, {})
+        existing = per_core.get(core)
+        if existing is None or _CPU_RANK[cpu] < _CPU_RANK[existing[0]]:
+            per_core[core] = (cpu, latency, cpi)
+    for key, per_core in per_form.items():
         mnemonic = _mnemonic(key)
-        # canonical core -> (cpu label, latency, throughput) for this form
-        per_core: dict[str, tuple[str, str, str]] = {}
-        for row_match in _ROW_RE.finditer(form_match.group("rows")):
-            cpu, latency, cpi = row_match.group("cpu", "l", "t")
-            seen[cpu] += 1
-            core = _CPU_CORE.get(cpu)
-            if core is None:
-                continue
-            existing = per_core.get(core)
-            if existing is None or _CPU_RANK[cpu] < _CPU_RANK[existing[0]]:
-                per_core[core] = (cpu, latency, cpi)
         for core, (cpu, latency, cpi) in per_core.items():
             kept_label[cpu] += 1
-            kept.append(
-                PerfRow(
-                    mnemonic=mnemonic,
-                    form=key,
-                    core=core,
-                    source=SOURCE_INTEL_GUIDE,
-                    source_kind="modeled",
-                    source_version=SOURCE_VERSION,
-                    architecture="x86",
-                    latency=latency,
-                    cpi=cpi,
-                    applies_to="form",
-                    citation_url=CITATION_URL,
-                )
-            )
+            kept.append(_row(mnemonic, key, core, SOURCE_VERSION, latency, cpi))
     dropped = {label: count - kept_label[label] for label, count in seen.items()}
     return IntelGuideParse(rows=kept, dropped=dropped)
 
@@ -156,18 +188,13 @@ def load_vendored(path: str | Path | None = None) -> list[PerfRow]:
         payload = json.loads(file.read_text())
         for entry in payload["rows"]:
             rows.append(
-                PerfRow(
-                    mnemonic=entry["mnemonic"],
-                    form=entry["form"],
-                    core=payload["core"],
-                    source=SOURCE_INTEL_GUIDE,
-                    source_kind="modeled",
-                    source_version=payload["source_version"],
-                    architecture="x86",
-                    latency=entry["latency"],
-                    cpi=entry["cpi"],
-                    applies_to="form",
-                    citation_url=CITATION_URL,
+                _row(
+                    entry["mnemonic"],
+                    entry["form"],
+                    payload["core"],
+                    payload["source_version"],
+                    entry["latency"],
+                    entry["cpi"],
                 )
             )
     return rows

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+from fractions import Fraction
 from functools import lru_cache
 import re
 from typing import Any, Iterable
 
 from simdref.models import InstructionRecord
+from simdref.tablecols import mixed_number, strip_footnote
 
 # Perf-source ids, best first. When several sources give perf for one
 # instruction form on one core, the catalog keeps exactly one value: the
@@ -58,6 +60,26 @@ _MODELED_SOURCES = frozenset(
 def source_kind_for(source: str | None) -> str:
     """``"measured"`` or ``"modeled"`` for one perf-source id."""
     return "modeled" if (source or SOURCE_UOPS_INFO) in _MODELED_SOURCES else "measured"
+
+
+def fmt_cycles(value: float) -> str:
+    """CPI text: three decimals with trailing zeros and the point dropped."""
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def ipc_value(raw: str) -> Fraction | None:
+    """Parse an ops-per-cycle cell (footnote, mixed number or plain number)."""
+    raw = strip_footnote(raw)
+    mixed = mixed_number(raw)
+    try:
+        return mixed if mixed is not None else Fraction(raw)
+    except ValueError:
+        return None
+
+
+def cpi_for(ipc: Fraction) -> str:
+    """Invert ops-per-cycle into the cycles-per-instruction text."""
+    return fmt_cycles(float(1 / ipc))
 
 
 # One provenance key per merged field, written only when the value comes

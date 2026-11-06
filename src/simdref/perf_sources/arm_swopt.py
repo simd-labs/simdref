@@ -31,12 +31,11 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from fractions import Fraction
 from pathlib import Path
 
 from simdref.perf_sources.cores import canonical_core_id
-from simdref.perf_sources.merge import SOURCE_ARM_SWOPT, PerfRow
-from simdref.tablecols import mixed_number, row_tail, strip_footnote, word_spans
+from simdref.perf_sources.merge import SOURCE_ARM_SWOPT, PerfRow, cpi_for, ipc_value
+from simdref.tablecols import row_tail, strip_footnote, word_spans
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_VENDOR_DIR = _REPO_ROOT / "vendor" / "arm_swopt"
@@ -270,19 +269,10 @@ def _clean_num(raw: str) -> str:
 
 def _cpi(throughput: str) -> str:
     """Invert the throughput (instructions per cycle) to cycles per instruction."""
-    raw = _clean_num(throughput)
-    mixed = mixed_number(raw)
-    try:
-        if mixed is not None:
-            ipc = mixed
-        else:
-            ipc = Fraction(raw)
-    except ValueError:
+    ipc = ipc_value(throughput)
+    if ipc is None:
         return ""  # ranges such as "1/4 to 1/2" stay in extra_measurement
-    cpi = 1 / ipc
-    if cpi == cpi.numerator // cpi.denominator:
-        return str(cpi.numerator // cpi.denominator)
-    return f"{float(cpi):.3f}".rstrip("0").rstrip(".")
+    return cpi_for(ipc)
 
 
 def perf_rows(groups: list[dict], cpu: str) -> tuple[list[PerfRow], int]:
