@@ -17,7 +17,7 @@ from simdref.display import (
     display_instruction_form,
     instruction_markdown,
     measurement_rows,
-    print_instruction_mapping,
+    print_mapping,
     render_instruction,
 )
 from simdref.export import _detail_chunks, _search_instructions, _web_measurements
@@ -73,7 +73,7 @@ class TemplateTokenGuardTests(unittest.TestCase):
             isa=["NEON"],
         )
         with console.capture() as capture:
-            print_instruction_mapping(_catalog(record), intrinsic)
+            print_mapping("instruction", _catalog(record), intrinsic)
         output = capture.get()
         self.assertNotIn("<T_FMUL_HSD>", output)
         self.assertIn("FMUL", output)

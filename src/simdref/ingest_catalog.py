@@ -17,7 +17,7 @@ from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.catkey import build_key, parse_key, split_isa_parts, substitute_placeholders
-from simdref.display import _LEADING_INSTR_TAG_RE, strip_instruction_decorators
+from simdref.display import strip_instruction_decorators, strip_leading_tags
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
@@ -1094,7 +1094,7 @@ def _normalize_uops_form(form: str) -> str:
     APX-first variant never shadows the ordinary row.
     """
     head, sep, tail = form.partition(" ")
-    head = _LEADING_INSTR_TAG_RE.sub("", head)
+    head = strip_leading_tags(head)
     index = head.rfind("_")
     suffix = head[index + 1 :] if index >= 0 else ""
     if 2 <= len(suffix) <= 4 and all(c in "0123456789ABCDEF" for c in suffix):
@@ -1245,7 +1245,7 @@ def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], 
             assignments[node_index] = partitions[0][0].db_key
         for record, node_raw_form, node_indices in partitions[1:]:
             head, sep, tail = node_raw_form.partition(" ")
-            candidate = f"{_LEADING_INSTR_TAG_RE.sub('', head)}{sep}{tail}".strip()
+            candidate = f"{strip_leading_tags(head)}{sep}{tail}".strip()
             if not candidate or replace(record, form=candidate).db_key in used_keys:
                 candidate = f"{record.form} [{record.metadata.get('iform', '')}]"
             while replace(record, form=candidate).db_key in used_keys:

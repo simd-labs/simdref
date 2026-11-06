@@ -8,7 +8,6 @@ delegate to these functions for all Rich-based output.
 
 from __future__ import annotations
 
-import re
 import urllib.parse
 from typing import TYPE_CHECKING
 
@@ -176,14 +175,6 @@ X86_BASE_ISAS: frozenset[str] = frozenset(
 )
 
 # ---------------------------------------------------------------------------
-# Compiled patterns (simple helpers avoid regex where possible)
-# ---------------------------------------------------------------------------
-
-# Matches display-only instruction decorators like ``{evex}``, ``{load}``,
-# ``{disp8}``, etc. at the beginning of a form/mnemonic.
-_LEADING_INSTR_TAG_RE = re.compile(r"^(?:\s*\{[^}]+\}\s*)+")
-
-# ---------------------------------------------------------------------------
 # Microarchitecture helpers
 # ---------------------------------------------------------------------------
 
@@ -303,15 +294,23 @@ def _column_width_budget(
 # ---------------------------------------------------------------------------
 
 
+def strip_leading_tags(text: str) -> str:
+    """Remove the leading display-only ``{tag}`` decorators from a form."""
+    i = 0
+    while True:
+        j = i
+        while j < len(text) and text[j].isspace():
+            j += 1
+        k = text.find("}", j + 1)
+        if text[j : j + 1] != "{" or k <= j + 1:
+            # a matched run also eats the whitespace after its last tag
+            return text[j:] if i else text
+        i = k + 1
+
+
 def strip_instruction_decorators(text: str) -> str:
     """Remove display-only leading decorators and EVEX suffix markers."""
-    result = text or ""
-    while True:
-        stripped = _LEADING_INSTR_TAG_RE.sub("", result, count=1)
-        if stripped == result:
-            break
-        result = stripped
-    return result.replace("_EVEX", "").strip()
+    return strip_leading_tags(text or "").replace("_EVEX", "").strip()
 
 
 def display_isa(values: list[str]) -> str:
@@ -544,9 +543,32 @@ def _latency_pair_hover_lines(item) -> list[str]:
     return [f"**lat pairs ({core}).** {text}"]
 
 
+_MD_MARKDOWN_CHARS = frozenset("\\`*_[]<>|#~")
+
+
 def _md_escape(text: str) -> str:
     """Show Markdown control characters in catalog text as literal text."""
-    return re.sub(r"([\\`*_\[\]<>|#~])", r"\\\1", text)
+    return "".join(f"\\{ch}" if ch in _MD_MARKDOWN_CHARS else ch for ch in text)
+
+
+def _split_paragraphs(text: str) -> list[str]:
+    """Split at each blank-line separator: newline, spaces, closing newline."""
+    parts: list[str] = []
+    start = i = 0
+    while i < len(text):
+        if text[i] == "\n":
+            j = i + 1
+            while j < len(text) and text[j].isspace():
+                j += 1
+            # greedy close: the last newline of the whitespace run
+            k = text.rfind("\n", i + 1, j)
+            if k != -1:
+                parts.append(text[start:i])
+                start = i = k + 1
+                continue
+        i += 1
+    parts.append(text[start:])
+    return parts
 
 
 def _section_markdown(title: str, body: str) -> str:
@@ -554,7 +576,7 @@ def _section_markdown(title: str, body: str) -> str:
     lang = _CODE_SECTION_LANG.get(title)
     if lang:
         return f"## {title}\n\n```{lang}\n{body.strip()}\n```"
-    paragraphs = re.split(r"\n\s*\n", body.strip())
+    paragraphs = _split_paragraphs(body.strip())
     text = "\n\n".join(
         "\\\n".join(_md_escape(line.strip()) for line in para.splitlines()) for para in paragraphs
     )
@@ -608,7 +630,7 @@ def instruction_query_text(item) -> str:
         form = form[len(item.mnemonic) :].strip()
     if form.startswith("(") and form.endswith(")"):
         form = form[1:-1]
-    tokens = [t for t in re.split(r"[\s,()]+", form) if t]
+    tokens = "".join(" " if ch in ",()" else ch for ch in form).split()
     return " ".join([name, *tokens]).strip()
 
 
@@ -642,13 +664,20 @@ def normalize_instruction_query(value: str) -> str:
 
 def natural_query_sort_key(value: str) -> tuple[object, ...]:
     """Sort key that orders numbers numerically within text."""
-    parts = re.findall(r"[A-Za-z]+|\d+", value.casefold())
     key: list[object] = []
-    for part in parts:
-        if part.isdigit():
-            key.append((1, int(part)))
-        else:
-            key.append((0, part))
+    text = value.casefold()
+    i = 0
+    while i < len(text):
+        j = i + 1
+        if "a" <= text[i] <= "z":
+            while j < len(text) and "a" <= text[j] <= "z":
+                j += 1
+            key.append((0, text[i:j]))
+        elif text[i].isdecimal():
+            while j < len(text) and text[j].isdecimal():
+                j += 1
+            key.append((1, int(text[i:j])))
+        i = j
     return tuple(key)
 
 
@@ -952,54 +981,49 @@ def print_operand_block(item) -> None:
     console.print(Panel(table, title="operands", border_style="blue"))
 
 
-def print_instruction_mapping(catalog, intrinsic, conn=None) -> None:
-    """Show which instructions implement a given intrinsic."""
-    linked = linked_instruction_records(catalog, intrinsic, conn=conn)
-    if not linked:
+def print_mapping(kind, catalog, item, conn=None) -> None:
+    """Show which instructions implement an intrinsic, or which intrinsics use an instruction."""
+    if kind == "instruction":
+        rows = [
+            (
+                display_instruction_form(instr.key),
+                display_architecture(instr.architecture),
+                instr.summary or "-",
+                ", ".join(instr.isa) or "-",
+            )
+            for instr in linked_instruction_records(catalog, item, conn=conn)
+        ]
+    else:
+        from simdref.storage import load_intrinsic_from_db
+        from simdref.search import find_intrinsic
+
+        rows = []
+        for name in item.linked_intrinsics:
+            intrinsic = (
+                load_intrinsic_from_db(conn, name)
+                if conn is not None
+                else find_intrinsic(catalog, name)
+            )
+            if intrinsic is None:
+                rows.append((name, "-", "-", "-"))
+                continue
+            rows.append(
+                (
+                    intrinsic.signature or intrinsic.name,
+                    display_architecture(intrinsic.architecture),
+                    intrinsic.description or "-",
+                    ", ".join(intrinsic.isa) or "-",
+                )
+            )
+    if not rows:
         return
     table = Table(header_style="bold cyan")
-    table.add_column("instruction", style="cyan")
+    table.add_column(kind, style="cyan")
     table.add_column("arch", width=6)
     table.add_column("summary")
     table.add_column("isa", width=12)
-    for instr in linked:
-        table.add_row(
-            display_instruction_form(instr.key),
-            display_architecture(instr.architecture),
-            instr.summary or "-",
-            ", ".join(instr.isa) or "-",
-        )
-    console.print(table)
-
-
-def print_intrinsic_mapping(catalog, item, conn=None, find_intrinsic_fn=None) -> None:
-    """Show which intrinsics use a given instruction."""
-    if not item.linked_intrinsics:
-        return
-    from simdref.storage import load_intrinsic_from_db
-    from simdref.search import find_intrinsic as _find_intrinsic
-
-    find_fn = find_intrinsic_fn or _find_intrinsic
-    table = Table(header_style="bold cyan")
-    table.add_column("intrinsic", style="cyan")
-    table.add_column("arch", width=6)
-    table.add_column("summary")
-    table.add_column("isa", width=12)
-    for intrinsic_name in item.linked_intrinsics:
-        intrinsic = (
-            load_intrinsic_from_db(conn, intrinsic_name)
-            if conn is not None
-            else find_fn(catalog, intrinsic_name)
-        )
-        if intrinsic is None:
-            table.add_row(intrinsic_name, "-", "-", "-")
-            continue
-        table.add_row(
-            intrinsic.signature or intrinsic.name,
-            display_architecture(intrinsic.architecture),
-            intrinsic.description or "-",
-            ", ".join(intrinsic.isa) or "-",
-        )
+    for row in rows:
+        table.add_row(*row)
     console.print(table)
 
 
@@ -1204,7 +1228,7 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
         print_description_sections(primary.description, full=full)
     if linked:
         console.print(Rule("intrinsic to instruction mapping", style="cyan"))
-        print_instruction_mapping(catalog, item, conn=conn)
+        print_mapping("instruction", catalog, item, conn=conn)
         console.print(
             Rule(f"instruction details: {display_instruction_title(primary)}", style="magenta")
         )
@@ -1238,7 +1262,7 @@ def render_instruction_sections(
     if not short and item.description:
         print_description_sections(item.description, full=full)
     console.print(Rule("instruction to intrinsic mapping", style="cyan"))
-    print_intrinsic_mapping(catalog, item, conn=conn)
+    print_mapping("intrinsic", catalog, item, conn=conn)
     print_operand_block(item)
     print_perf_tables(measurement_rows(item))
     print_latency_pair_tables(item)
