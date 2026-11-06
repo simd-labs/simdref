@@ -14,7 +14,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-from typing import TYPE_CHECKING
 
 _PROFILE = os.environ.get("SIMDREF_PROFILE") == "1"
 
@@ -117,7 +116,6 @@ from simdref.display import (
     DEFAULT_SUBS,
     FAMILY_SUB_ORDER,
     ISA_FAMILY_ORDER,
-    canonical_url,
     category_display_text,
     display_isa,
     display_instruction_form,
@@ -139,7 +137,6 @@ from simdref.perf import record_iclass, variant_perf_summary
 from simdref.queries import linked_instruction_records
 from simdref.search import SearchResult
 from simdref.storage import (
-    SQLITE_PATH,
     load_instruction_from_db,
     load_intrinsic_from_db,
     open_db,
@@ -193,6 +190,46 @@ def _normalize_sub_isa_selection(
     if not normalized or normalized == visible_subs:
         return None
     return normalized
+
+
+def _lru_order(order: list, key: object) -> None:
+    """Move *key* to the end of *order* (no-op when absent)."""
+    try:
+        order.remove(key)
+    except ValueError:
+        pass
+    order.append(key)
+
+
+def _lru_evict(cache: dict, order: list, cap: int) -> None:
+    """Drop least-recently-used keys past *cap* from *cache* and *order*."""
+    while len(order) > cap:
+        evict = order.pop(0)
+        cache.pop(evict, None)
+
+
+# Native clipboard commands per direction: (wayland, x11, macos).
+# The Wayland or X11 tools are tried first, in table order; the macOS tool
+# always runs last.
+_CLIPBOARD_TOOLS = {
+    "write": (
+        ["wl-copy"],
+        [["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]],
+        ["pbcopy"],
+    ),
+    "read": (
+        ["wl-paste"],
+        [["xclip", "-selection", "clipboard", "-o"], ["xsel", "--clipboard", "--output"]],
+        ["pbpaste"],
+    ),
+}
+
+
+def _clipboard_commands(direction: str) -> list[list[str]]:
+    """Ordered native clipboard commands for *direction* ('write' or 'read')."""
+    wayland, x11, macos = _CLIPBOARD_TOOLS[direction]
+    primary = [wayland] if os.environ.get("WAYLAND_DISPLAY") else x11
+    return [*primary, macos]
 
 
 # ---------------------------------------------------------------------------
@@ -334,52 +371,38 @@ def _fts_search(
     # filter drops non-matching rows before they reach Python.
     isa_filter_clause = f" AND {isa_like_sql}" if isa_like_sql else ""
 
-    def _query_intrinsic_rows(expr: str) -> list[sqlite3.Row]:
+    def _query_rows(expr: str, sqls: tuple[str, ...], key: str) -> list[sqlite3.Row]:
+        """Fetch rows via *sqls* (first success wins), doubling the fetch
+        limit until enough ISA-visible rows are found or the cap is hit."""
         rows: list[sqlite3.Row] = []
         fetch_limit = max((offset + limit) * 2, 60)
         while fetch_limit <= 5000:
-            for sql in (
-                f"SELECT name, summary, description, isa FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
-                f"SELECT name, description, isa FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
-            ):
+            for sql in sqls:
                 try:
                     rows = conn.execute(sql, (expr, *isa_like_params, fetch_limit)).fetchall()
                     break
                 except sqlite3.OperationalError:
                     continue
             visible = sum(
-                1 for row in rows if row["name"] not in seen and _isa_visible(row["isa"] or "")
+                1 for row in rows if row[key] not in seen and _isa_visible(row["isa"] or "")
             )
             if visible >= _target_candidate_count() or len(rows) < fetch_limit:
                 return rows
             fetch_limit *= 2
         return rows
 
-    def _query_instruction_rows(expr: str) -> list[sqlite3.Row]:
-        rows: list[sqlite3.Row] = []
-        fetch_limit = max((offset + limit) * 2, 60)
-        while fetch_limit <= 5000:
-            try:
-                rows = conn.execute(
-                    f"""
-                    SELECT instructions_data.db_key, instructions_fts.key, instructions_fts.summary, instructions_fts.isa
-                    FROM instructions_fts
-                    JOIN instructions_data ON instructions_data.rowid = instructions_fts.rowid
-                    WHERE instructions_fts MATCH ?{isa_filter_clause.replace("REPLACE(isa,", "REPLACE(instructions_fts.isa,")}
-                    ORDER BY rank
-                    LIMIT ?
-                    """,
-                    (expr, *isa_like_params, fetch_limit),
-                ).fetchall()
-            except sqlite3.OperationalError:
-                return rows
-            visible = sum(
-                1 for row in rows if row["db_key"] not in seen and _isa_visible(row["isa"] or "")
-            )
-            if visible >= _target_candidate_count() or len(rows) < fetch_limit:
-                return rows
-            fetch_limit *= 2
-        return rows
+    intrinsic_sqls = (
+        f"SELECT name, summary, description, isa FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
+        f"SELECT name, description, isa FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
+    )
+    instruction_sql = f"""
+        SELECT instructions_data.db_key, instructions_fts.key, instructions_fts.summary, instructions_fts.isa
+        FROM instructions_fts
+        JOIN instructions_data ON instructions_data.rowid = instructions_fts.rowid
+        WHERE instructions_fts MATCH ?{isa_filter_clause.replace("REPLACE(isa,", "REPLACE(instructions_fts.isa,")}
+        ORDER BY rank
+        LIMIT ?
+        """
 
     # Search name columns first (precise), then broaden to all columns.
     # The name-only query uses {name name_tokens} column filter which
@@ -388,7 +411,7 @@ def _fts_search(
     want_intrinsic = enabled_kinds is None or "intrinsic" in enabled_kinds
     want_instruction = enabled_kinds is None or "instruction" in enabled_kinds
     for expr in search_exprs:
-        rows = _query_intrinsic_rows(expr) if want_intrinsic else []
+        rows = _query_rows(expr, intrinsic_sqls, "name") if want_intrinsic else []
         for row in rows:
             if row["name"] in seen or not _isa_visible(row["isa"] or ""):
                 continue
@@ -405,7 +428,7 @@ def _fts_search(
             )
             candidates.append((_name_match_score(row["name"], terms) + intrinsic_bias, result))
 
-        irows = _query_instruction_rows(expr) if want_instruction else []
+        irows = _query_rows(expr, (instruction_sql,), "db_key") if want_instruction else []
         for row in irows:
             if row["db_key"] in seen or not _isa_visible(row["isa"] or ""):
                 continue
@@ -491,23 +514,8 @@ class _AnnSplitter(Static):
     def on_key(self, event: events.Key) -> None:  # pragma: no cover - UI wiring
         if event.key in ("left", "right"):
             delta = -0.05 if event.key == "left" else 0.05
-            parent = self.parent
-            parent_region = getattr(parent, "region", None) if parent is not None else None
-            width = parent_region.width if parent_region else 60
-            if width <= 0:
-                return
-            # Nudge by a % step, independent of current position — the App
-            # clamps the new ratio.
-            current_fraction = None
-            try:
-                sibling = parent.query_one("#ann-input") if parent else None
-                cw = sibling.region.width if sibling and sibling.region else None
-                if cw is not None and width > 0:
-                    current_fraction = cw / width
-            except Exception:
-                current_fraction = None
-            new_ratio = (current_fraction if current_fraction is not None else 0.33) + delta
-            self.post_message(self.Moved(new_ratio))
+            # Nudge from the App's stored ratio; the App clamps the result.
+            self.post_message(self.Moved(self.app._ann_split_ratio + delta))
             event.stop()
 
 
@@ -641,36 +649,17 @@ class ResultItem(ListItem):
     """A search result list item carrying the underlying SearchResult.
 
     Row format (single line, plus a dim summary on a second line): the
-    mnemonic/name on the left, then a right-aligned ``kind · arch · ISA · perf``
-    strip. Perf slots (``lat``/``tput``) are emitted only when present —
-    missing values are not rendered as "—" (prevents noise on Arm/RISC-V
-    rows where perf is usually absent).
+    mnemonic/name on the left, then a right-aligned dim ``kind`` chip.
     """
 
     def __init__(self, result: SearchResult, index: int) -> None:
         self.result = result
         title_color = "cyan" if result.kind == "intrinsic" else "magenta"
         subtitle = (result.subtitle or "").split("\n")[0]
-        # Right-side chips. ``arch`` / ``isa`` come off the SearchResult
-        # if present; perf only if non-empty / non-placeholder.
-        chips: list[str] = [f"[dim]{result.kind}[/]"]
-        arch = getattr(result, "architecture", "") or getattr(result, "arch", "")
-        if arch:
-            chips.append(f"[dim]{arch}[/]")
-        isa = getattr(result, "isa_display", "") or ""
-        if isa:
-            chips.append(f"[dim]{isa}[/]")
-        lat = getattr(result, "lat", "") or ""
-        cpi = getattr(result, "cpi", "") or ""
-        if lat and lat != "-":
-            chips.append(f"[yellow]lat {lat}c[/]")
-        if cpi and cpi != "-":
-            chips.append(f"[yellow]tput {cpi}[/]")
-        right = "  ".join(chips)
         head = f"[dim]{index:>2}[/] [{title_color} bold]{result.title}[/]"
         if subtitle:
             head = f"{head}  [dim italic]{subtitle}[/]"
-        head = f"{head}    {right}"
+        head = f"{head}    [dim]{result.kind}[/]"
         super().__init__(Static(head, markup=True))
 
 
@@ -999,7 +988,6 @@ class SimdrefApp(App):
         self._initial_view = initial_view if initial_view in ("search", "annotate") else "search"
         self._initial_asm = initial_asm
         self._annotate_debounce_timer = None  # textual Timer, set in on_mount
-        self._annotate_last_text: str = ""
         self._ann_split_ratio: float = 0.33  # fraction of width for input pane
         self._current_results: list[SearchResult] = []
         self._current_query: str = ""
@@ -1014,7 +1002,6 @@ class SimdrefApp(App):
         self._enabled_sub_isas: set[str] | None = initial_subs if initial_subs else None
         self._current_detail: IntrinsicRecord | InstructionRecord | None = None
         self._current_detail_token: int = 0
-        self._batch_toggle = False
         # LRU caches keyed by (kind, key) so arrow-key navigation through
         # results hits cache instead of re-loading + re-building.
         self._detail_cache: dict[tuple[str, str], IntrinsicRecord | InstructionRecord] = {}
@@ -1025,7 +1012,6 @@ class SimdrefApp(App):
         # Map family -> list of sub-ISA names present in the DB
         self._family_subs: dict[str, list[str]] = {}
         self._enabled_kinds: set[str] = {"intrinsic", "instruction"}
-        self._enabled_arm_arch: set[str] | None = None
         self._ann_local_clipboard_valid = False
         # Cached frozensets of filter state passed to _fts_search; cleared
         # whenever a toggle changes. Avoids rebuilding sets per keystroke.
@@ -1325,9 +1311,7 @@ class SimdrefApp(App):
             toggles = list(self.query(IsaToggle))
             target = not any(t.enabled for t in toggles)
             for t in toggles:
-                t.enabled = target
-                t.remove_class("enabled" if not target else "disabled")
-                t.add_class("enabled" if target else "disabled")
+                t.set_enabled(target)
             self._enabled_families = {t.family for t in toggles if t.enabled}
             if target:
                 # Add defaults for all families
@@ -1351,9 +1335,7 @@ class SimdrefApp(App):
                 return
             target = not any(t.enabled for t in toggles)
             for t in toggles:
-                t.enabled = target
-                t.remove_class("enabled" if not target else "disabled")
-                t.add_class("enabled" if target else "disabled")
+                t.set_enabled(target)
             # Rebuild enabled_sub_isas from all visible toggles
             all_subs = list(self.query(SubIsaToggle))
             enabled = {t.isa for t in all_subs if t.enabled}
@@ -1365,13 +1347,8 @@ class SimdrefApp(App):
         if query:
             self._do_search(query)
 
-    def _apply_initial_preset(self, name: str) -> None:
-        """Apply a named preset before first render (used for --preset CLI flag)."""
-        from simdref.filters import ARCH_PRESETS
-
-        preset = ARCH_PRESETS.get(name)
-        if preset is None:
-            return
+    def _apply_preset(self, name: str, preset) -> None:
+        """Set the family, sub-ISA and kind state from a named preset."""
         if name == "all":
             self._enabled_families = set(_ISA_FAMILIES)
             self._enabled_sub_isas = None
@@ -1383,15 +1360,23 @@ class SimdrefApp(App):
                 available = set(self._family_subs.get(fam, []))
                 subs.update(available & preset_subs)
             self._enabled_sub_isas = subs if subs else set()
-        self._enabled_arm_arch = set(preset.arm_arch) if preset.arm_arch else None
         self._enabled_kinds = set(preset.kind)
         self._enabled_sub_isas = _normalize_sub_isa_selection(
             self._enabled_families, self._enabled_sub_isas, self._family_subs
         )
 
+    def _apply_initial_preset(self, name: str) -> None:
+        """Apply a named preset before first render (used for --preset CLI flag)."""
+        from simdref.filters import ARCH_PRESETS
+
+        preset = ARCH_PRESETS.get(name)
+        if preset is None:
+            return
+        self._apply_preset(name, preset)
+
     @on(PresetButton.Clicked)
     def on_preset_clicked(self, event: PresetButton.Clicked) -> None:
-        """Apply ISA presets — families + subs + arm_arch + kind in one step.
+        """Apply ISA presets — families + subs + kind in one step.
 
         Also persist the choice so the next ``isa`` launch lands on the same
         preset (see ``_save_last_preset`` in ``cli.py``).
@@ -1406,34 +1391,13 @@ class SimdrefApp(App):
             pass  # best-effort; must not break preset application
 
         preset = ARCH_PRESETS.get(event.mode) or ARCH_PRESETS["default"]
-        if event.mode == "all":
-            self._enabled_families = set(_ISA_FAMILIES)
-            self._enabled_sub_isas = None
-        else:
-            self._enabled_families = {f for f in _ISA_FAMILIES if f in preset.families}
-            preset_subs = set(preset.subs)
-            subs: set[str] = set()
-            for fam in self._enabled_families:
-                available = set(self._family_subs.get(fam, []))
-                subs.update(available & preset_subs)
-            self._enabled_sub_isas = subs if subs else set()
-        self._enabled_arm_arch = set(preset.arm_arch) if preset.arm_arch else None
-        self._enabled_kinds = set(preset.kind)
-        self._enabled_sub_isas = _normalize_sub_isa_selection(
-            self._enabled_families, self._enabled_sub_isas, self._family_subs
-        )
+        self._apply_preset(event.mode, preset)
         # Update ISA toggle visuals
         for t in self.query(IsaToggle):
-            target = t.family in self._enabled_families
-            t.enabled = target
-            t.remove_class("enabled" if not target else "disabled")
-            t.add_class("enabled" if target else "disabled")
+            t.set_enabled(t.family in self._enabled_families)
         # Reflect kind toggle state.
         for t in self.query(KindToggle):
-            target = t.kind in self._enabled_kinds
-            t.enabled = target
-            t.remove_class("enabled" if not target else "disabled")
-            t.add_class("enabled" if target else "disabled")
+            t.set_enabled(t.kind in self._enabled_kinds)
         self._refresh_sub_isa_bar()
         query = self.query_one("#search-input", Input).value.strip()
         if query:
@@ -1590,11 +1554,7 @@ class SimdrefApp(App):
         cache_key = (kind, key)
         cached = self._detail_cache.get(cache_key)
         if cached is not None:
-            try:
-                self._detail_cache_order.remove(cache_key)
-            except ValueError:
-                pass
-            self._detail_cache_order.append(cache_key)
+            _lru_order(self._detail_cache_order, cache_key)
             return cached
         record = (
             load_intrinsic_from_db(conn, key)
@@ -1603,10 +1563,8 @@ class SimdrefApp(App):
         )
         if record is not None:
             self._detail_cache[cache_key] = record
-            self._detail_cache_order.append(cache_key)
-            while len(self._detail_cache_order) > self._detail_cache_cap:
-                evict = self._detail_cache_order.pop(0)
-                self._detail_cache.pop(evict, None)
+            _lru_order(self._detail_cache_order, cache_key)
+            _lru_evict(self._detail_cache, self._detail_cache_order, self._detail_cache_cap)
         return record
 
     def _get_render_payload(
@@ -1625,11 +1583,7 @@ class SimdrefApp(App):
         cache_key = (kind, key)
         cached = self._render_cache.get(cache_key)
         if cached is not None:
-            try:
-                self._render_cache_order.remove(cache_key)
-            except ValueError:
-                pass
-            self._render_cache_order.append(cache_key)
+            _lru_order(self._render_cache_order, cache_key)
             return cached
         record = self._get_detail_record(kind, key, conn=conn)
         if record is None:
@@ -1640,10 +1594,8 @@ class SimdrefApp(App):
             else self._build_instruction_payload(record)
         )
         self._render_cache[cache_key] = payload
-        self._render_cache_order.append(cache_key)
-        while len(self._render_cache_order) > self._detail_cache_cap:
-            evict = self._render_cache_order.pop(0)
-            self._render_cache.pop(evict, None)
+        _lru_order(self._render_cache_order, cache_key)
+        _lru_evict(self._render_cache, self._render_cache_order, self._detail_cache_cap)
         return payload
 
     def _mount_payload(self, container, payload: list[tuple]) -> None:
@@ -1678,11 +1630,7 @@ class SimdrefApp(App):
         cached_payload = self._render_cache.get(cache_key)
         cached_record = self._detail_cache.get(cache_key)
         if cached_payload is not None and cached_record is not None:
-            try:
-                self._render_cache_order.remove(cache_key)
-            except ValueError:
-                pass
-            self._render_cache_order.append(cache_key)
+            _lru_order(self._render_cache_order, cache_key)
             self._current_detail = cached_record
             self._mount_payload(detail, cached_payload)
             return
@@ -1965,31 +1913,14 @@ class SimdrefApp(App):
 
     def _write_system_clipboard(self, text: str) -> bool:
         """Best-effort write to the OS clipboard using native tools."""
-        prefer_wayland = bool(os.environ.get("WAYLAND_DISPLAY"))
-        commands: list[list[str]] = []
-        if prefer_wayland:
-            commands.append(["wl-copy"])
-        else:
-            commands.extend(
-                [
-                    ["xclip", "-selection", "clipboard"],
-                    ["xsel", "--clipboard", "--input"],
-                ]
-            )
-        commands.append(["pbcopy"])
-        for cmd in commands:
+        for cmd in _clipboard_commands("write"):
             if shutil.which(cmd[0]):
                 try:
                     subprocess.run(cmd, input=text.encode(), check=True, timeout=5)
                     return True
                 except (subprocess.SubprocessError, OSError):
                     continue
-        if prefer_wayland and self._qt_write_system_clipboard(text):
-            return True
-        if not prefer_wayland:
-            if self._qt_write_system_clipboard(text):
-                return True
-        return False
+        return self._qt_write_system_clipboard(text)
 
     def copy_to_clipboard(self, text: str) -> None:  # type: ignore[override]
         """Update Textual's local clipboard and mirror it to the OS clipboard."""
@@ -2257,7 +2188,6 @@ class SimdrefApp(App):
         except Exception:
             return
         text = getattr(ta, "text", "") or ""
-        self._annotate_last_text = text
         if not text.strip():
             out.update("")
             status.update("")
@@ -2335,16 +2265,6 @@ class SimdrefApp(App):
         if self._current_tab() != "annotate":
             return
         self._apply_ann_split(self._ann_split_ratio + float(delta))
-
-    def action_ann_paste_clipboard(self) -> None:
-        """Explicit paste action for callers that want to trigger paste."""
-        if self._current_tab() != "annotate":
-            self._set_tab("annotate")
-        try:
-            ta = self.query_one("#ann-input", _AnnInput)
-        except Exception:
-            return
-        ta.action_paste()
 
     def action_focus_search(self) -> None:
         if self._current_tab() != "search":
@@ -2461,24 +2381,12 @@ class SimdrefApp(App):
         return proc.returncode == 0
 
     def _read_system_clipboard(self) -> str | None:
-        """Read system clipboard via the first available paste tool.
+        """Read the system clipboard via the first available tool.
 
         On Wayland, avoid xclip/xsel as the primary source because they often
-        see only the X11 clipboard. Prefer wl-clipboard or a Qt backend there.
+        see only the X11 clipboard. The Qt backend is the last resort.
         """
-        prefer_wayland = bool(os.environ.get("WAYLAND_DISPLAY"))
-        commands: list[list[str]] = []
-        if prefer_wayland:
-            commands.append(["wl-paste"])
-        else:
-            commands.extend(
-                [
-                    ["xclip", "-selection", "clipboard", "-o"],
-                    ["xsel", "--clipboard", "--output"],
-                ]
-            )
-        commands.append(["pbpaste"])
-        for cmd in commands:
+        for cmd in _clipboard_commands("read"):
             if not shutil.which(cmd[0]):
                 continue
             try:
@@ -2486,15 +2394,7 @@ class SimdrefApp(App):
             except (subprocess.SubprocessError, OSError):
                 continue
             return proc.stdout.decode(errors="replace")
-        if prefer_wayland:
-            text = self._qt_read_system_clipboard()
-            if text is not None:
-                return text
-        else:
-            text = self._qt_read_system_clipboard()
-            if text is not None:
-                return text
-        return None
+        return self._qt_read_system_clipboard()
 
     @work(thread=True)
     def _run_update(self) -> None:
