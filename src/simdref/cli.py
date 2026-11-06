@@ -76,7 +76,7 @@ from simdref.manpages import write_manpages
 from simdref import perf
 from simdref.perf import variant_perf_summary
 from simdref.queries import (
-    instruction_rows_for_intrinsic,
+    instruction_rows_for_intrinsic_indexed,
     intrinsic_perf_summary_runtime,
     linked_instruction_records,
 )
@@ -783,7 +783,9 @@ def _resolve_query_payload(catalog, query: str, limit: int = 8) -> dict:
             "mode": "exact",
             "match_kind": "intrinsic",
             "intrinsic": asdict(intrinsic),
-            "performance": instruction_rows_for_intrinsic(catalog, intrinsic),
+            "performance": instruction_rows_for_intrinsic_indexed(
+                linked_instruction_records(catalog, intrinsic)
+            ),
             **_catalog_meta(catalog),
         }
     instructions = find_instructions(catalog, query)

@@ -15,8 +15,6 @@ from simdref.perf import record_iclass, variant_perf_summary
 from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, source_kind_for
 from simdref.storage import load_instruction_from_db
 
-SOURCE_KINDS: tuple[str, ...] = ("measured", "modeled", "any")
-
 
 def filter_arch_details_by_source_kind(
     arch_details: dict[str, dict[str, object]],
@@ -92,9 +90,8 @@ def build_intrinsic_instruction_index(
 ) -> dict[str, list[InstructionRecord]]:
     """Invert ``catalog.instructions`` into an ``intrinsic name → instructions`` map.
 
-    One linear pass replaces the quadratic per-intrinsic scan performed by
-    :func:`instruction_rows_for_intrinsic`, turning ``O(intrinsics × instructions)``
-    into ``O(intrinsics + instructions)``.
+    One linear pass replaces per-intrinsic scans of the instruction list,
+    turning ``O(intrinsics × instructions)`` into ``O(intrinsics + instructions)``.
     """
     index: dict[str, list[InstructionRecord]] = {}
     for instruction in catalog.instructions:
@@ -130,63 +127,8 @@ def _rows_from_linked_instructions(
 def instruction_rows_for_intrinsic_indexed(
     linked: list[InstructionRecord],
 ) -> list[dict]:
-    """Variant of :func:`instruction_rows_for_intrinsic` that takes a prebuilt list."""
+    """Build per-microarchitecture metric rows from a prebuilt linked list."""
     return _rows_from_linked_instructions(linked)
-
-
-def instruction_rows_for_intrinsic(
-    catalog: Catalog,
-    intrinsic: IntrinsicRecord,
-) -> list[dict]:
-    """Build per-microarchitecture metric rows for an intrinsic's linked instructions.
-
-    Returns a list of dicts with keys ``instruction``, ``uarch``, and
-    whatever metric columns the instruction exposes (``latency``,
-    ``throughput``, ``uops``, ``ports``).
-    """
-    rows: list[dict] = []
-    for instruction in catalog.instructions:
-        if intrinsic.name not in instruction.linked_intrinsics:
-            continue
-        if instruction.metrics:
-            for arch, values in sorted(instruction.metrics.items()):
-                row = {"instruction": instruction.key, "uarch": arch}
-                row.update(values)
-                rows.append(row)
-        else:
-            rows.append(
-                {
-                    "instruction": instruction.key,
-                    "uarch": "-",
-                    "latency": "-",
-                    "throughput": "-",
-                    "uops": "-",
-                    "ports": "-",
-                }
-            )
-    return rows
-
-
-def intrinsic_perf_summary(
-    catalog: Catalog,
-    intrinsic: IntrinsicRecord,
-) -> tuple[str, str]:
-    """Return ``(best_latency, best_cpi)`` across all linked instruction variants.
-
-    Scans every instruction linked to *intrinsic* in the in-memory catalog.
-    """
-    from simdref.perf import best_numeric
-
-    linked = linked_instruction_records(catalog, intrinsic)
-    latencies: list[str] = []
-    throughput: list[str] = []
-    for item in linked:
-        lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
-        if lat != "-":
-            latencies.append(lat)
-        if cpi != "-":
-            throughput.append(cpi)
-    return best_numeric(latencies), best_numeric(throughput)
 
 
 def intrinsic_perf_summary_runtime(
@@ -194,28 +136,12 @@ def intrinsic_perf_summary_runtime(
     intrinsic: IntrinsicRecord,
     instruction_map: dict[str, object],
 ) -> tuple[str, str]:
-    """Like :func:`intrinsic_perf_summary` but uses DB + a mutable cache.
+    """Return ``(best_latency, best_cpi)`` across linked instruction variants.
 
     Resolves linked instructions via *instruction_map* (populated during
     search) and falls back to ``load_instruction_from_db`` for cache misses.
     """
-    from simdref.perf import best_numeric
-
-    ref_keys = [
-        ref.get("key", "").strip()
-        for ref in intrinsic.instruction_refs
-        if isinstance(ref, dict) and ref.get("key", "").strip()
-    ]
-    linked: list[InstructionRecord] = []
-    keys = ref_keys or intrinsic.instructions
-    for key in keys:
-        instruction = instruction_map.get(key)
-        if instruction is None:
-            instruction = load_instruction_from_db(conn, key)
-            if instruction is not None:
-                instruction_map[key] = instruction
-        if instruction is not None:
-            linked.append(instruction)
+    linked = linked_instruction_records(None, intrinsic, conn, cache=instruction_map)
     if not linked:
         return "-", "-"
     perf_pairs = [

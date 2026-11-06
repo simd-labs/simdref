@@ -13,7 +13,10 @@ from simdref.display import (
     instruction_variant_items,
     strip_instruction_decorators,
 )
-from simdref.queries import instruction_rows_for_intrinsic
+from simdref.queries import (
+    instruction_rows_for_intrinsic_indexed,
+    linked_instruction_records,
+)
 from simdref.ingest import (
     _instruction_summary,
     _normalize_operand_xtype,
@@ -153,7 +156,9 @@ class SearchTests(unittest.TestCase):
     def test_intrinsic_performance_rows(self):
         catalog = build_fixture_catalog()
         intrinsic = find_intrinsic(catalog, "_mm_add_ps")
-        rows = instruction_rows_for_intrinsic(catalog, intrinsic)
+        rows = instruction_rows_for_intrinsic_indexed(
+            linked_instruction_records(catalog, intrinsic)
+        )
         self.assertTrue(any(row["uarch"] == "SKL" for row in rows))
 
     def test_normalize_operand_xtype(self):
