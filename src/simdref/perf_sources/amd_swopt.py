@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import zipfile
 from dataclasses import dataclass, field
@@ -130,9 +129,11 @@ class ParseStats:
 
 
 def _column_index(cell_ref: str) -> int:
-    letters = re.match(r"[A-Z]+", cell_ref).group(0)
+    i = 0
+    while "A" <= cell_ref[i : i + 1] <= "Z":
+        i += 1
     n = 0
-    for ch in letters:
+    for ch in cell_ref[:i]:
         n = n * 26 + ord(ch) - 64
     return n - 1
 
@@ -187,6 +188,12 @@ def _data_sheet_rows(path: Path) -> list[list[str]]:
     raise ValueError(f"no instruction table sheet found in {path}")
 
 
+def _op_column(name: str) -> bool:
+    # "Op1" .. "Op9" name operand columns in the workbooks without an
+    # "Instruction Operands" column.
+    return len(name) == 3 and name[:2] == "op" and name[2].isdecimal()
+
+
 def _header_columns(header: list[str], name: str) -> list[int]:
     # The later workbooks add columns (masking operand, opmask), so the
     # column positions come from the header text, not from fixed offsets.
@@ -203,50 +210,81 @@ def _clean(text: str) -> str:
 # wildcard class: it matches the record class with its digits stripped
 # (``gpr*`` takes gpr8 through gpr64 and the unknown width, ``mem*`` every
 # memory form). See merge._form_class_match.
+def _num_tail(token: str, name: str) -> str | None:
+    # "xmm2" is *name* plus a digit run; the bare name counts as no digits.
+    if token == name:
+        return ""
+    if token.startswith(name) and token[len(name) :].isdecimal():
+        return token[len(name) :]
+    return None
+
+
+def _width_alts(tail: str) -> list[str]:
+    # "32/64" and "32/reg64" both name the widths 32 and 64.
+    out: list[str] = []
+    for i, part in enumerate(tail.split("/")):
+        if i:
+            for pfx in ("reg", "r"):
+                num = _num_tail(part, pfx)
+                if num is not None:
+                    part = num
+                    break
+        if not part.isdecimal():
+            return []
+        out.append(part)
+    return out
+
+
 def _vendor_alt_classes(alt: str) -> frozenset[str]:
     # One ``/`` alternative of one workbook operand ("mem128{k0}", "reg32").
-    a = alt.strip().casefold().split(" ", 1)[0]
-    a = re.sub(r"\{.*$", "", a).strip("<>_`")
-    if re.fullmatch(r"xmm\d*|x|s", a):
-        return frozenset({"xmm"})
-    if re.fullmatch(r"ymm\d*|y", a):
-        return frozenset({"ymm"})
-    if re.fullmatch(r"zmm\d*|z", a):
-        return frozenset({"zmm"})
+    a = alt.strip().casefold().split(" ", 1)[0].partition("{")[0].strip("<>_`")
+    single = {"x": "xmm", "s": "xmm", "y": "ymm", "z": "zmm"}
+    if a in single:
+        return frozenset({single[a]})
+    for name, cls in (("xmm", "xmm"), ("ymm", "ymm"), ("zmm", "zmm"), ("mmx", "mmx"), ("k", "k")):
+        if _num_tail(a, name) is not None:
+            return frozenset({cls})
     if a == "xy":
         return frozenset({"xmm", "ymm"})
     if a == "xyz":
         return frozenset({"xmm", "ymm", "zmm"})
     if a == "yz":
         return frozenset({"ymm", "zmm"})
-    if re.fullmatch(r"mmx\d*", a):
-        return frozenset({"mmx"})
-    if re.fullmatch(r"k\d*", a):
-        return frozenset({"k"})
     if a == "sti":
         return frozenset({"x87"})
     if a == "xi":
         return frozenset({"xmm", "imm*"})
     if a == "cl":
         return frozenset({"gpr8"})
-    regs = re.fullmatch(r"(?:\[)?r(?:eg)?((?:\d+(?:/(?:r(?:eg)?)?\d+)*)?)(?:\])?", a)
     if a in ("reg", "r", "g", "gx"):
         return frozenset({"gpr*"})
-    if regs and regs.group(1):
-        return frozenset(f"gpr{w}" for w in re.findall(r"\d+", regs.group(1)))
+    core = a[1:] if a.startswith("[") else a
+    if core.endswith("]"):
+        core = core[:-1]
+    for pfx in ("reg", "r"):
+        if core.startswith(pfx):
+            widths = _width_alts(core[len(pfx) :])
+            if widths:
+                return frozenset(f"gpr{w}" for w in widths)
+            break
     if a in ("i", "imm"):
         return frozenset({"imm*"})
     if a in ("m", "mi", "mem", "vm32x"):
         return frozenset({"mem*"})
-    widths = re.fullmatch(r"(?:mem)?(?:em)?(\d+)(?:bcst)?(?:/(\d+))?", a)
-    if a.startswith(("mem", "memem")) and widths:
-        found = [w for w in widths.groups() if w]
-        return frozenset(f"mem{w}" for w in found)
-    imms = re.fullmatch(r"imm(\d+(?:/\d+)*)", a)
-    if imms:
-        return frozenset(
-            re.findall(r"imm\d+", "imm" + imms.group(1).replace("/", "/imm"))
-        ) | frozenset({"imm0"})
+    if a.startswith("mem"):
+        body = a[3:]
+        if body.startswith("em"):
+            body = body[2:]
+        first, slash, second = body.partition("/")
+        if first.endswith("bcst"):
+            first = first[:-4]
+        if first.isdecimal() and (not slash or second.isdecimal()):
+            found = [first] + ([second] if slash else [])
+            return frozenset(f"mem{w}" for w in found)
+    if a.startswith("imm"):
+        parts = a[3:].split("/")
+        if all(p.isdecimal() for p in parts):
+            return frozenset(f"imm{p}" for p in parts) | frozenset({"imm0"})
     return frozenset({"other"})
 
 
@@ -335,7 +373,7 @@ def parse_workbook(
     throughput_at = _header_columns(header, "throughput")
     cpuid_at = _header_columns(header, "cpuid")
     form_at = _header_columns(header, "instruction operands")
-    operand_at = [i for i, cell in enumerate(header) if re.fullmatch(r"op\d", _norm(cell))]
+    operand_at = [i for i, cell in enumerate(header) if _op_column(_norm(cell))]
 
     def cell(row: list[str], indices: list[int]) -> str:
         return _clean(row[indices[0]]) if indices and indices[0] < len(row) else ""
@@ -500,28 +538,44 @@ _IMM = ("2", "0x1234", "0x12345678")
 def _operand_alts(operand: str) -> list[str]:
     # Trailing width alternatives take the family of the first token:
     # "reg8/16/32" reads as "reg8/reg16/reg32".
-    widen = re.fullmatch(r"([a-z\[\]_]*[a-z_\]])(\d+)((?:/\d+)+)", operand)
+    alts = operand.split("/")
+    head = alts[0]
+    i = len(head)
+    while i and head[i - 1].isdecimal():
+        i -= 1
+    prefix, width = head[:i], head[i:]
+    widen = (
+        len(alts) > 1
+        and width.isdecimal()
+        and all(w.isdecimal() for w in alts[1:])
+        and prefix
+        and all(ch in "abcdefghijklmnopqrstuvwxyz[]_" for ch in prefix)
+        and not prefix.endswith("[")
+    )
     if widen:
-        return [f"{widen.group(1)}{w}" for w in [widen.group(2), *widen.group(3)[1:].split("/")]]
-    return operand.split("/")
+        return [prefix + w for w in [width, *alts[1:]]]
+    return alts
 
 
 def _alt_token(alt: str) -> str:
     # ``{k1}`` mask and ``{z}`` suffixes and the workbook's quote/bracket
     # artifacts carry no operand meaning.
-    return re.sub(r"\{.*$", "", alt).strip().strip("'`_<>")
+    return alt.partition("{")[0].strip().strip("'`_<>")
 
 
 def _alt_width(alt: str) -> int | None:
     a = _alt_token(alt)
     if a in _SHAPES:
         return {"x": 128, "y": 256, "z": 512}.get(a[-1], 512)
-    reg = re.fullmatch(r"(?:xmm|ymm|zmm)(\d+)?", a, re.IGNORECASE)
-    if reg:
-        return {"xmm": 128, "ymm": 256, "zmm": 512}[a.lower()[:3]]
-    mem = re.fullmatch(r"mem(?:em)?(\d+)(?:bcst)?", a)
-    if mem:
-        return int(mem.group(1))
+    for name, width in (("xmm", 128), ("ymm", 256), ("zmm", 512)):
+        if _num_tail(a.lower(), name) is not None:
+            return width
+    if a.startswith("mem"):
+        rest = a[5:] if a.startswith("memem") else a[3:]
+        if rest.endswith("bcst"):
+            rest = rest[:-4]
+        if rest.isdecimal():
+            return int(rest)
     return None
 
 
@@ -546,30 +600,35 @@ def _alt_lines(alt: str, pos: int, op_width: int) -> list[str]:
         return [f"mm{n}", _IMM[0]]  # MMX register or immediate
     if a == "xi":
         return [f"xmm{n}", _IMM[0]]  # xmm register or immediate
-    reg = re.fullmatch(r"(xmm|ymm|zmm|mmx|mm)(\d+)?", a, re.IGNORECASE)
-    if reg:
-        family = reg.group(1).lower()
-        family = "mm" if family == "mmx" else family
-        num = reg.group(2) or str(n)
-        return [f"{family}{num}"]
-    fixed = re.fullmatch(r"(?:\[)?r(?:eg)?(\d+)(?:\])?", a)
-    if fixed:
-        return [_GPR_NAME[int(fixed.group(1))]]
-    if re.fullmatch(r"(?:\[)?(?:r|reg|g|gx)(?:\])?", a):
+    low = a.lower()
+    for family in ("xmm", "ymm", "zmm", "mmx", "mm"):
+        num = _num_tail(low, family)
+        if num is not None:
+            family = "mm" if family == "mmx" else family
+            return [f"{family}{num or str(n)}"]
+    core = a[1:] if a.startswith("[") else a
+    if core.endswith("]"):
+        core = core[:-1]
+    if core in ("r", "reg", "g", "gx"):
         return [_GPR_NAME[w] for w in (8, 16, 32, 64)]
-    imm = re.fullmatch(r"imm(\d+)?", a, re.IGNORECASE)
-    if imm:
-        if imm.group(1) == "8":
+    for pfx in ("reg", "r"):
+        num = _num_tail(core, pfx)
+        if num:
+            return [_GPR_NAME[int(num)]]
+    num = _num_tail(low, "imm")
+    if num is not None:
+        if num == "8":
             return [_IMM[0]]
-        if imm.group(1) == "16":
+        if num == "16":
             return [_IMM[1]]
-        if imm.group(1) is None:  # a bare imm names every immediate width
+        if not num:  # a bare imm names every immediate width
             return list(_IMM)
         return [_IMM[2]]
     if a == "i":
         return list(_IMM)
-    if re.fullmatch(r"k(\d+)?", a, re.IGNORECASE):
-        return ["k" + (re.fullmatch(r"k(\d+)?", a, re.IGNORECASE).group(1) or str(n))]
+    num = _num_tail(low, "k")
+    if num is not None:
+        return ["k" + (num or str(n))]
     if a in ("m", "mem"):
         return [f"{_MEM_SIZE[w]} ptr [rax]" for w in (8, 16, 32, 64, 80, 128, 256, 512)]
     if a == "vm32x":  # VSIB memory; the index register width follows the form
@@ -578,14 +637,14 @@ def _alt_lines(alt: str, pos: int, op_width: int) -> list[str]:
         return ["qword ptr [rax + rcx*2 + 0x12345678]"]
     if a == "mem (simple addressing)":
         return ["qword ptr [rax]"]
-    bcst = re.fullmatch(r"mem(\d+)bcst", a)
-    if bcst:
-        width = int(bcst.group(1))
+    if a.startswith("mem") and a.endswith("bcst") and a[3:-4].isdecimal():
+        width = int(a[3:-4])
         factor = max(op_width // width, 1)
         return [f"{_MEM_SIZE[width]} ptr [rax]{{1to{factor}}}"]
-    mem = re.fullmatch(r"mem(?:em)?(\d+)", a)
-    if mem:
-        return [f"{_MEM_SIZE[int(mem.group(1))]} ptr [rax]"]
+    if a.startswith("mem"):
+        rest = a[5:] if a.startswith("memem") else a[3:]
+        if rest.isdecimal():
+            return [f"{_MEM_SIZE[int(rest)]} ptr [rax]"]
     return []
 
 
