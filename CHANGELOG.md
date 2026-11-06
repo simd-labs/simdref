@@ -5,7 +5,7 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.16] - 2026-11-06
+## [0.0.16], 2026-11-06
 
 ### Added
 
@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New core ids: Silvermont (SLM), Ice Lake server (ICX), Neoverse E1 and Neoverse V3AE. The Intel guide "Icelake Xeon" rows now go to ICX.
 - AMD rows carry CPI = 1 / ops-per-cycle next to the raw `amd_ops_per_cycle` value. Intel guide round and SAE note text lands on the intrinsics that cite it.
 - The web export writes `cores.json` with llvm -mcpu names and aliases per simdref CPU key.
+- SMSTART, SMSTOP, GCSPOPM, GCSSS1 and GCSSS2 have their own catalog rows with the target timing. The rows come with this release's data and then after `isa update`.
 
 ### Changed
 
@@ -35,10 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `isa annotate` reads Thumb-2 halfword pairs and long objdump byte columns.
 - Latency shows the operand-path value and the stored range.
 - Arm briefs join rows by `operation_id`, so each summary matches its instruction.
-- `simdref update --build` (the `simdref build` command) writes the version stamp without a TTY.
+- `simdref build` writes the version stamp without a TTY.
 - x86 IN/OUT DX-port forms resolve by register width.
 - Intrinsic man pages show `PERFORMANCE` once.
 - `pip install 'simdref[ingest]'` resolves on PyPy. PyMuPDF installs on CPython only, and pdfplumber covers PDF ingest on PyPy.
+- `simdref build` makes the RISC-V intrinsics bundle from the upstream repos when the upstream `intrinsics.json` is missing.
+- A missing latency or CPI comes from the best source that has it. SME ZA rows keep no borrowed timing. `simdref annotate --arch` shows a warning when the catalog holds no timing data for the pinned arch. The values come with this release's data and then after `isa update`.
+- A RISC-V row with no synopsis shows an empty summary, not the `No synopsis available.` text. `TDPFP16PS` rows show the description of the `_tile_dpfp16ps` intrinsic.
+- Byte identity resolves `stadd`, `pmull2`, GCS, `endbr64`, `endbr32` and the Zvbb, Zvkned and Zfh lines to their rows. A line that no assembler accepts shows no row, not an x86 row.
+- RISC-V compressed rows such as `c.mv` and `c.li` show latency and CPI from `llvm-mca`. The values come with this release's data and then after `isa update`.
 
 ## [0.0.15], 2026-10-31
 
