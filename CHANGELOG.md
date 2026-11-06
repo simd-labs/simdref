@@ -5,40 +5,40 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.0.16] - 2026-11-06
 
 ### Added
 
-- Five perf sources now feed the catalog: Intel Intrinsics Guide perf
-  tables, Intel Optimization Reference Manual volume 2, InstLatX64 dumps,
-  AMD Software Optimization Guide latency workbooks and Arm Neoverse
-  Software Optimization Guides. `perf_sources/merge.py` picks one value
-  per core by source priority.
-- New core ids: Silvermont (SLM), Ice Lake server (ICX), Neoverse E1 and
-  Neoverse V3AE. The Intel guide "Icelake Xeon" rows now go to ICX.
-- AMD rows carry CPI = 1 / ops-per-cycle next to the raw
-  `amd_ops_per_cycle` value, and Intel guide round/SAE note text lands on
-  the intrinsics that reference it.
+- Five perf sources feed the catalog: Intel Intrinsics Guide perf tables, Intel Optimization Reference Manual volume 2, InstLatX64 dumps, AMD Software Optimization Guide latency workbooks and Arm Neoverse Software Optimization Guides. The merge keeps one value per core by source priority.
+- New core ids: Silvermont (SLM), Ice Lake server (ICX), Neoverse E1 and Neoverse V3AE. The Intel guide "Icelake Xeon" rows now go to ICX.
+- AMD rows carry CPI = 1 / ops-per-cycle next to the raw `amd_ops_per_cycle` value. Intel guide round and SAE note text lands on the intrinsics that cite it.
+- The web export writes `cores.json` with llvm -mcpu names and aliases per simdref CPU key.
 
 ### Changed
 
 - Python 3.11 or newer is necessary.
-- `pdfplumber` and `PyMuPDF` moved to the `simdref[ingest]` extra. The
-  plain install covers queries, the LSP and `isa update`. For
-  `simdref build`, run `pip install 'simdref[ingest]'`.
+- `pdfplumber` and `PyMuPDF` moved to the `simdref[ingest]` extra. `simdref build` needs `pip install 'simdref[ingest]'`.
 - All dependencies moved to their latest release.
-- The first-run catalog download prints a progress line on stderr
-  every 5 seconds when stderr is not a terminal (pipes, CI, editor
-  self-install).
+- The first-run catalog download prints a progress line on stderr every 5 seconds when stderr is not a terminal.
+- The validate-release job reads the pinned `data-latest` data tag.
+- The TUI uses the search query classifier, so `mm` and `zv` queries order like the CLI.
+- Non-registers such as `xmm99` show `?` instead of a register class.
+- RISC-V rows carry `operation()` text, full descriptions and YAML extension names.
+- The TUI splitter steps from the stored ratio.
+- `simdref update` shows one progress bar.
+- The Arm brief and RISC-V text changes reach users with this release's data and then after `isa update`.
 
 ### Fixed
 
-- `isa annotate` recognizes objdump lines that carry no byte column when
-  the mnemonic is only hex letters, for example `fadd` and `addb`.
-- `isa annotate` reads an objdump address of only hex letters, for
-  example `b:` and `c:`, as an address, not as a label.
-- `pip install 'simdref[ingest]'` resolves on PyPy. PyMuPDF installs on
-  CPython only, and pdfplumber covers PDF ingest on PyPy.
+- `isa annotate` recognizes objdump lines that carry no byte column when the mnemonic is only hex letters, for example `fadd` and `addb`.
+- `isa annotate` reads an objdump address of only hex letters, for example `b:` and `c:`, as an address, not as a label.
+- `isa annotate` reads Thumb-2 halfword pairs and long objdump byte columns.
+- Latency shows the operand-path value and the stored range.
+- Arm briefs join rows by `operation_id`, so each summary matches its instruction.
+- `simdref update --build` (the `simdref build` command) writes the version stamp without a TTY.
+- x86 IN/OUT DX-port forms resolve by register width.
+- Intrinsic man pages show `PERFORMANCE` once.
+- `pip install 'simdref[ingest]'` resolves on PyPy. PyMuPDF installs on CPython only, and pdfplumber covers PDF ingest on PyPy.
 
 ## [0.0.15], 2026-10-31
 
