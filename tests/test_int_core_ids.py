@@ -29,6 +29,17 @@ class CoreIdTests(unittest.TestCase):
         self.assertEqual(canonical_core_id("neoverse-v3ae"), "neoverse-v3ae")
         self.assertEqual(canonical_core_id("V3AE"), "neoverse-v3ae")
 
+    def test_compact_table_reconstruction(self):
+        """Row rebuild: triple from _TRIPLE, and aliases cover the canonical id."""
+        from simdref.perf_sources.cores import CANONICAL_CORES, _ALIAS_INDEX, _TRIPLE
+
+        for core in CANONICAL_CORES:
+            self.assertEqual(core.llvm_triple, _TRIPLE[core.architecture])
+            self.assertIn(core.canonical_id, core.aliases)
+            self.assertIs(_ALIAS_INDEX[core.canonical_id.casefold()], core)
+            for alias in core.aliases:
+                self.assertIs(_ALIAS_INDEX[alias.casefold()], core)
+
 
 class IntelGuideMappingTests(unittest.TestCase):
     def test_icelake_xeon_rows_map_to_icx(self):
