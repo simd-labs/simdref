@@ -18,6 +18,7 @@ from urllib.parse import quote, urljoin
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.catkey import build_key, parse_key, split_isa_parts, substitute_placeholders
 from simdref.display import strip_instruction_decorators, strip_leading_tags
+from simdref.htmltext import squeeze, strip_html, tidy, unwrap_anchors
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
@@ -587,23 +588,29 @@ def _normalize_arm_intrinsic_name(name: str) -> str:
     return name.strip().replace("[_", "_").replace("]", "")
 
 
+_MD_TAG_RULES = (("tags", ("code", "strong", "em", "span", "p", "div"), ""),)
+
+
 def _strip_markdown_html(value: str) -> str:
     text = value.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-    text = re.sub(r"</?(?:code|strong|em|span|p|div)[^>]*>", "", text)
-    text = re.sub(r"<a [^>]*>(.*?)</a>", r"\1", text)
-    text = html.unescape(re.sub(r"&nbsp;", " ", text))
-    text = re.sub(r"\s+\n", "\n", text)
-    return text.strip()
+    text = unwrap_anchors(strip_html(text, _MD_TAG_RULES))
+    return tidy(html.unescape(text.replace("&nbsp;", " ")))
+
+
+_ARM_TAG_RULES = (
+    (
+        "tags",
+        ("pre", "p", "code", "strong", "em", "span", "div", "h4", "ul", "ol", "li", "b", "i"),
+        "",
+    ),
+)
 
 
 def _arm_html_to_text(value: str) -> str:
     text = value.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
     text = text.replace("</p>", "\n\n").replace("</pre>", "\n").replace("</h4>", "\n")
-    text = re.sub(r"<a [^>]*>(.*?)</a>", r"\1", text)
-    text = re.sub(r"</?(?:pre|p|code|strong|em|span|div|h4|ul|ol|li|b|i)[^>]*>", "", text)
-    text = html.unescape(text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    text = strip_html(unwrap_anchors(text), _ARM_TAG_RULES)
+    return squeeze(html.unescape(text))
 
 
 def _arm_live_instruction_refs(groups: list[dict[str, Any]]) -> list[dict[str, str]]:

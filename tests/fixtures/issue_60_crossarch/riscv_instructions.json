@@ -25,7 +25,20 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  RV32:\n    match: -----------------011-----0000011\n    variables:\n      - name: imm\n        location: 31-20\n        sign_extend: true\n      - name: xs1\n        location: 19-15\n      - name: xd\n        location: 11-7\n        not: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]\n  RV64:\n    match: -----------------011-----0000011\n    variables:\n      - name: imm\n        location: 31-20\n        sign_extend: true\n      - name: xs1\n        location: 19-15\n      - name: xd\n        location: 11-7"
+   "encoding": [
+    [
+     "RV32",
+     32,
+     28799,
+     12291
+    ],
+    [
+     "RV64",
+     32,
+     28799,
+     12291
+    ]
+   ]
   },
   {
    "mnemonic": "lw",
@@ -49,7 +62,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------010-----0000011\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: xd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     8195
+    ]
+   ]
   },
   {
    "mnemonic": "lbu",
@@ -73,7 +93,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------100-----0000011\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: xd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     16387
+    ]
+   ]
   },
   {
    "mnemonic": "addi",
@@ -97,7 +124,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------000-----0010011\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: xd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     19
+    ]
+   ]
   },
   {
    "mnemonic": "beq",
@@ -121,7 +155,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------000-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     99
+    ]
+   ]
   },
   {
    "mnemonic": "bne",
@@ -145,7 +186,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------001-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     4195
+    ]
+   ]
   },
   {
    "mnemonic": "blt",
@@ -169,7 +217,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------100-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     16483
+    ]
+   ]
   },
   {
    "mnemonic": "bge",
@@ -193,7 +248,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------101-----1100011\"\n  variables:\n    - name: imm\n      location: 31|7|30-25|11-8\n      left_shift: 1\n      sign_extend: true\n    - name: xs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     20579
+    ]
+   ]
   },
   {
    "mnemonic": "jal",
@@ -217,7 +279,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-------------------------1101111\"\n  variables:\n    - name: imm\n      location: 31|19-12|20|30-21\n      left_shift: 1\n      sign_extend: true\n    - name: xd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     127,
+     111
+    ]
+   ]
   },
   {
    "mnemonic": "flw",
@@ -241,7 +310,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------010-----0000111\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     8199
+    ]
+   ]
   },
   {
    "mnemonic": "fsw",
@@ -265,7 +341,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------010-----0100111\"\n  variables:\n    - name: imm\n      location: 31-25|11-7\n      sign_extend: true\n    - name: fs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     8231
+    ]
+   ]
   },
   {
    "mnemonic": "fld",
@@ -289,7 +372,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------011-----0000111\"\n  variables:\n    - name: imm\n      location: 31-20\n      sign_extend: true\n    - name: xs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     12295
+    ]
+   ]
   },
   {
    "mnemonic": "fsd",
@@ -313,7 +403,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: \"-----------------011-----0100111\"\n  variables:\n    - name: imm\n      location: 31-25|11-7\n      sign_extend: true\n    - name: fs2\n      location: 24-20\n    - name: xs1\n      location: 19-15"
+   "encoding": [
+    [
+     "",
+     32,
+     28799,
+     12327
+    ]
+   ]
   },
   {
    "mnemonic": "fsgnj.s",
@@ -337,7 +434,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 0010000----------000-----1010011\n  variables:\n    - name: fs2\n      location: 24-20\n    - name: fs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     4261441663,
+     536870995
+    ]
+   ]
   },
   {
    "mnemonic": "fsgnj.d",
@@ -361,7 +465,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 0010001----------000-----1010011\n  variables:\n    - name: fs2\n      location: 24-20\n    - name: fs1\n      location: 19-15\n    - name: fd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     32,
+     4261441663,
+     570425427
+    ]
+   ]
   },
   {
    "mnemonic": "c.ldsp",
@@ -385,7 +496,20 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  RV32:\n    match: 011-----------10\n    variables:\n      - name: imm\n        location: 4-2|12|6-5\n        left_shift: 3\n      - name: xd\n        location: 11-7\n        not: [0, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]\n  RV64:\n    match: 011-----------10\n    variables:\n      - name: imm\n        location: 4-2|12|6-5\n        left_shift: 3\n      - name: xd\n        location: 11-7"
+   "encoding": [
+    [
+     "RV32",
+     16,
+     57347,
+     24578
+    ],
+    [
+     "RV64",
+     16,
+     57347,
+     24578
+    ]
+   ]
   },
   {
    "mnemonic": "c.sdsp",
@@ -409,7 +533,20 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  RV32:\n    match: 111-----------10\n    variables:\n      - name: xs2\n        location: 6-2\n        not: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]\n      - name: imm\n        location: 9-7|12-10\n        left_shift: 3\n  RV64:\n    match: 111-----------10\n    variables:\n      - name: xs2\n        location: 6-2\n      - name: imm\n        location: 9-7|12-10\n        left_shift: 3"
+   "encoding": [
+    [
+     "RV32",
+     16,
+     57347,
+     57346
+    ],
+    [
+     "RV64",
+     16,
+     57347,
+     57346
+    ]
+   ]
   },
   {
    "mnemonic": "c.addi",
@@ -433,7 +570,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 000-----------01\n  variables:\n    - name: imm\n      location: 12|6-2\n      not: 0\n      sign_extend: true\n    - name: xd\n      location: 11-7\n      not: 0"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     1
+    ]
+   ]
   },
   {
    "mnemonic": "c.addi16sp",
@@ -457,7 +601,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 011-00010-----01\n  variables:\n    - name: imm\n      location: 12|4-3|5|2|6\n      left_shift: 4\n      not: 0\n      sign_extend: true"
+   "encoding": [
+    [
+     "",
+     16,
+     61315,
+     24833
+    ]
+   ]
   },
   {
    "mnemonic": "c.j",
@@ -481,7 +632,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 101-----------01\n  variables:\n    - name: imm\n      location: 12|8|10-9|6|7|2|11|5-3\n      left_shift: 1\n      sign_extend: true"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     40961
+    ]
+   ]
   },
   {
    "mnemonic": "c.jal",
@@ -505,7 +663,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 001-----------01\n  variables:\n    - name: imm\n      location: 12|8|10-9|6|7|2|11|5-3\n      left_shift: 1\n      sign_extend: true"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     8193
+    ]
+   ]
   },
   {
    "mnemonic": "c.beqz",
@@ -529,7 +694,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 110-----------01\n  variables:\n    - name: imm\n      location: 12|6-5|2|11-10|4-3\n      left_shift: 1\n      sign_extend: true\n    - name: xs1\n      location: 9-7"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     49153
+    ]
+   ]
   },
   {
    "mnemonic": "c.bnez",
@@ -553,7 +725,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 111-----------01\n  variables:\n    - name: imm\n      location: 12|6-5|2|11-10|4-3\n      left_shift: 1\n      sign_extend: true\n    - name: xs1\n      location: 9-7"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     57345
+    ]
+   ]
   },
   {
    "mnemonic": "c.fldsp",
@@ -577,7 +756,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 001-----------10\n  variables:\n    - name: imm\n      location: 4-2|12|6-5\n      left_shift: 3\n    - name: fd\n      location: 11-7"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     8194
+    ]
+   ]
   },
   {
    "mnemonic": "c.fsdsp",
@@ -601,7 +787,14 @@
    },
    "policy": "agnostic",
    "masking": "unmasked",
-   "encoding": "  match: 101-----------10\n  variables:\n    - name: imm\n      location: 9-7|12-10\n      left_shift: 3\n    - name: fs2\n      location: 6-2"
+   "encoding": [
+    [
+     "",
+     16,
+     57347,
+     40962
+    ]
+   ]
   }
  ]
 }

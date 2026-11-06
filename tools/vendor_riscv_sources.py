@@ -16,6 +16,8 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT_DIR = REPO_ROOT / "vendor" / "riscv"
@@ -73,19 +75,68 @@ def ensure_git_repo(root: Path, url: str, ref: str | None = None) -> None:
         raise SystemExit(f"{root} is at {head}, not the pinned commit {ref}")
 
 
-def extract_yaml_scalar(text: str, key: str) -> str:
-    match = re.search(rf"^{re.escape(key)}:\s*(.+)$", text, re.MULTILINE)
-    return match.group(1).strip().strip('"') if match else ""
+def _rv_bits_to_ints(bits: str) -> tuple[int, int, int]:
+    mask = match = 0
+    for char in bits:
+        mask <<= 1
+        match <<= 1
+        if char == "1":
+            mask |= 1
+            match |= 1
+        elif char == "0":
+            mask |= 1
+    return len(bits), mask, match
 
 
-def extract_yaml_block(text: str, key: str) -> str:
-    match = re.search(rf"^{re.escape(key)}:\s*\|\n(?P<body>(?:^[ ]+.*\n?)*)", text, re.MULTILINE)
-    if not match:
+def _scalar_bits(item: object) -> str:
+    if not isinstance(item, str):
         return ""
-    lines = [
-        line[2:] if line.startswith("  ") else line for line in match.group("body").splitlines()
-    ]
-    return "\n".join(lines).strip()
+    probe = item[1:] if item.startswith('"') else item
+    end = 0
+    while end < len(probe) and probe[end] in "01xX-":
+        end += 1
+    return probe[:end]
+
+
+def _match_bits(value: object) -> str:
+    """First ``match:`` bit string in document order, the old regex shape."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "match":
+                bits = _scalar_bits(item)
+                if bits:
+                    return bits
+            bits = _match_bits(item)
+            if bits:
+                return bits
+    elif isinstance(value, list):
+        for item in value:
+            bits = _match_bits(item)
+            if bits:
+                return bits
+    return ""
+
+
+def _encoding_rows(encoding: object) -> list[list]:
+    """Compute [base, bits, mask, match] rows from the YAML encoding value.
+
+    A flat ``match:`` applies to every base; a per-base block (RV32/RV64/...)
+    yields one row per base named in the block.
+    """
+    rows: list[list] = []
+    if isinstance(encoding, dict):
+        for base, block in encoding.items():
+            if base not in ("RV32", "RV64", "RV32E", "RV64E"):
+                continue
+            bits = _match_bits(block)
+            if bits:
+                rows.append([base, *_rv_bits_to_ints(bits)])
+        if rows:
+            return rows
+        bits = _match_bits(encoding)
+        if bits:
+            rows.append(["", *_rv_bits_to_ints(bits)])
+    return rows
 
 
 def normalize_extension(extension: str) -> str:
@@ -138,28 +189,49 @@ def instruction_doc_url(isa: list[str], source_url: str) -> str:
     return source_url
 
 
+def _text(value: object) -> str:
+    return str(value).strip() if isinstance(value, (str, int, float)) else ""
+
+
+def _first_name(value: object) -> str:
+    """First ``name:`` scalar in document order, the old definedBy scan."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "name":
+                found = _text(item)
+                if found:
+                    return found
+            found = _first_name(item)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = _first_name(item)
+            if found:
+                return found
+    return ""
+
+
 def parse_instruction_file(path: Path, source_url: str) -> dict[str, object]:
-    text = path.read_text()
-    mnemonic = extract_yaml_scalar(text, "name").casefold()
+    data = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(data, dict):
+        return {}
+    mnemonic = _text(data.get("name")).casefold()
     if not mnemonic:
         return {}
-    description = extract_yaml_block(text, "description")
-    operation = extract_yaml_block(text, "operation()")
-    # Keep the encoding block (per-base match strings): the byte-identity
-    # lookup keys rows on it (spec K3).
-    match = re.search(r"^encoding:\s*\n(?P<body>(?:^[ ]+.*\n?)*)", text, re.MULTILINE)
-    encoding = match.group("body").strip("\n") if match else ""
-    long_name = extract_yaml_scalar(text, "long_name")
-    extension_match = re.search(r"definedBy:\n(?:^[ ]+.*\n)*?^\s+name:\s*(.+)$", text, re.MULTILINE)
-    extension = normalize_extension(
-        extension_match.group(1).strip() if extension_match else path.parent.name
-    )
+    description = _text(data.get("description"))
+    operation = _text(data.get("operation()"))
+    # The byte-identity lookup keys rows on the encoding (spec K3): the
+    # [base, bits, mask, match] rows are computed here, at vendor time.
+    encoding = _encoding_rows(data.get("encoding"))
+    long_name = _text(data.get("long_name"))
+    extension = normalize_extension(_first_name(data.get("definedBy")) or path.parent.name)
     isa = [extension]
     return {
         "mnemonic": mnemonic,
         "summary": sentence(long_name or description or f"{mnemonic} instruction."),
-        "description": description.strip(),
-        "operation": operation.strip(),
+        "description": description,
+        "operation": operation,
         "isa": isa,
         "category": instruction_category(mnemonic, isa),
         "url": instruction_doc_url(isa, source_url),
@@ -322,7 +394,7 @@ def synthesize_instruction_records(
                     "metadata": metadata,
                     "policy": policy,
                     "masking": masking,
-                    "encoding": str(base.get("encoding") or ""),
+                    "encoding": base.get("encoding") or [],
                 }
             )
     return records

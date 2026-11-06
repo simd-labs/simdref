@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from simdref.catkey import RULE_PLACEHOLDER_BY_FOLD, build_key, split_isa_parts
+from simdref.htmltext import squash, strip_html
 from simdref.ingest_sources import read_local_arm_a64_xml_briefs
 from simdref.models import InstructionRecord
 
@@ -49,7 +50,7 @@ _SIMD_ISAS = frozenset({"NEON", "SVE", "SVE2", "SME", "SME2", "MVE"})
 
 
 def _acle_first_sentence(description: str) -> str:
-    clean = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html.unescape(description))).strip()
+    clean = squash(strip_html(html.unescape(description), (), generic=""))
     sentence = clean.split(". ")[0].rstrip(".")
     if len(sentence) > _ACLE_SUMMARY_CAP:
         sentence = sentence[:_ACLE_SUMMARY_CAP].rsplit(" ", 1)[0]

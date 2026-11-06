@@ -5,8 +5,10 @@ from __future__ import annotations
 import html
 import json
 import re
+from collections.abc import Iterator
 from typing import Any
 
+from simdref.htmltext import strip_html, tag_at, tighten
 from simdref.models import InstructionRecord, IntrinsicRecord
 
 RISCV_RVV_INTRINSICS_PROJECT_URL = "https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc"
@@ -56,33 +58,63 @@ def _string_list(value: Any) -> list[str]:
     return []
 
 
+_RV_TAG_RULES = (
+    ("br", (), "\n"),
+    ("close", ("p",), "\n\n"),
+    ("tags", ("code", "span", "strong", "em"), ""),
+    ("tags", ("pre", "div", "section", "article", "ul", "ol", "li"), "\n"),
+)
+
+
 def _strip_tags(text: str) -> str:
-    clean = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    clean = re.sub(r"</p\s*>", "\n\n", clean, flags=re.IGNORECASE)
-    clean = re.sub(r"</?(?:code|span|strong|em)[^>]*>", "", clean, flags=re.IGNORECASE)
-    clean = re.sub(
-        r"</?(?:pre|div|section|article|ul|ol|li)[^>]*>", "\n", clean, flags=re.IGNORECASE
-    )
-    clean = re.sub(r"<[^>]+>", " ", clean)
-    clean = html.unescape(clean)
-    clean = clean.replace("\r", "")
-    clean = re.sub(r"[ \t]+\n", "\n", clean)
-    clean = re.sub(r"\n{3,}", "\n\n", clean)
-    clean = re.sub(r"[ \t]{2,}", " ", clean)
-    clean = re.sub(r"\s*\n\s*", "\n", clean)
-    clean = re.sub(r"\n+", "\n", clean)
-    return clean.strip()
+    clean = strip_html(text, _RV_TAG_RULES, generic=" ", ignorecase=True)
+    return tighten(html.unescape(clean).replace("\r", ""))
+
+
+def _find_ci(text: str, needle: str, pos: int) -> int:
+    low = needle.casefold()
+    span = len(needle)
+    for start in range(pos, len(text) - span + 1):
+        if text[start : start + span].casefold() == low:
+            return start
+    return -1
+
+
+def _heading_open(inner: str) -> bool:
+    return len(inner) >= 2 and inner[0].casefold() == "h" and inner[1] in "123456"
+
+
+def _heading_close(raw: str) -> bool:
+    return raw.casefold() in {"</h1>", "</h2>", "</h3>", "</h4>", "</h5>", "</h6>"}
 
 
 def _extract_html_section(doc: str, title: str) -> str:
-    pattern = re.compile(
-        rf"<h[1-6][^>]*>\s*{re.escape(title)}\s*</h[1-6]>(?P<body>.*?)(?=<h[1-6][^>]*>|$)",
-        re.IGNORECASE | re.DOTALL,
-    )
-    match = pattern.search(doc)
-    if not match:
-        return ""
-    return _strip_tags(match.group("body"))
+    needle = title.casefold()
+    probe = 0
+    while True:
+        hit = tag_at(doc, probe)
+        if hit is None:
+            return ""
+        start, end, inner = hit
+        if _heading_open(inner):
+            # The close sits where <h> + ws + title + ws ends, no scanning.
+            lead = end
+            while lead < len(doc) and doc[lead].isspace():
+                lead += 1
+            tail = lead + len(title)
+            if doc[lead:tail].casefold() == needle:
+                while tail < len(doc) and doc[tail].isspace():
+                    tail += 1
+                if _heading_close(doc[tail : tail + 5]):
+                    body_end = len(doc)
+                    scan = tag_at(doc, tail + 5)
+                    while scan is not None:
+                        if _heading_open(scan[2]):
+                            body_end = scan[0]
+                            break
+                        scan = tag_at(doc, scan[0] + 1)
+                    return _strip_tags(doc[tail + 5 : body_end])
+        probe = start + 1
 
 
 def _section_slice(doc: str, mnemonic: str) -> str:
@@ -107,16 +139,82 @@ def _section_slice(doc: str, mnemonic: str) -> str:
     return doc[start:end]
 
 
+def _paragraph_texts(section: str) -> Iterator[str]:
+    open_lit = '<div class="paragraph">'
+    cursor = 0
+    while True:
+        start = _find_ci(section, open_lit, cursor)
+        if start < 0:
+            return
+        body_start = start + len(open_lit)
+        stop = _find_ci(section, "</div>", body_start)
+        if stop < 0:
+            return
+        yield section[body_start:stop]
+        cursor = stop + 6
+
+
+def _dt_operation_end(section: str) -> int | None:
+    probe = 0
+    while True:
+        hit = tag_at(section, probe)
+        if hit is None:
+            return None
+        start, end, inner = hit
+        if inner.casefold().startswith("dt"):
+            index = end
+            while index < len(section) and section[index].isspace():
+                index += 1
+            if section[index : index + 9].casefold() == "operation":
+                index += 9
+                while index < len(section) and section[index].isspace():
+                    index += 1
+                if section[index : index + 5].casefold() == "</dt>":
+                    return index + 5
+        probe = start + 1
+
+
+def _pre_block(section: str, pos: int) -> tuple[str, int] | None:
+    """First ``<pre[^>]*>(.*?)</pre>`` capture after pos, with its end."""
+    probe = pos
+    while True:
+        hit = tag_at(section, probe)
+        if hit is None:
+            return None
+        start, end, inner = hit
+        if inner.casefold().startswith("pre"):
+            stop = _find_ci(section, "</pre>", end)
+            if stop >= 0:
+                return section[end:stop], stop + 6
+        probe = start + 1
+
+
+def _listing_block(section: str, pos: int) -> tuple[str, int] | None:
+    """First ``<div class="listingblock">(.*?)</div>\\s*</div>`` capture."""
+    open_lit = '<div class="listingblock">'
+    while True:
+        start = _find_ci(section, open_lit, pos)
+        if start < 0:
+            return None
+        body_start = start + len(open_lit)
+        close = _find_ci(section, "</div>", body_start)
+        while close >= 0:
+            after = close + 6
+            while after < len(section) and section[after].isspace():
+                after += 1
+            if section[after : after + 6].casefold() == "</div>":
+                return section[body_start:close], after + 6
+            close = _find_ci(section, "</div>", close + 6)
+        pos = start + 1
+
+
 def _extract_instruction_section_semantics(doc: str, mnemonic: str) -> dict[str, str]:
     section = _section_slice(doc, mnemonic)
     if not section:
         return {}
 
     description = ""
-    paragraphs = re.findall(
-        r"<div class=\"paragraph\">(.*?)</div>", section, re.IGNORECASE | re.DOTALL
-    )
-    for raw in paragraphs:
+    for raw in _paragraph_texts(section):
         text = _strip_tags(raw)
         if not text:
             continue
@@ -125,28 +223,33 @@ def _extract_instruction_section_semantics(doc: str, mnemonic: str) -> dict[str,
             break
 
     operation = ""
-    op_heading = re.search(r"<dt[^>]*>\s*Operation\s*</dt>", section, re.IGNORECASE | re.DOTALL)
-    if op_heading:
-        pre_match = re.search(
-            r"<pre[^>]*>(.*?)</pre>", section[op_heading.end() :], re.IGNORECASE | re.DOTALL
-        )
-        if pre_match:
-            operation = _strip_tags(pre_match.group(1))
+    op_end = _dt_operation_end(section)
+    if op_end is not None:
+        pre = _pre_block(section, op_end)
+        if pre is not None:
+            operation = _strip_tags(pre[0])
     if not operation:
-        for pre in re.findall(r"<pre[^>]*>(.*?)</pre>", section, re.IGNORECASE | re.DOTALL):
-            text = _strip_tags(pre)
+        probe = 0
+        while True:
+            pre = _pre_block(section, probe)
+            if pre is None:
+                break
+            text = _strip_tags(pre[0])
             if mnemonic.casefold() in text.casefold():
                 operation = text
                 break
+            probe = pre[1]
     if not operation:
-        listings = re.findall(
-            r"<div class=\"listingblock\">(.*?)</div>\s*</div>", section, re.IGNORECASE | re.DOTALL
-        )
-        for listing in listings:
-            text = _strip_tags(listing)
+        probe = 0
+        while True:
+            listing = _listing_block(section, probe)
+            if listing is None:
+                break
+            text = _strip_tags(listing[0])
             if mnemonic.casefold() in text.casefold():
                 operation = text
                 break
+            probe = listing[1]
     result: dict[str, str] = {}
     if description:
         result["Description"] = description
@@ -289,43 +392,20 @@ def _instruction_form(item: dict[str, Any], mnemonic: str) -> str:
     return mnemonic
 
 
-_RV_ENC_KEYED_RE = re.compile(
-    r"^[ ]{0,2}(RV32|RV64|RV32E|RV64E):[ \t]*\n((?:^[ ]{3,}.*\n?)*)", re.MULTILINE
-)
-_RV_ENC_MATCH_RE = re.compile(r"^[ \t]*match:[ \t]*\"?([01xX-]+)\"?", re.MULTILINE)
-
-
-def _rv_bits_to_ints(bits: str) -> tuple[int, int, int]:
-    mask = match = 0
-    for char in bits:
-        mask <<= 1
-        match <<= 1
-        if char == "1":
-            mask |= 1
-            match |= 1
-        elif char == "0":
-            mask |= 1
-    return len(bits), mask, match
-
-
-def _rv_encoding_patterns(block: str) -> list[list]:
-    """Parse a kept YAML encoding block into [base, bits, mask, match] rows.
-
-    A flat ``match:`` applies to every base; a per-base block (RV32/RV64/...)
-    yields one pattern per base named in the block.
-    """
-    patterns: list[list] = []
-    for keyed in _RV_ENC_KEYED_RE.finditer(block):
-        matched = _RV_ENC_MATCH_RE.search(keyed.group(2))
-        if matched:
-            bits, mask, match = _rv_bits_to_ints(matched.group(1).strip())
-            patterns.append([keyed.group(1), bits, mask, match])
-    if not patterns:
-        matched = _RV_ENC_MATCH_RE.search(block)
-        if matched:
-            bits, mask, match = _rv_bits_to_ints(matched.group(1).strip())
-            patterns.append(["", bits, mask, match])
-    return patterns
+def _rv_encoding_rows(value: Any) -> list[list]:
+    """Normalize the vendor-computed ``[base, bits, mask, match]`` rows."""
+    rows: list[list] = []
+    if not isinstance(value, list):
+        return rows
+    for row in value:
+        if not isinstance(row, (list, tuple)) or len(row) != 4:
+            continue
+        base, bits, mask, match = row
+        try:
+            rows.append([str(base), int(bits), int(mask), int(match)])
+        except (TypeError, ValueError):
+            continue
+    return rows
 
 
 def parse_riscv_instruction_payload(text: str) -> list[InstructionRecord]:
@@ -402,10 +482,10 @@ def parse_riscv_instruction_payload(text: str) -> list[InstructionRecord]:
             source="riscv-unified-db",
         )
         # RVV masked/unmasked variants share one encoding (spec K3): the key
-        # lives on the base-instruction row only.
-        encoding_block = _string(item.get("encoding"))
-        if encoding_block and record.form == record.mnemonic:
-            patterns = _rv_encoding_patterns(encoding_block)
+        # lives on the base-instruction row only. The vendor tool computes the
+        # [base, bits, mask, match] rows from the instruction YAML.
+        if record.form == record.mnemonic:
+            patterns = _rv_encoding_rows(item.get("encoding"))
             if patterns:
                 record.enc_bits = patterns[0][1]
                 record.enc_mask = patterns[0][2]

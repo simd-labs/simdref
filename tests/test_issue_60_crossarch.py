@@ -55,7 +55,7 @@ B_COND_VALUES = {
     "B.NV": 15,
 }
 
-# (enc_bits, enc_mask, enc_match) the fixture's YAML encoding blocks parse to.
+# (enc_bits, enc_mask, enc_match) the fixture's YAML encoding rows hold.
 RV_PATTERNS = {
     "ld": (32, 0x707F, 0x3003),
     "lbu": (32, 0x707F, 0x4003),

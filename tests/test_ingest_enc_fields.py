@@ -1,7 +1,7 @@
 """Ingest tests for the byte-identity encoding fields (spec K1-K4).
 
 Each behavioral test names the mutation that must make it fail: reverting the
-walker's mnemonic fix, the sibling-row rule, the kept encoding block or the
+walker's mnemonic fix, the sibling-row rule, the vendor's encoding rows or the
 split-attribute identity must each break its own test here.
 """
 
@@ -169,7 +169,7 @@ class AarchmrsSiblingRowsTest(unittest.TestCase):
 
 
 class RiscvEncodingBlocksTest(unittest.TestCase):
-    """Spec K3: the vendor keeps the YAML encoding block, the reader keys rows."""
+    """Spec K3: the vendor computes the YAML encoding rows, the reader keys rows."""
 
     YAML_KEYED = """\
 $schema: "inst_schema.json#"
@@ -233,13 +233,15 @@ encoding:
                 base, {name: {("agnostic", "masked")} for name in base}
             )
 
-    def test_vendor_keeps_encoding_block(self) -> None:
-        # Mutation: drop "encoding" in parse_instruction_file -> KeyError here.
+    def test_vendor_computes_encoding_rows(self) -> None:
+        # Mutation: drop the encoding rows in parse_instruction_file -> assert fails.
         records = self._records({("I", "slli"): self.YAML_KEYED, ("I", "add"): self.YAML_FLAT})
         by_form = {record["form"]: record for record in records}
-        self.assertIn("encoding", by_form["slli"])
-        self.assertIn("RV32:", by_form["slli"]["encoding"])
-        self.assertIn("match: 0000000", by_form["add"]["encoding"])
+        self.assertEqual(
+            by_form["slli"]["encoding"],
+            [["RV32", 32, 0xFE00707F, 0x1013], ["RV64", 32, 0xFC00707F, 0x1013]],
+        )
+        self.assertEqual(by_form["add"]["encoding"], [["", 32, 0xFE00707F, 0x33]])
 
     def test_reader_keys_base_row_with_per_base_patterns(self) -> None:
         records = self._records({("I", "slli"): self.YAML_KEYED, ("I", "add"): self.YAML_FLAT})
