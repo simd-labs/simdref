@@ -14,8 +14,8 @@ from simdref.display import display_architecture
 from simdref.models import Catalog, InstructionRecord, IntrinsicRecord
 from simdref.queries import (
     build_intrinsic_instruction_index,
-    instruction_rows_for_intrinsic,
     instruction_rows_for_intrinsic_indexed,
+    linked_instruction_records,
 )
 
 
@@ -56,15 +56,7 @@ def intrinsic_page(
     linked_instructions: list[InstructionRecord] | None = None,
 ) -> str:
     if linked_instructions is None:
-        linked_instructions = (
-            [
-                instruction
-                for instruction in catalog.instructions
-                if record.name in instruction.linked_intrinsics
-            ]
-            if catalog is not None
-            else []
-        )
+        linked_instructions = linked_instruction_records(catalog, record)
     parts = [f'.TH "{record.name}" "7" "simdref" "simdref" "SIMD Intrinsic Reference"\n']
     parts.append(
         _section(
@@ -166,15 +158,16 @@ def write_manpages(
         if on_progress is not None:
             on_progress(done, total)
     for instruction in catalog.instructions:
+        page = instruction_page(instruction)
         filename = (
             f"instruction-{record_slug(instruction.architecture)}-{record_slug(instruction.key)}.7"
         )
-        (section_dir / filename).write_text(instruction_page(instruction))
+        (section_dir / filename).write_text(page)
         if instruction.architecture == "x86":
-            (section_dir / f"{instruction.mnemonic}.7").write_text(instruction_page(instruction))
+            (section_dir / f"{instruction.mnemonic}.7").write_text(page)
         (
             section_dir / f"{record_slug(instruction.architecture)}-{instruction.mnemonic}.7"
-        ).write_text(instruction_page(instruction))
+        ).write_text(page)
         done += 1
         if on_progress is not None:
             on_progress(done, total)
