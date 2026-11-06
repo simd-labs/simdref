@@ -22,7 +22,6 @@ from simdref.perf_sources.cores import core_architecture
 
 # x86 vendor sets mirror the web's current labels so old rows keep the same
 # group names. Non-x86 cores group by architecture, never by a fixed vendor.
-_X86_AMD_CORES = {"ZEN5", "ZEN4", "ZEN3", "ZEN2", "ZEN1", "ZEN+"}
 _X86_SERVER_CORES = {"EMR", "CLX", "SKX", "CNL"}
 
 
@@ -35,7 +34,7 @@ def perf_family_label(uarch: str) -> str:
     if not uarch:
         return ""
     core = uarch.strip().upper()
-    if core in _X86_AMD_CORES:
+    if core.startswith("ZEN"):
         return "AMD"
     if core in _X86_SERVER_CORES:
         return "Intel Server"
@@ -331,30 +330,6 @@ def best_cpi(arch_details: dict[str, dict[str, Any]], iclass: str | None = None)
     Prefers measured rows over modeled rows (see :func:`best_cpi_labeled`).
     """
     return best_cpi_labeled(arch_details, iclass=iclass).value
-
-
-def best_latency_measured(arch_details: dict[str, dict[str, Any]]) -> PerfValue:
-    """Lowest latency drawn exclusively from ``source_kind="measured"`` rows."""
-    return best_latency_labeled(arch_details, kind_filter="measured")
-
-
-def best_latency_modeled(arch_details: dict[str, dict[str, Any]]) -> PerfValue:
-    """Lowest latency drawn exclusively from ``source_kind="modeled"`` rows."""
-    return best_latency_labeled(arch_details, kind_filter="modeled")
-
-
-def best_cpi_measured(
-    arch_details: dict[str, dict[str, Any]], iclass: str | None = None
-) -> PerfValue:
-    """Lowest CPI drawn exclusively from ``source_kind="measured"`` rows."""
-    return best_cpi_labeled(arch_details, kind_filter="measured", iclass=iclass)
-
-
-def best_cpi_modeled(
-    arch_details: dict[str, dict[str, Any]], iclass: str | None = None
-) -> PerfValue:
-    """Lowest CPI drawn exclusively from ``source_kind="modeled"`` rows."""
-    return best_cpi_labeled(arch_details, kind_filter="modeled", iclass=iclass)
 
 
 def variant_perf_summary(
