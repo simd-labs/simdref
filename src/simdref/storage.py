@@ -9,7 +9,6 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import re
 import secrets
 import sqlite3
 import stat
@@ -146,8 +145,19 @@ def write_installed_version_stamp(version: str) -> None:
         pass  # best-effort — stamp persistence must not break commands
 
 
-FTS_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 SQLITE_INSERT_BATCH_SIZE = 512
+_INSERT_INTRINSICS_DATA = (
+    "INSERT INTO intrinsics_data (name, architecture, signature, description, "
+    "header, isa, category, subcategory, arm_arch, payload) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+)
+_INSERT_INTRINSICS_FTS = "INSERT INTO intrinsics_fts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+_INSERT_INSTRUCTIONS_DATA = (
+    "INSERT INTO instructions_data (db_key, key, architecture, mnemonic, form, "
+    "summary, isa, category, payload, enc_bits, enc_mask, enc_match, enc_extra, "
+    "iform, split_attrs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+)
+_INSERT_INSTRUCTIONS_FTS = "INSERT INTO instructions_fts VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 
 
 def ensure_dir(path: Path) -> None:
@@ -343,7 +353,35 @@ def sqlite_schema_is_current(path: Path = SQLITE_PATH) -> bool:
         conn.close()
 
 
-_ALPHA_NUM_SPLIT = re.compile(r"[a-zA-Z]+|[0-9]+")
+def _alnum_runs(text: str, split_alpha_digit: bool = False) -> list[str]:
+    """ASCII alnum runs: "a1_b2" -> ["a1", "b2"].
+
+    Replaces the [A-Za-z0-9]+ scan. With split_alpha_digit set, alpha runs and
+    digit runs are separate tokens ("mm256" -> ["mm", "256"]), replacing the
+    [a-zA-Z]+|[0-9]+ scan.
+    """
+    runs: list[str] = []
+    start = None
+    kind = None
+    for i, ch in enumerate(text):
+        if ch.isascii() and ch.isalpha():
+            is_alpha = 1
+        elif ch.isascii() and ch.isdigit():
+            is_alpha = 0
+        else:
+            is_alpha = None
+        if is_alpha is None:
+            if start is not None:
+                runs.append(text[start:i])
+                start = kind = None
+        elif start is None:
+            start, kind = i, is_alpha
+        elif split_alpha_digit and is_alpha != kind:
+            runs.append(text[start:i])
+            start, kind = i, is_alpha
+    if start is not None:
+        runs.append(text[start:])
+    return runs
 
 
 def _tokenize_name(name: str) -> str:
@@ -352,7 +390,7 @@ def _tokenize_name(name: str) -> str:
     _mm256_add_epi32 → mm 256 add epi 32
     VADDPS (YMM, YMM, YMM) → vaddps ymm ymm ymm
     """
-    return " ".join(_ALPHA_NUM_SPLIT.findall(name)).lower()
+    return " ".join(_alnum_runs(name, split_alpha_digit=True)).lower()
 
 
 def _batched(items, size: int = SQLITE_INSERT_BATCH_SIZE):
@@ -436,123 +474,87 @@ def build_sqlite(catalog: Catalog, path: Path = SQLITE_PATH) -> None:
             _instr_summary[irec.mnemonic] = irec.summary
 
     # Intrinsics data + FTS
-    intrinsics_data_batch = []
-    intrinsics_fts_batch = []
-    for record in catalog.intrinsics:
-        payload = _pack_payload(record.to_dict())
-        intrinsics_data_batch.append(
-            (
-                record.name,
-                record.architecture,
-                record.signature,
-                record.description,
-                record.header,
-                " ".join(record.isa),
-                record.category,
-                record.subcategory,
-                derive_arm_arch(record.isa, record.metadata),
-                payload,
+    def _intrinsic_rows():
+        for record in catalog.intrinsics:
+            payload = _pack_payload(record.to_dict())
+            instr_summary = ""
+            if record.instructions:
+                mnemonic = record.instructions[0].split("(")[0].split()[0].strip()
+                instr_summary = _instr_summary.get(mnemonic, "")
+            if not instr_summary and record.description:
+                instr_summary = record.description.split(".")[0] + "."
+            yield (
+                (
+                    record.name,
+                    record.architecture,
+                    record.signature,
+                    record.description,
+                    record.header,
+                    " ".join(record.isa),
+                    record.category,
+                    record.subcategory,
+                    derive_arm_arch(record.isa, record.metadata),
+                    payload,
+                ),
+                (
+                    record.name,
+                    record.signature,
+                    record.description,
+                    record.header,
+                    " ".join(record.isa),
+                    record.category,
+                    " ".join(record.instructions),
+                    " ".join(record.notes),
+                    " ".join(record.aliases),
+                    instr_summary,
+                    _tokenize_name(record.name),
+                ),
             )
-        )
-        instr_summary = ""
-        if record.instructions:
-            mnemonic = record.instructions[0].split("(")[0].split()[0].strip()
-            instr_summary = _instr_summary.get(mnemonic, "")
-        if not instr_summary and record.description:
-            instr_summary = record.description.split(".")[0] + "."
-        intrinsics_fts_batch.append(
-            (
-                record.name,
-                record.signature,
-                record.description,
-                record.header,
-                " ".join(record.isa),
-                record.category,
-                " ".join(record.instructions),
-                " ".join(record.notes),
-                " ".join(record.aliases),
-                instr_summary,
-                _tokenize_name(record.name),
-            )
-        )
-        if len(intrinsics_data_batch) >= SQLITE_INSERT_BATCH_SIZE:
-            cur.executemany(
-                "INSERT INTO intrinsics_data (name, architecture, signature, description, header, isa, category, subcategory, arm_arch, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                intrinsics_data_batch,
-            )
-            cur.executemany(
-                "INSERT INTO intrinsics_fts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                intrinsics_fts_batch,
-            )
-            intrinsics_data_batch.clear()
-            intrinsics_fts_batch.clear()
-    if intrinsics_data_batch:
-        cur.executemany(
-            "INSERT INTO intrinsics_data (name, architecture, signature, description, header, isa, category, subcategory, arm_arch, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            intrinsics_data_batch,
-        )
-        cur.executemany(
-            "INSERT INTO intrinsics_fts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            intrinsics_fts_batch,
-        )
+
+    for batch in _batched(_intrinsic_rows()):
+        data_rows, fts_rows = zip(*batch)
+        cur.executemany(_INSERT_INTRINSICS_DATA, data_rows)
+        cur.executemany(_INSERT_INTRINSICS_FTS, fts_rows)
 
     # Instructions data + FTS
-    instructions_data_batch = []
-    instructions_fts_batch = []
-    for record in catalog.instructions:
-        payload = _pack_payload(record.to_dict())
-        metadata = record.metadata if isinstance(record.metadata, dict) else {}
-        instructions_data_batch.append(
-            (
-                record.db_key,
-                record.key,
-                record.architecture,
-                record.mnemonic,
-                record.form,
-                record.summary,
-                " ".join(record.isa),
-                metadata.get("category", ""),
-                payload,
-                record.enc_bits,
-                record.enc_mask,
-                record.enc_match,
-                json.dumps(record.enc_extra),
-                metadata.get("iform", ""),
-                metadata.get("split_attrs", ""),
+    def _instruction_rows():
+        for record in catalog.instructions:
+            payload = _pack_payload(record.to_dict())
+            metadata = record.metadata if isinstance(record.metadata, dict) else {}
+            yield (
+                (
+                    record.db_key,
+                    record.key,
+                    record.architecture,
+                    record.mnemonic,
+                    record.form,
+                    record.summary,
+                    " ".join(record.isa),
+                    metadata.get("category", ""),
+                    payload,
+                    record.enc_bits,
+                    record.enc_mask,
+                    record.enc_match,
+                    json.dumps(record.enc_extra),
+                    metadata.get("iform", ""),
+                    metadata.get("split_attrs", ""),
+                ),
+                (
+                    record.key,
+                    record.mnemonic,
+                    record.form,
+                    record.summary,
+                    " ".join(record.isa),
+                    " ".join(record.linked_intrinsics),
+                    " ".join(record.aliases),
+                    _tokenize_name(record.key),
+                ),
             )
-        )
-        instructions_fts_batch.append(
-            (
-                record.key,
-                record.mnemonic,
-                record.form,
-                record.summary,
-                " ".join(record.isa),
-                " ".join(record.linked_intrinsics),
-                " ".join(record.aliases),
-                _tokenize_name(record.key),
-            )
-        )
-        if len(instructions_data_batch) >= SQLITE_INSERT_BATCH_SIZE:
-            cur.executemany(
-                "INSERT INTO instructions_data (db_key, key, architecture, mnemonic, form, summary, isa, category, payload, enc_bits, enc_mask, enc_match, enc_extra, iform, split_attrs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                instructions_data_batch,
-            )
-            cur.executemany(
-                "INSERT INTO instructions_fts VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                instructions_fts_batch,
-            )
-            instructions_data_batch.clear()
-            instructions_fts_batch.clear()
-    if instructions_data_batch:
-        cur.executemany(
-            "INSERT INTO instructions_data (db_key, key, architecture, mnemonic, form, summary, isa, category, payload, enc_bits, enc_mask, enc_match, enc_extra, iform, split_attrs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            instructions_data_batch,
-        )
-        cur.executemany(
-            "INSERT INTO instructions_fts VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            instructions_fts_batch,
-        )
+
+    for batch in _batched(_instruction_rows()):
+        data_rows, fts_rows = zip(*batch)
+        cur.executemany(_INSERT_INSTRUCTIONS_DATA, data_rows)
+        cur.executemany(_INSERT_INSTRUCTIONS_FTS, fts_rows)
 
     conn.commit()
     # Switch back to DELETE before publishing: a reader that only opens the
@@ -639,7 +641,7 @@ def load_instructions_by_mnemonic_prefix_from_db(
 
 
 def _fts_match_query(query: str) -> str:
-    tokens = [token.casefold() for token in FTS_TOKEN_RE.findall(query)]
+    tokens = [token.casefold() for token in _alnum_runs(query)]
     return " AND ".join(f'"{token}"*' for token in tokens if token)
 
 
@@ -676,6 +678,46 @@ def _append_filter_clause(
     return base_sql.replace(match_marker, f"{match_marker} AND {clause} ", 1)
 
 
+def _search_candidates_from_db(
+    conn: sqlite3.Connection,
+    query: str,
+    limit: int,
+    table: str,
+    fts: str,
+    order_col: str,
+    from_record,
+    filter_spec=None,
+    enabled_families=None,
+    enabled_categories=None,
+    enabled_arm_arch=None,
+) -> list:
+    match_query = _fts_match_query(query)
+    if not match_query:
+        return []
+    binds: list = [match_query]
+    sql = f"""
+        SELECT {table}.payload
+        FROM {fts}
+        JOIN {table} ON {table}.rowid = {fts}.rowid
+        WHERE {fts} MATCH ?
+        ORDER BY bm25({fts}), length({table}.{order_col}), {table}.{order_col}
+        LIMIT ?
+        """
+    sql = _append_filter_clause(
+        sql,
+        table,
+        filter_spec,
+        enabled_families,
+        enabled_categories,
+        binds,
+        match_marker=f"{fts} MATCH ?",
+        enabled_arm_arch=enabled_arm_arch,
+    )
+    binds.append(limit)
+    rows = conn.execute(sql, binds).fetchall()
+    return [from_record(row["payload"]) for row in rows]
+
+
 def search_intrinsic_candidates_from_db(
     conn: sqlite3.Connection,
     query: str,
@@ -686,31 +728,19 @@ def search_intrinsic_candidates_from_db(
     enabled_categories=None,
     enabled_arm_arch=None,
 ) -> list[IntrinsicRecord]:
-    match_query = _fts_match_query(query)
-    if not match_query:
-        return []
-    binds: list = [match_query]
-    sql = """
-        SELECT intrinsics_data.payload
-        FROM intrinsics_fts
-        JOIN intrinsics_data ON intrinsics_data.id = intrinsics_fts.rowid
-        WHERE intrinsics_fts MATCH ?
-        ORDER BY bm25(intrinsics_fts), length(intrinsics_data.name), intrinsics_data.name
-        LIMIT ?
-        """
-    sql = _append_filter_clause(
-        sql,
-        "intrinsics_data",
-        filter_spec,
-        enabled_families,
-        enabled_categories,
-        binds,
-        match_marker="intrinsics_fts MATCH ?",
+    return _search_candidates_from_db(
+        conn,
+        query,
+        limit,
+        table="intrinsics_data",
+        fts="intrinsics_fts",
+        order_col="name",
+        from_record=lambda raw: IntrinsicRecord(**_unpack_payload(raw)),
+        filter_spec=filter_spec,
+        enabled_families=enabled_families,
+        enabled_categories=enabled_categories,
         enabled_arm_arch=enabled_arm_arch,
     )
-    binds.append(limit)
-    rows = conn.execute(sql, binds).fetchall()
-    return [IntrinsicRecord(**_unpack_payload(row["payload"])) for row in rows]
 
 
 def search_instruction_candidates_from_db(
@@ -722,27 +752,15 @@ def search_instruction_candidates_from_db(
     enabled_families=None,
     enabled_categories=None,
 ) -> list[InstructionRecord]:
-    match_query = _fts_match_query(query)
-    if not match_query:
-        return []
-    binds: list = [match_query]
-    sql = """
-        SELECT instructions_data.payload
-        FROM instructions_fts
-        JOIN instructions_data ON instructions_data.rowid = instructions_fts.rowid
-        WHERE instructions_fts MATCH ?
-        ORDER BY bm25(instructions_fts), length(instructions_data.key), instructions_data.key
-        LIMIT ?
-        """
-    sql = _append_filter_clause(
-        sql,
-        "instructions_data",
-        filter_spec,
-        enabled_families,
-        enabled_categories,
-        binds,
-        match_marker="instructions_fts MATCH ?",
+    return _search_candidates_from_db(
+        conn,
+        query,
+        limit,
+        table="instructions_data",
+        fts="instructions_fts",
+        order_col="key",
+        from_record=lambda raw: InstructionRecord.from_dict(_unpack_payload(raw)),
+        filter_spec=filter_spec,
+        enabled_families=enabled_families,
+        enabled_categories=enabled_categories,
     )
-    binds.append(limit)
-    rows = conn.execute(sql, binds).fetchall()
-    return [InstructionRecord.from_dict(_unpack_payload(row["payload"])) for row in rows]
