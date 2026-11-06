@@ -169,10 +169,8 @@ def _x86_gpr_width(name: str) -> int | None:
     """Width of an x86 general-register spelling, or None."""
     tail = name[1:]
     if name.startswith("r") and tail[:1].isdigit():
-        index = 0
-        while tail[index : index + 1].isdigit():
-            index += 1
-        if tail[index:] not in ("", "d", "w", "b") or not 8 <= int(tail[:index]) <= 15:
+        number = _reg_number(tail, 15)
+        if not number or int(number) < 8 or tail[len(number) :] not in ("", "d", "w", "b"):
             return None
     if name == "rip":
         return None
@@ -186,20 +184,37 @@ def _x86_vector(name: str) -> bool:
     )
 
 
-def _element(tail: str) -> str | None:
-    """The element letter of an arrangement tail ("4h" -> "h"), or None."""
+def _arrangement_tail(tail: str) -> tuple[str | None, str]:
+    """The element letter and lane index of an arrangement tail.
+
+    "4h" -> ("h", ""), "d[1]" -> ("d", "1"). The parse takes the prefix, so
+    trailing text after the letter or lane is the caller's business.
+    """
     index = 0
     while tail[index : index + 1].isdigit():
         index += 1
-    return tail[index] if index + 1 == len(tail) and tail[index] in "bhsdq" else None
+    letter = tail[index : index + 1]
+    if letter not in ("b", "h", "s", "d", "q"):
+        return None, ""
+    rest = tail[index + 1 :]
+    if rest[:1] == "[":
+        lane = 1
+        while rest[lane : lane + 1].isdigit():
+            lane += 1
+        if lane > 1 and rest[lane : lane + 1] == "]":
+            return letter, rest[1:lane]
+    return letter, ""
 
 
 def _is_arrangement(name: str) -> bool:
     """True for an arranged register spelling ("z0.4h", "q0.16b")."""
     head, dot, tail = name.partition(".")
+    element, lane = _arrangement_tail(tail) if dot else (None, "")
     return (
         bool(dot)
-        and _element(tail) is not None
+        and element is not None
+        and not lane
+        and (tail[:-1] == "" or tail[:-1].isdigit())
         and any(
             klass in ("fp", "z", "v") and family == "a64"
             for klass, _width, family in reg_rows(head)
@@ -264,21 +279,14 @@ def _z_range_numbers(member: str) -> list[int]:
     start anywhere in the member.
     """
     numbers = []
-    index = 0
-    while index < len(member):
-        if member[index] == "z":
+    for index, char in enumerate(member):
+        if char == "z":
             tail = member[index + 1 :]
             number = _reg_number(tail, 31)
             if number and tail[len(number) : len(number) + 1] == ".":
-                rest = tail[len(number) + 1 :]
-                digits = ""
-                while rest[len(digits) : len(digits) + 1].isdigit():
-                    digits += rest[len(digits)]
-                if rest[len(digits) : len(digits) + 1] in ("b", "h", "s", "d", "q"):
+                element, _lane = _arrangement_tail(tail[len(number) + 1 :])
+                if element:
                     numbers.append(int(number))
-                    index += len(number) + len(digits) + 3
-                    continue
-        index += 1
     return numbers
 
 
@@ -292,17 +300,9 @@ def _is_a64_only_operand(name: str) -> bool:
     head, dot, tail = name.partition(".")
     number = _reg_number(head[1:], 31) if head[:1] in ("z", "v") else ""
     if dot and number and head[1:] == number:
-        digits = ""
-        while tail[len(digits) : len(digits) + 1].isdigit():
-            digits += tail[len(digits)]
-        rest = tail[len(digits) :]
-        if rest[:1] in ("b", "h", "s", "d", "q") and rest[1:].startswith("["):
-            inner = rest[2:]
-            end = 0
-            while inner[end : end + 1].isdigit():
-                end += 1
-            if end and inner[end : end + 1] == "]":
-                return True
+        element, lane = _arrangement_tail(tail)
+        if element and lane:
+            return True
     if name[:1] == "p":
         rest = name[1:]
         number = _reg_number(rest.removeprefix("n"), 15)
@@ -383,13 +383,9 @@ def _av_class(arrangement: str) -> str:
         return "av"
     index = arrangement.find(".")
     while index != -1:
-        rest = arrangement[index + 1 :]
-        digits = 0
-        while rest[digits : digits + 1].isdigit():
-            digits += 1
-        letter = rest[digits : digits + 1]
-        if letter in ("b", "h", "s", "d", "q"):
-            return f"av{letter}"
+        element, _lane = _arrangement_tail(arrangement[index + 1 :])
+        if element:
+            return f"av{element}"
         index = arrangement.find(".", index + 1)
     return "av"
 
@@ -1202,6 +1198,58 @@ def identity_keys(
     return out
 
 
+def _resolve_line_form(db, mnemonic, count, operands, intel, exact=None):
+    """The form one asm line names: classify, alias, weak gate, match.
+
+    db is a connection (hover) or a catalog path (hints, cached lookup).
+    EXACT is the line's own exact-name row for hover's exact-name path; a
+    hint passes None and only matches the form on the source line.
+    """
+    line = _classify_line(operands, intel)
+    # The folded shift/extend suffix makes the classified parts shorter than
+    # the parsed comma count; the parts are authoritative for the count
+    # checks below.
+    if line[1]:
+        count = len(line[1])
+    # One alias step for hover and hint: an AArch64 alias line (mov, cmp,
+    # cmn, tst) is judged on the alias mnemonic's rows before any weak-gate
+    # or catalog-miss decision. An empty alias mnemonic means the operand
+    # text does not decide the form: show nothing.
+    alias = _a64_alias_for_line(mnemonic, line[0], operands)
+    mnemonic, transform = alias if alias else (mnemonic, None)
+    if not mnemonic:
+        return None
+    lookup = _mnemonic_matches if isinstance(db, str) else _lookup_mnemonic
+    matches, width = lookup(db, mnemonic, line[0])
+    if exact is None and not matches:
+        return None
+    # Weak votes come from spellings two architectures share (a RISC-V `add
+    # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them so the
+    # exact-name path and _match_form both honor the veto.
+    if line[3]:
+        line = _gate_weak_votes(matches, line, operands, intel, transform=transform)
+        if line is None:
+            return None
+    if exact is not None:
+        # An exact name can name a row with a different operand count (a bare
+        # "movsd" is the string move), or a row from the wrong architecture
+        # (a bare "nop" picks AArch64 NOP over x86 in an Intel file). In both
+        # cases fall through to the form match, so hover and hint agree.
+        chosen = exact
+        if line[0] and chosen.architecture not in line[0]:
+            chosen = None
+        elif count is not None and len(catkey.operands_of_key(chosen.key)) != count:
+            chosen = None
+        if chosen is not None:
+            return chosen
+    if not matches:
+        return None
+    # Match the form on the source line, so "vaddps ymm0, ymm1, ymm2" gets
+    # the YMM form, not the first row.
+    match_line = (line[0], transform(line[1]), line[2], line[3]) if transform else line
+    return _match_form(matches, count, match_line, width)
+
+
 def _hover_markdown(
     conn,
     word: str,
@@ -1268,52 +1316,10 @@ def _hover_markdown(
     # line assembles to. None keeps the old matcher on its exact-name path.
     instruction = load_instruction_from_db(conn, identity_key) if identity_key else None
     if instruction is None:
-        line = _classify_line(operand_text, intel)
-        # The folded shift/extend suffix makes the classified parts shorter than
-        # the parsed comma count; the parts are authoritative for the two count
-        # checks below.
-        if line[1]:
-            operand_count = len(line[1])
-        # One alias step for hover and hint: an AArch64 alias line (mov, cmp,
-        # cmn, tst) is judged on the alias mnemonic's rows before any weak-gate
-        # or catalog-miss decision. An empty alias mnemonic means the operand
-        # text does not decide the form: show nothing.
-        alias = _a64_alias_for_line(word, line[0], operand_text)
-        if alias:
-            word_mn, transform = alias
-        else:
-            word_mn, transform = word, None
-        if not word_mn:
-            return None
-        # Weak votes come from spellings two architectures share (a RISC-V `add
-        # s0, s1, s2` vs the AArch64 scalar FP s-registers). Gate them once here
-        # so the exact-name path and _match_form both honor the veto.
-        matches = width = None
-        if line[3]:
-            matches, width = _lookup_mnemonic(conn, word_mn, line[0])
-            line = _gate_weak_votes(matches, line, operand_text, intel, transform=transform)
-            if line is None:
-                return None
-        instruction = load_instruction_from_db(conn, word)
-        # An exact name can name a row with a different operand count (a bare
-        # "movsd" is the string move), or a row from the wrong architecture
-        # (a bare "nop" picks AArch64 NOP over x86 in an Intel file).
-        # In both cases, fall back to _match_form so hover and hint agree.
-        if instruction is not None:
-            if line[0] and instruction.architecture not in line[0]:
-                instruction = None
-            elif (
-                operand_count is not None
-                and len(catkey.operands_of_key(instruction.key)) != operand_count
-            ):
-                instruction = None
-        if instruction is None:
-            # Match the form on the source line like _hint_label does, so
-            # "vaddps ymm0, ymm1, ymm2" gets the YMM form, not the first row.
-            if matches is None:
-                matches, width = _lookup_mnemonic(conn, word_mn, line[0])
-            match_line = (line[0], transform(line[1]), line[2], line[3]) if transform else line
-            instruction = _match_form(matches, operand_count, match_line, width)
+        exact = load_instruction_from_db(conn, word)
+        instruction = _resolve_line_form(
+            conn, word, operand_count, operand_text, intel, exact=exact
+        )
     if instruction is not None:
         # The url and reference rows of the body already carry the source links.
         link = web_deep_link("instruction", instruction.key)
@@ -1453,22 +1459,7 @@ def _hint_label(
     operands: str = "",
     intel: bool = False,
 ) -> str | None:
-    line = _classify_line(operands, intel)
-    # The same one alias step as hover, before the catalog-miss return, so
-    # both entries judge the alias mnemonic's rows. An empty alias mnemonic
-    # matches no rows and the hint is None, like hover.
-    alias = _a64_alias_for_line(mnemonic, line[0], operands)
-    lookup_mn, transform = alias if alias else (mnemonic, None)
-    matches, width = _mnemonic_matches(db_path, lookup_mn, line[0])
-    if not matches:
-        return None
-    # The same weak-vote gate as hover, so both entries pick the same form.
-    line = _gate_weak_votes(matches, line, operands, intel, transform=transform)
-    if line is None:
-        return None
-    if transform is not None:
-        line = (line[0], transform(line[1]), line[2], line[3])
-    chosen = _match_form(matches, operand_count, line, width)
+    chosen = _resolve_line_form(db_path, mnemonic, operand_count, operands, intel)
     return _cut_label(chosen.summary or "") if chosen else None
 
 

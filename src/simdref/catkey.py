@@ -8,10 +8,10 @@ name the classes lsp.py mints in _operand_class.
 from __future__ import annotations
 
 from simdref.asmline import split_operands
+from simdref.regtable import reg_width
 
 IMMEDIATE_ACCEPT = frozenset({"i", "lit0", "lit1"})
 LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
-ACCUMULATOR = {"al": "r8", "ax": "r16", "eax": "r32", "rax": "r64"}
 X86_VECTOR_WIDTHS = {"xmm": "v128", "ymm": "v256", "zmm": "v512"}
 
 
@@ -53,11 +53,14 @@ def form_accept(op: str) -> frozenset:
         return frozenset({"lit" + o})
     if o[:1] == "i" and o[1:].isdecimal():
         return IMMEDIATE_ACCEPT
-    if o in ACCUMULATOR or o == "cl":
-        return frozenset({ACCUMULATOR.get(o, "r8")})
     base = o[:-1] if o[-1:] in ("h", "l") else o
     if base in ("r8", "r16", "r32", "r64"):
         return frozenset({base})
+    # An exact x86 gpr spelling (the implicit AL, AX, CL and DX forms) takes
+    # its width from the regtable, so ECX, RCX, EDX, RDX and DX constrain too.
+    width = reg_width(o, "gpr", "x86")
+    if width:
+        return frozenset({f"r{width}"})
     if o in X86_VECTOR_WIDTHS or o in ("k", "mm"):
         return frozenset({X86_VECTOR_WIDTHS.get(o, o)})
     head, sep, tail = o.partition("_")
