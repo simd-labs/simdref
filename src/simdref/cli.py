@@ -67,7 +67,6 @@ from simdref.display import (
 from simdref import __version__
 from simdref.ingest import build_catalog
 from simdref.ingest_sources import (
-    ARM_A64_ARCHIVE_CACHE,
     refresh_local_arm_a64_archive,
     refresh_local_arm_intrinsics_bundle,
 )
@@ -347,146 +346,75 @@ def _download_from_release() -> None:
 def _build_runtime_locally(*, man_dir: Path, include_sdm: bool = False) -> None:
     """Build catalog, SQLite, manpages, and web bundle locally.
 
-    Renders a single rich.progress.Progress that shows a per-phase ETA.
-    Download phases render bytes + transfer speed; processing phases
-    render item counts + remaining time.
+    One work path for both contexts. ``status`` renders each phase as a
+    rich Progress line with transfer speed and per-phase ETA on a TTY,
+    and as a plain ``dim`` log line in non-TTY contexts (CI, harnesses).
     """
     interactive_progress = console.is_terminal and os.environ.get("GITHUB_ACTIONS") != "true"
 
-    if not interactive_progress:
+    if interactive_progress:
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            DownloadColumn(),
+            TransferSpeedColumn(),
+            MofNCompleteColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=err_console,
+            transient=True,
+        )
+        task = progress.add_task("", total=None)
 
-        def _status(msg: str) -> None:
+        def status(msg: str) -> None:
+            progress.update(task, description=msg, completed=0, total=None)
+
+        def on_progress(done: int, total: int | None) -> None:
+            progress.update(task, completed=done, total=total)
+
+        ctx = progress
+    else:
+
+        def status(msg: str) -> None:
             err_console.print(msg, style="dim")
 
-        _status("Refreshing local Arm intrinsics cache")
+        on_progress = None
+        ctx = _nullcontext()
+
+    with ctx:
+        status("Refreshing local Arm intrinsics cache")
         try:
-            written = refresh_local_arm_intrinsics_bundle()
+            written = refresh_local_arm_intrinsics_bundle(on_progress=on_progress)
         except Exception as exc:
             err_console.print(f"Arm intrinsics download failed: {exc}", style="red")
             raise typer.Exit(code=1) from exc
-        _status(f"Refreshed {len(written)} Arm JSON files in {written[0].parent}")
-        _status("Fetching Arm A64 AARCHMRS archive (large, one-time download)")
+        status(f"Refreshed {len(written)} Arm JSON files in {written[0].parent}")
+        status("Fetching Arm A64 AARCHMRS archive (large, one-time download)")
         try:
-            archive_path = refresh_local_arm_a64_archive()
+            archive_path = refresh_local_arm_a64_archive(on_progress=on_progress)
         except Exception as exc:
             err_console.print(f"AARCHMRS download failed: {exc}", style="red")
             raise typer.Exit(code=1) from exc
-        _status(f"AARCHMRS archive ready at {archive_path}")
-        _status("Building local catalog")
-        catalog = build_catalog(include_sdm=include_sdm, status=_status)
-        _status("Saving catalog snapshot")
+        status(f"AARCHMRS archive ready at {archive_path}")
+        status("Building local catalog")
+        catalog = build_catalog(include_sdm=include_sdm, status=status)
+        status("Saving catalog snapshot")
         save_catalog(catalog)
-        _status("Building SQLite search database")
+        status("Building SQLite search database")
         build_sqlite(catalog)
-        _status("Writing manpages")
-        write_manpages(catalog, man_dir)
-        _status("Exporting site data")
+        status("Writing manpages")
+        write_manpages(catalog, man_dir, on_progress=on_progress)
+        status("Exporting site data")
         export_site_data(catalog, WEB_DIR)
         err_console.print(
             f"updated catalog with {len(catalog.intrinsics)} intrinsics and {len(catalog.instructions)} instructions",
             style="green",
         )
-        return
-
-    download_progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        DownloadColumn(),
-        TransferSpeedColumn(),
-        TimeRemainingColumn(),
-        console=err_console,
-        transient=True,
-    )
-    count_progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TaskProgressColumn(),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        console=err_console,
-        transient=True,
-    )
-
-    from rich.live import Live
-    from rich.console import Group
-
-    with Live(Group(download_progress, count_progress), console=err_console, refresh_per_second=10):
-        arm_task = count_progress.add_task("Arm intrinsics JSON bundle", total=3)
-        try:
-            refresh_local_arm_intrinsics_bundle(
-                on_progress=lambda done, total: count_progress.update(
-                    arm_task, completed=done, total=total
-                ),
-            )
-        except Exception as exc:
-            count_progress.update(arm_task, description=f"Arm intrinsics download failed: {exc}")
-            raise typer.Exit(code=1) from exc
-        count_progress.update(arm_task, description="Arm intrinsics JSON bundle \u2713")
-
-        if ARM_A64_ARCHIVE_CACHE.exists() and ARM_A64_ARCHIVE_CACHE.stat().st_size > 0:
-            cached_task = count_progress.add_task(
-                f"Arm A64 AARCHMRS archive \u2713 ({ARM_A64_ARCHIVE_CACHE.name}, cached)",
-                total=1,
-            )
-            count_progress.update(cached_task, completed=1)
-        else:
-            a64_task = download_progress.add_task("Arm A64 AARCHMRS archive", total=None)
-
-            def _a64_progress(done: int, total: int | None) -> None:
-                download_progress.update(a64_task, completed=done, total=total)
-
-            try:
-                archive_path = refresh_local_arm_a64_archive(on_progress=_a64_progress)
-            except Exception as exc:
-                download_progress.update(a64_task, description=f"AARCHMRS download failed: {exc}")
-                raise typer.Exit(code=1) from exc
-            download_progress.update(
-                a64_task, description=f"Arm A64 AARCHMRS archive \u2713 ({archive_path.name})"
-            )
-
-        build_task = count_progress.add_task("Building catalog from sources", total=None)
-
-        def _build_status(msg: str) -> None:
-            count_progress.update(build_task, description=f"Building catalog: {msg}")
-
-        catalog = build_catalog(include_sdm=include_sdm, status=_build_status)
-        count_progress.update(
-            build_task, description="Building catalog \u2713", completed=1, total=1
-        )
-
-        save_task = count_progress.add_task("Saving catalog snapshot", total=1)
-        save_catalog(catalog)
-        count_progress.update(save_task, completed=1, description="Saving catalog snapshot \u2713")
-
-        sqlite_task = count_progress.add_task("Building SQLite search database", total=1)
-        build_sqlite(catalog)
-        count_progress.update(
-            sqlite_task, completed=1, description="Building SQLite search database \u2713"
-        )
-
-        man_total = len(catalog.intrinsics) + len(catalog.instructions)
-        man_task = count_progress.add_task("Writing manpages", total=man_total)
-        write_manpages(
-            catalog,
-            man_dir,
-            on_progress=lambda done, total: count_progress.update(
-                man_task, completed=done, total=total
-            ),
-        )
-        count_progress.update(man_task, description="Writing manpages \u2713")
-
-        web_task = count_progress.add_task("Exporting site data", total=1)
-        export_site_data(catalog, WEB_DIR)
-        count_progress.update(web_task, completed=1, description="Exporting site data \u2713")
-
-    err_console.print(
-        f"updated catalog with {len(catalog.intrinsics)} intrinsics and {len(catalog.instructions)} instructions",
-        style="green",
-    )
-    write_installed_version_stamp(__version__)
+        # F04: the non-interactive path used to skip the stamp, so the next
+        # run treated this fresh runtime as stale and re-downloaded it.
+        write_installed_version_stamp(__version__)
 
 
 def _refresh_runtime_from_existing_catalog() -> None:
