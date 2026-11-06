@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sqlite3
 import subprocess
 import tempfile
@@ -64,10 +63,51 @@ _EOSZ_ATTR = {16: "1", 32: "2", 64: "3"}
 _HIGH8_REGS = frozenset({"AH", "BH", "CH", "DH"})
 
 _COMMENT_STARTS = ("#", "//", "/*", "@", ";")
-_ERR_RE = re.compile(r"^<stdin>:(\d+):(\d+): (?:error|warning): (.*)$", re.M)
-# The encoding comment llvm-mc appends ends its echo line. Requiring the end
-# keeps a string echo (".ascii \" # encoding: [0x90]\"") from faking bytes.
-_ENC_RE = re.compile(r"encoding: \[([^\]]*)\]\s*$")
+
+# ---------------------------------------------------------------------------
+# llvm-mc output readers: fixed fields by position, never a pattern (S6)
+# ---------------------------------------------------------------------------
+
+
+def _mc_diagnostic(line: str) -> tuple[str, int, int, str, str] | None:
+    """(file, line, column, kind, message) of one diagnostic line, else None.
+
+    Fixed fields: ``name : digits : digits : ' ' kind : ' ' message`` with
+    kind "error" or "warning". The name is the longest space-free prefix,
+    the shape the two old patterns read (``<stdin>`` and ``q0.s`` alike).
+    """
+    scan = 0
+    while scan < len(line) and not line[scan].isspace():
+        scan += 1
+    cut = line.rfind(":", 0, scan)
+    while cut > 0:
+        number, sep, rest = line[cut + 1 :].partition(":")
+        column, sep, tail = rest.partition(":")
+        if sep and number.isdecimal() and column.isdecimal():
+            for kind in ("error", "warning"):
+                head = f" {kind}: "
+                if tail.startswith(head):
+                    return line[:cut], int(number), int(column), kind, tail[len(head) :]
+        cut = line.rfind(":", 0, cut)
+    return None
+
+
+def _encoding_payload(line: str) -> str | None:
+    """The bytes list of an llvm-mc ``encoding: [..]`` comment, else None.
+
+    The comment ends its echo line, so the bracket must close the line: a
+    string echo (".ascii \\" # encoding: [0x90]\\"") cannot fake bytes.
+    """
+    stripped = line.rstrip()
+    if not stripped.endswith("]"):
+        return None
+    start = stripped.find("encoding: [")
+    while start != -1:
+        tail = stripped[start + len("encoding: [") :]
+        if "]" not in tail[:-1]:
+            return tail[:-1]
+        start = stripped.find("encoding: [", start + 1)
+    return None
 
 
 def _mcinst_opcode(line: str) -> str | None:
@@ -87,8 +127,18 @@ def _mcinst_opcode(line: str) -> str | None:
     return None
 
 
-_CONT_RE = re.compile(r"^\s+(#|//|@|;)")
-_LABEL_RE = re.compile(r"^[\w.$]+:")
+def _continuation_line(line: str) -> bool:
+    """An indented comment line joins the previous output block."""
+    return line[:1].isspace() and line.lstrip().startswith(("#", "//", "@", ";"))
+
+
+def _label_end(text: str) -> int:
+    """Length of the leading ``name:`` label token of ``text``, else 0."""
+    index = 0
+    while index < len(text) and (text[index].isalnum() or text[index] in "._$"):
+        index += 1
+    return index + 1 if index and text[index : index + 1] == ":" else 0
+
 
 _ROW_COLUMNS = "db_key, key, architecture, mnemonic, form, enc_bits, enc_mask, enc_match, enc_extra, iform, split_attrs"
 
@@ -147,8 +197,19 @@ def _tool_path(env_var: str, tool: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-# A real llvm-mc diagnostic block ends in a caret line ("^", "^~~~", "  ^").
-_CARET_RE = re.compile(r"^[ ~]*\^+[~]*$")
+def _caret_line(line: str) -> bool:
+    """A real llvm-mc diagnostic block ends in a caret line ("^", "^~~~", "  ^")."""
+    index = 0
+    while index < len(line) and line[index] in " ~":
+        index += 1
+    start = index
+    while index < len(line) and line[index] == "^":
+        index += 1
+    if index == start:
+        return False
+    while index < len(line) and line[index] == "~":
+        index += 1
+    return index == len(line)
 
 
 def _classify_line(text: str) -> str | None:
@@ -158,9 +219,9 @@ def _classify_line(text: str) -> str | None:
         return "blank"
     if stripped.startswith(_COMMENT_STARTS):
         return "comment"
-    label = _LABEL_RE.match(stripped)
+    label = _label_end(stripped)
     if label:
-        stripped = stripped[label.end() :].strip()
+        stripped = stripped[label:].strip()
         if not stripped:
             return "label"
     if stripped.startswith("."):
@@ -172,7 +233,6 @@ def _classify_line(text: str) -> str | None:
 # it. Only the bare echo counts: a label (".code16:") and a symbol assignment
 # print (".code16 = 1", from ".set .code16, 1") echo user-chosen names at the
 # line start in the same stream, and user text must never set the mode.
-_MODE_DIR_RE = re.compile(r"^\.(code16gcc|code16|code32|code64)$")
 _MODE_BITS = {"code16": "16", "code16gcc": "16", "code32": "32", "code64": "64"}
 
 
@@ -186,13 +246,13 @@ def _parse_echo_blocks(listing: str) -> list[tuple[str, str | None, str | None, 
     blocks: list[list] = []
     mode = "64"  # the x86_64 triple starts in 64-bit mode
     for line in listing.splitlines():
-        if _CONT_RE.match(line):
+        if _continuation_line(line):
             if not blocks:
                 blocks.append(["", None, None, mode])
         else:
-            found = _MODE_DIR_RE.match(line.strip())
-            if found:
-                mode = _MODE_BITS[found.group(1)]
+            name = line.strip()
+            if name.startswith(".") and name[1:] in _MODE_BITS:
+                mode = _MODE_BITS[name[1:]]
             blocks.append([line.rstrip(), None, None, mode])
         block = blocks[-1]
         if block[1] is None:
@@ -200,9 +260,9 @@ def _parse_echo_blocks(listing: str) -> list[tuple[str, str | None, str | None, 
             if opcode is not None:
                 block[1] = opcode
         if block[2] is None:
-            match = _ENC_RE.search(line)
-            if match:
-                block[2] = match.group(1).strip()
+            payload = _encoding_payload(line)
+            if payload is not None:
+                block[2] = payload.strip()
     return [tuple(block) for block in blocks]
 
 
@@ -274,10 +334,10 @@ def _probe_lines_uncached(
     errors: dict[int, str] = {}
     stderr_lines = run.stderr.splitlines()
     for index, line in enumerate(stderr_lines):
-        match = _ERR_RE.match(line)
-        if match is None or index + 2 >= len(stderr_lines):
+        diag = _mc_diagnostic(line)
+        if diag is None or diag[0] != "<stdin>" or index + 2 >= len(stderr_lines):
             continue
-        claimed = int(match.group(1))
+        claimed = diag[1]
         # Error lines number the marked document: 2i-1 is the marker of
         # source line i, 2i is the source line itself. Only the exact llvm-mc
         # diagnostic shape counts: the diagnostic, the echo of the line it
@@ -288,9 +348,9 @@ def _probe_lines_uncached(
             continue
         if stderr_lines[index + 1].rstrip() != work[claimed - 1].rstrip():
             continue
-        if not _CARET_RE.match(stderr_lines[index + 2]):
+        if not _caret_line(stderr_lines[index + 2]):
             continue
-        errors.setdefault(claimed, match.group(3))
+        errors.setdefault(claimed, diag[4])
     blocks = _parse_echo_blocks(listing)
 
     index_of = {marker.strip(): i for i, marker in enumerate(markers, 1)}
@@ -388,8 +448,19 @@ def _probe_lines_split(lines: list[str], arch: str, syntax: str, llvm_mc: str) -
     return out
 
 
-_BYTE_RE = re.compile(r"0x([0-9a-fA-F]{2})(?:'A')?$")
-_BITS_RE = re.compile(r"0b([01Aa]{8})$")
+def _byte_token(token: str) -> tuple[str, bool] | None:
+    """(digits, binary) of one llvm-mc encoding-list token, else None.
+
+    Shapes: ``0xHH`` with an optional ``'A'`` fixup marker, and the binary
+    ``0bAAAAAAAA`` bit shape.
+    """
+    if token.startswith("0x") and len(token) in (4, 7) and token[4:] in ("", "'A'"):
+        digits = token[2:4]
+        return (digits, False) if all(ch in "0123456789abcdefABCDEF" for ch in digits) else None
+    if token.startswith("0b") and len(token) == 10:
+        digits = token[2:]
+        return (digits, True) if all(ch in "01Aa" for ch in digits) else None
+    return None
 
 
 def _covered_mask(hexbytes: str | None, *, marked_byte_covers: bool = True) -> int:
@@ -407,11 +478,13 @@ def _covered_mask(hexbytes: str | None, *, marked_byte_covers: bool = True) -> i
     for index, token in enumerate(hexbytes.split(",")):
         token = token.strip()
         bits = 0xFF
-        match = _BITS_RE.match(token)
-        if match:
-            bits = sum(1 << (7 - pos) for pos, ch in enumerate(match.group(1)) if ch in "Aa")
-        elif _BYTE_RE.match(token) and (not marked_byte_covers or not token.endswith("'A'")):
-            bits = 0
+        parsed = _byte_token(token)
+        if parsed is not None:
+            digits, binary = parsed
+            if binary:
+                bits = sum(1 << (7 - pos) for pos, ch in enumerate(digits) if ch in "Aa")
+            elif not marked_byte_covers or not token.endswith("'A'"):
+                bits = 0
         mask |= bits << (8 * index)
     return mask
 
@@ -428,14 +501,14 @@ def _bytes_to_words(hexbytes: str | None) -> bytes:
         if token in ("A", "'A'"):
             out.append(0)
             continue
-        match = _BYTE_RE.match(token) or _BITS_RE.match(token)
-        if not match:
+        parsed = _byte_token(token)
+        if parsed is None:
             # shortcut: unknown llvm-mc byte format zero-fills the whole byte,
             # upgrade the shapes if llvm-mc prints new fixup forms
             out.append(0)
             continue
-        digits = match.group(1)
-        if token.startswith("0b"):
+        digits, binary = parsed
+        if binary:
             out.append(int(digits.replace("A", "0").replace("a", "0"), 2))
         else:
             out.append(int(digits, 16))
@@ -713,7 +786,6 @@ _CATALOG_CACHE: dict[tuple[str, str, int], _Catalog] = {}
 # lines, probe B4), so the batch restarts after the erroring line.
 _QUOTE_SPAN_CACHE: dict[tuple[str, str], bool] = {}
 _UNTERM = "unterminated string constant"
-_ERR_LINE_RE = re.compile(r"^(\S+):(\d+):(\d+): error: (.*)$")
 
 
 def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str | None) -> bool:
@@ -765,9 +837,9 @@ def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str |
             run = subprocess.run(cmd + [str(top)], capture_output=True, text=True)
             errors = []
             for line in run.stderr.splitlines():
-                match = _ERR_LINE_RE.match(line)
-                if match:
-                    errors.append((owner.get(match.group(1)), match.group(4)))
+                diag = _mc_diagnostic(line)
+                if diag is not None and diag[3] == "error":
+                    errors.append((owner.get(diag[0]), diag[4]))
             if not errors:
                 for text in pending[start:]:
                     _QUOTE_SPAN_CACHE[(arch, text)] = False
@@ -792,6 +864,25 @@ def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str |
     return False
 
 
+def _results_from_probed(probed: list[dict]) -> list[LineResult]:
+    """One LineResult per probe entry: kind, rejection error, or no reason."""
+    return [
+        LineResult(
+            n=entry["n"],
+            text=entry["text"],
+            status="not-an-instruction" if entry["status"] == "NOT-AN-INSTRUCTION" else "no-row",
+            reason=(
+                entry.get("kind", "")
+                if entry["status"] == "NOT-AN-INSTRUCTION"
+                else entry.get("error", "rejected by llvm-mc")
+                if entry["status"] == "REJECTED"
+                else ""
+            ),
+        )
+        for entry in probed
+    ]
+
+
 def identify(
     document: str,
     arch: str,
@@ -811,17 +902,7 @@ def identify(
     if arch == "x86" and syntax not in _X86_SYNTAX_FLAG:
         raise ValueError(f"unknown x86 syntax {syntax!r}; expected att or intel")
 
-    if catalog_path is None:
-        from simdref.storage import SQLITE_PATH
-
-        catalog_path = SQLITE_PATH
-    catalog_path = Path(catalog_path)
-    if not catalog_path.exists():
-        raise FileNotFoundError(catalog_path)
-    cache_key = (str(catalog_path), arch, catalog_path.stat().st_mtime_ns)
-    catalog = _CATALOG_CACHE.get(cache_key)
-    if catalog is None:
-        catalog = _CATALOG_CACHE[cache_key] = _Catalog(catalog_path, arch)
+    catalog = _catalog_for(catalog_path, arch)
 
     lines = document.splitlines()
     if _string_spans_lines(lines, arch, syntax, llvm_mc):
@@ -861,21 +942,7 @@ def identify(
     # isa_by_acceptance): a RISC-V source line whose mnemonic does not start
     # with "c." probes without +c, so the bytes name the uncompressed row.
     probed = _probe_lines_split(lines, arch, syntax, llvm_mc)
-    results = [
-        LineResult(
-            n=entry["n"],
-            text=entry["text"],
-            status="not-an-instruction" if entry["status"] == "NOT-AN-INSTRUCTION" else "no-row",
-            reason=(
-                entry.get("kind", "")
-                if entry["status"] == "NOT-AN-INSTRUCTION"
-                else entry.get("error", "rejected by llvm-mc")
-                if entry["status"] == "REJECTED"
-                else ""
-            ),
-        )
-        for entry in probed
-    ]
+    results = _results_from_probed(probed)
 
     if arch == "arm":
         # No arm32 rows carry a byte key (spec K4: "arm32 (none usable
@@ -968,10 +1035,10 @@ def _parse_disasm(listing: str) -> dict[bytes, tuple[str, str]]:
         if opcode is not None and raw is not None:
             found[raw] = (found[raw][0], opcode)
             continue
-        if not line.strip() or _CONT_RE.match(line):
+        if not line.strip() or _continuation_line(line):
             continue
-        enc = _ENC_RE.search(line)
-        raw = _bytes_to_words(enc.group(1)) if enc is not None else None
+        payload = _encoding_payload(line)
+        raw = _bytes_to_words(payload) if payload is not None else None
         if raw is not None:
             found.setdefault(raw, (line.split()[0], ""))
     return found
@@ -1312,6 +1379,37 @@ def _probe_all_triples(lines: list[str], llvm_mc: str) -> dict[tuple[str, str], 
         return {key: future.result() for key, future in futures.items()}
 
 
+def _families_and_majority(
+    probed: dict[tuple[str, str], list[dict]],
+) -> tuple[list[set[str]], str | None]:
+    """Per-line accepting families and the batch majority, shared rule.
+
+    The majority names the top family of the singly accepted lines when one
+    family alone holds the top count; a tie leaves None.
+    """
+    first = probed[("x86", "att")]
+    families_of = [
+        {
+            family
+            for arch, syntax, family in _ISA_CANDIDATES
+            if probed[(arch, syntax)][index].get("status") == "OK"
+        }
+        for index in range(len(first))
+    ]
+    counts: dict[str, int] = {}
+    for families in families_of:
+        if len(families) == 1:
+            name = next(iter(families))
+            counts[name] = counts.get(name, 0) + 1
+    majority = None
+    if counts:
+        top = max(counts.values())
+        winners = [name for name, count in counts.items() if count == top]
+        if len(winners) == 1:
+            majority = winners[0]
+    return families_of, majority
+
+
 def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
     """Name each line's ISA family by the triples whose assembler encodes it.
 
@@ -1328,28 +1426,13 @@ def isa_by_acceptance(lines: list[str]) -> tuple[list[str | None], str | None]:
     llvm_mc = _tool_path("SIMDREF_LLVM_MC", "llvm-mc")
     if llvm_mc is None:
         return [None] * len(lines), None
-    accepted: list[set[str]] = [set() for _ in lines]
     try:
         runs = _probe_all_triples(list(lines), llvm_mc)
-        for arch, syntax, family in _ISA_CANDIDATES:
-            for entry, families in zip(runs[(arch, syntax)], accepted):
-                if entry["status"] == "OK":
-                    families.add(family)
     except OSError:
         # A missing or failing llvm-mc answers like no tool: all None and
         # the caller keeps its register vote.
         return [None] * len(lines), None
-    counts: dict[str, int] = {}
-    for families in accepted:
-        if len(families) == 1:
-            name = next(iter(families))
-            counts[name] = counts.get(name, 0) + 1
-    majority = None
-    if counts:
-        top = max(counts.values())
-        winners = [name for name, count in counts.items() if count == top]
-        if len(winners) == 1:
-            majority = winners[0]
+    accepted, majority = _families_and_majority(runs)
     out: list[str | None] = []
     for families in accepted:
         if len(families) == 1:
@@ -1389,21 +1472,7 @@ def identify_x86_instructions(
     if xed is None:
         raise ToolUnavailableError("xed decoder not found (set SIMDREF_XED)")
     probed = _probe_lines(texts, "x86", "intel", llvm_mc)
-    results = [
-        LineResult(
-            n=entry["n"],
-            text=entry["text"],
-            status="not-an-instruction" if entry["status"] == "NOT-AN-INSTRUCTION" else "no-row",
-            reason=(
-                entry.get("kind", "")
-                if entry["status"] == "NOT-AN-INSTRUCTION"
-                else entry.get("error", "rejected by llvm-mc")
-                if entry["status"] == "REJECTED"
-                else ""
-            ),
-        )
-        for entry in probed
-    ]
+    results = _results_from_probed(probed)
     iform_pools: dict[str, list[Row]] = {}
     for row in rows:
         if row.iform:
@@ -1505,25 +1574,9 @@ def identify_lines(
         raise ToolUnavailableError(f"llvm-mc failed to run: {exc}") from exc
     # Family per line = isa_by_acceptance's rule: the line's own accepting
     # family, else the batch majority of the singly accepted lines, else the
-    # line keeps the old matcher (no byte identity).
-    families_of: list[set[str]] = []
-    counts: dict[str, int] = {}
-    for index in range(len(texts)):
-        families = {
-            family
-            for arch, syntax, family in _ISA_CANDIDATES
-            if probed[(arch, syntax)][index].get("status") == "OK"
-        }
-        families_of.append(families)
-        if len(families) == 1:
-            name = next(iter(families))
-            counts[name] = counts.get(name, 0) + 1
-    majority = None
-    if counts:
-        top = max(counts.values())
-        winners = [name for name, count in counts.items() if count == top]
-        if len(winners) == 1:
-            majority = winners[0]
+    # line keeps the old matcher (no byte identity). The rule is shared in
+    # _families_and_majority.
+    families_of, majority = _families_and_majority(probed)
     groups: dict[tuple[str, str], list[tuple[int, dict]]] = {}
     for index, text in enumerate(texts):
         if probed[("x86", "intel")][index].get("status") == "NOT-AN-INSTRUCTION":

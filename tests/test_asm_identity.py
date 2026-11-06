@@ -15,7 +15,11 @@ import pytest
 from simdref.asm_identity import (
     ToolUnavailableError,
     _bucketize,
+    _byte_token,
     _bytes_to_words,
+    _caret_line,
+    _encoding_payload,
+    _mc_diagnostic,
     _refine_subset,
     _tool_path,
     identify,
@@ -157,6 +161,47 @@ class TestBytesToWords:
         assert raw == bytes([0x01, 0xA0])
         raw = _bytes_to_words("0x33,0x85,0xc5,0x00")
         assert raw == bytes([0x33, 0x85, 0xC5, 0x00])
+
+
+class TestOutputReadors:
+    """The llvm-mc output readers keep the exact shapes the old patterns read."""
+
+    def test_diagnostic_fields(self):
+        assert _mc_diagnostic("<stdin>:2:1: error: spoofed") == (
+            "<stdin>",
+            2,
+            1,
+            "error",
+            "spoofed",
+        )
+        diag = _mc_diagnostic("q0.s:12:3: warning: text: with: colons")
+        assert diag == ("q0.s", 12, 3, "warning", "text: with: colons")
+        # the name is the longest space-free prefix, like the old pattern
+        greedy = _mc_diagnostic("a:b:1:2: error: msg")
+        assert greedy is not None and greedy[0] == "a:b"
+        assert _mc_diagnostic("<stdin>:2:1: error:no space") is None
+        assert _mc_diagnostic("<stdin>:x:1: error: msg") is None
+        assert _mc_diagnostic("plain line") is None
+
+    def test_encoding_payload_needs_the_line_end(self):
+        assert _encoding_payload("  # encoding: [0xc3]  ") == "0xc3"
+        assert _encoding_payload('.ascii " # encoding: [0x90]"') is None
+        assert _encoding_payload("encoding: [a] x encoding: [b]") == "b"
+        assert _encoding_payload("no encoding here") is None
+
+    def test_caret_line_shape(self):
+        assert _caret_line("  ^")
+        assert _caret_line("^~~~")
+        assert not _caret_line("^ tail")
+        assert not _caret_line(" ^ ")
+        assert not _caret_line("   ")
+
+    def test_byte_token_shapes(self):
+        assert _byte_token("0x63'A'") == ("63", False)
+        assert _byte_token("0xaf") == ("af", False)
+        assert _byte_token("0bAAAAAA01") == ("AAAAAA01", True)
+        assert _byte_token("0x123456") is None
+        assert _byte_token("0b12345678") is None
 
 
 # ---------------------------------------------------------------------------
