@@ -57,7 +57,6 @@ from simdref.display import (
     display_architecture,
     display_isa,
     instruction_query_text,
-    instruction_variant_items,
     isa_visible,
     normalize_instruction_query,
     render_intrinsic,
@@ -76,15 +75,11 @@ from simdref.manpages import write_manpages
 from simdref import perf
 from simdref.perf import variant_perf_summary
 from simdref.queries import (
-    instruction_rows_for_intrinsic_indexed,
     intrinsic_perf_summary_runtime,
     linked_instruction_records,
 )
 from simdref.search import (
     SearchResult,
-    find_intrinsic,
-    find_instructions,
-    search_catalog,
     search_records,
 )
 from simdref.storage import (
@@ -101,7 +96,6 @@ from simdref.storage import (
     load_instruction_from_db,
     load_intrinsic_from_db,
     load_instructions_by_mnemonic_from_db,
-    load_instructions_by_mnemonic_prefix_from_db,
     open_db,
     read_installed_version_stamp,
     save_catalog,
@@ -184,8 +178,6 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 SHOW_FP16_ISAS = False
-SHORT_MODE = False
-FULL_MODE = False
 
 
 @contextmanager
@@ -682,13 +674,6 @@ def _maybe_auto_update_for_version_change() -> None:
         # Keep the old stamp so the next invocation retries the download.
 
 
-def _catalog_meta(catalog) -> dict:
-    return {
-        "generated_at": catalog.generated_at,
-        "source_versions": [asdict(source) for source in catalog.sources],
-    }
-
-
 def _search_runtime(
     conn, query: str, limit: int = 20
 ) -> tuple[list[SearchResult], dict[str, object], dict[str, object]]:
@@ -704,27 +689,6 @@ def _search_runtime(
 # ---------------------------------------------------------------------------
 # Instruction lookup helpers
 # ---------------------------------------------------------------------------
-
-
-def _select_instruction_variant(catalog, query: str, items):
-    parts = query.split()
-    if len(parts) < 2 or not parts[-1].isdigit():
-        return None
-    base_query = " ".join(parts[:-1]).strip()
-    if not base_query:
-        return None
-    index = int(parts[-1])
-    if index < 1:
-        return None
-    if items:
-        variants = instruction_variant_items(items)
-    elif catalog is not None:
-        variants = instruction_variant_items(find_instructions(catalog, base_query))
-    else:
-        variants = instruction_variant_items(_find_instructions_fast(base_query))
-    if 1 <= index <= len(variants):
-        return variants[index - 1]
-    return None
 
 
 # shortcut: the name lookup answers only when byte identity has no row
@@ -757,53 +721,9 @@ def _find_instructions_fast(query: str):
         return []
 
 
-def _find_instruction_family_fast(query: str):
-    ensure_runtime()
-    token = (query.split()[0] if query.split() else query).strip()
-    if not token:
-        return []
-    with open_db() as conn:
-        candidates = load_instructions_by_mnemonic_prefix_from_db(conn, token)
-    exact_mnemonic = {item.mnemonic.casefold() for item in candidates}
-    if token.casefold() in exact_mnemonic:
-        return []
-    return candidates
-
-
 # ---------------------------------------------------------------------------
 # LLM / JSON payload builders
 # ---------------------------------------------------------------------------
-
-
-def _resolve_query_payload(catalog, query: str, limit: int = 8) -> dict:
-    intrinsic = find_intrinsic(catalog, query)
-    if intrinsic is not None:
-        return {
-            "query": query,
-            "mode": "exact",
-            "match_kind": "intrinsic",
-            "intrinsic": asdict(intrinsic),
-            "performance": instruction_rows_for_intrinsic_indexed(
-                linked_instruction_records(catalog, intrinsic)
-            ),
-            **_catalog_meta(catalog),
-        }
-    instructions = find_instructions(catalog, query)
-    if instructions:
-        return {
-            "query": query,
-            "mode": "exact",
-            "match_kind": "instruction",
-            "instructions": [asdict(item) | {"key": item.key} for item in instructions],
-            **_catalog_meta(catalog),
-        }
-    return {
-        "query": query,
-        "mode": "search",
-        "match_kind": None,
-        "results": [asdict(result) for result in search_catalog(catalog, query, limit=limit)],
-        **_catalog_meta(catalog),
-    }
 
 
 def _llm_result_payload(
@@ -1018,21 +938,6 @@ def _payload_source_kinds(arch_details) -> list[str]:
         if kind not in kinds:
             kinds.append(kind)
     return kinds
-
-
-def _arch_has_perf_rows(arch: str) -> bool:
-    """True when any instruction row carries a perf slot for *arch*."""
-    from simdref.perf_sources.cores import core_architecture
-
-    family = core_architecture(arch) or ""
-    family = {"aarch64": "arm"}.get(family, family)
-    with open_db(SQLITE_PATH) as conn:
-        rows = conn.execute(
-            "SELECT payload FROM instructions_data WHERE architecture = ?", (family,)
-        )
-        return any(
-            arch in (_unpack_payload(row["payload"]).get("arch_details") or {}) for row in rows
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -1389,7 +1294,18 @@ def annotate(
             )
             raise typer.Exit(code=1)
         arch = canonical
-        if not _arch_has_perf_rows(arch):
+        from simdref.perf_sources.cores import core_architecture
+
+        family = core_architecture(arch) or ""
+        family = {"aarch64": "arm"}.get(family, family)
+        with open_db(SQLITE_PATH) as conn:
+            rows = conn.execute(
+                "SELECT payload FROM instructions_data WHERE architecture = ?", (family,)
+            )
+            has_perf_rows = any(
+                arch in (_unpack_payload(row["payload"]).get("arch_details") or {}) for row in rows
+            )
+        if not has_perf_rows:
             err_console.print(
                 f"[bold yellow]warning:[/bold yellow] no timing data for {arch} in this catalog",
                 style="yellow",
@@ -2586,7 +2502,7 @@ def export_command(
 
 def main() -> int:
     """CLI entry point — dispatches to subcommand or smart lookup."""
-    global SHOW_FP16_ISAS, SHORT_MODE, FULL_MODE
+    global SHOW_FP16_ISAS
     argv = sys.argv[1:]
     if any(arg in ("--version", "-V") for arg in argv):
         print(__version__)
@@ -2597,11 +2513,10 @@ def main() -> int:
     if "--fp16" in argv:
         SHOW_FP16_ISAS = True
         argv = [arg for arg in argv if arg != "--fp16"]
+    # Dead flags kept for compatibility: scripts still pass them.
     if "--short" in argv or "-s" in argv:
-        SHORT_MODE = True
         argv = [arg for arg in argv if arg not in ("--short", "-s")]
     if "--full" in argv or "-f" in argv:
-        FULL_MODE = True
         argv = [arg for arg in argv if arg not in ("--full", "-f")]
     # Pre-parse top-level --preset / --arch / --json for bare-query mode.
     # Subcommands (llm, annotate, etc.) handle their own flags via Typer,

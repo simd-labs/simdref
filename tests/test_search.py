@@ -6,7 +6,6 @@ from pathlib import Path
 import tempfile
 
 from conftest import build_fixture_catalog
-from simdref.cli import _resolve_query_payload
 from simdref.display import (
     display_instruction_form,
     instruction_query_text,
@@ -31,9 +30,19 @@ from simdref.riscv import (
     parse_riscv_instruction_payload,
     parse_riscv_intrinsics_payload,
 )
-from simdref.search import find_instruction, find_intrinsic, search_catalog, search_records
+from simdref.search import (
+    find_intrinsic,
+    find_instructions,
+    search_catalog,
+    search_records,
+)
 from simdref.storage import build_sqlite, open_db, save_catalog
 from simdref.tui import _fts_search, _normalize_sub_isa_selection
+
+
+def _first_instruction(catalog, query):
+    matches = find_instructions(catalog, query)
+    return matches[0] if matches else None
 
 
 class SearchTests(unittest.TestCase):
@@ -70,24 +79,24 @@ class SearchTests(unittest.TestCase):
 
     def test_instruction_lookup(self):
         catalog = build_fixture_catalog()
-        record = find_instruction(catalog, "ADDPS")
+        record = _first_instruction(catalog, "ADDPS")
         self.assertIsNotNone(record)
         self.assertIn("_mm_add_ps", record.linked_intrinsics)
         self.assertEqual(record.metadata["iclass"], "ADDPS")
         self.assertTrue(record.arch_details["SKL"]["measurement"])
         self.assertTrue(record.arch_details["SKL"]["doc"])
-        arm_record = find_instruction(catalog, "ADD (Zd.S, Pg/M, Zn.S, Zm.S)")
+        arm_record = _first_instruction(catalog, "ADD (Zd.S, Pg/M, Zn.S, Zm.S)")
         self.assertIsNotNone(arm_record)
         self.assertEqual(arm_record.architecture, "arm")
         self.assertIn("svadd_s32_z", arm_record.linked_intrinsics)
-        riscv_record = find_instruction(catalog, "vadd.vv")
+        riscv_record = _first_instruction(catalog, "vadd.vv")
         self.assertIsNotNone(riscv_record)
         self.assertEqual(riscv_record.architecture, "riscv")
         self.assertIn("__riscv_vadd_vv_i32m1", riscv_record.linked_intrinsics)
 
     def test_instruction_lookup_accepts_tokenized_form(self):
         catalog = build_fixture_catalog()
-        record = find_instruction(catalog, "VADDPS YMM YMM YMM")
+        record = _first_instruction(catalog, "VADDPS YMM YMM YMM")
         self.assertIsNotNone(record)
         self.assertEqual(record.key, "VADDPS (YMM, YMM, YMM)")
 
@@ -114,20 +123,6 @@ class SearchTests(unittest.TestCase):
         riscv_extension = search_catalog(catalog, "zvkned")
         self.assertEqual(riscv_extension[0].kind, "instruction")
         self.assertEqual(riscv_extension[0].title, "vaesdf.vv")
-
-    def test_llm_exact_intrinsic_payload(self):
-        catalog = build_fixture_catalog()
-        payload = _resolve_query_payload(catalog, "_mm_add_ps")
-        self.assertEqual(payload["mode"], "exact")
-        self.assertEqual(payload["match_kind"], "intrinsic")
-        self.assertEqual(payload["intrinsic"]["name"], "_mm_add_ps")
-        self.assertTrue(payload["performance"])
-
-    def test_llm_search_payload(self):
-        catalog = build_fixture_catalog()
-        payload = _resolve_query_payload(catalog, "_mm_add")
-        self.assertEqual(payload["mode"], "search")
-        self.assertTrue(payload["results"])
 
     def test_intrinsic_prefers_intrinsic_results(self):
         catalog = build_fixture_catalog()

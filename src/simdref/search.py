@@ -308,20 +308,6 @@ def find_intrinsic(catalog: Catalog, name: str):
     return None
 
 
-def find_instruction(catalog: Catalog, query: str):
-    target = query.casefold()
-    normalized_target = _normalized_instruction_query(query)
-    for item in catalog.instructions:
-        if item.key.casefold() == target or item.mnemonic.casefold() == target:
-            return item
-        if normalized_target and (
-            _normalized_instruction_query(item.key) == normalized_target
-            or _normalized_instruction_query(item.mnemonic) == normalized_target
-        ):
-            return item
-    return None
-
-
 def find_instructions(catalog: Catalog, query: str) -> list:
     target = query.casefold()
     normalized_target = _normalized_instruction_query(query)
