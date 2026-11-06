@@ -148,6 +148,38 @@ class SearchTests(unittest.TestCase):
         self.assertIn("_mm256_add_epi32", titles)
         self.assertNotIn("_mm512_maskz_expandloadu_epi32", [result.title for result in results])
 
+    def test_classify_query_verdicts(self):
+        from simdref.search import _classify_query
+
+        cases = {
+            "__riscv_add_vv_i32m1": "intrinsic",
+            "__riscv_": "intrinsic",
+            "_mm256_add_ps": "intrinsic",
+            "__m512": "intrinsic",
+            "mm": "intrinsic",
+            "fma.rtz.m512": "instruction",
+            "add.f32": "instruction",
+            "zv": "instruction",
+            "zvkt": "instruction",
+            "zve32f": "instruction",
+            "rv64gcv": "instruction",
+            "v": "instruction",
+            "vadd.vv": "instruction",
+            "VADDPS YMM YMM YMM": "instruction",
+            "add": "instruction",
+            "mm256": "neutral",
+            "sve": "neutral",
+            "neon": "neutral",
+        }
+        for query, kind in cases.items():
+            self.assertEqual(_classify_query(query), kind, query)
+
+    def test_tui_uses_shared_query_classifier(self):
+        from simdref.search import _classify_query as search_classify
+        from simdref.tui import _classify_query as tui_classify
+
+        self.assertIs(tui_classify, search_classify)
+
     def test_intrinsic_performance_rows(self):
         catalog = build_fixture_catalog()
         intrinsic = find_intrinsic(catalog, "_mm_add_ps")

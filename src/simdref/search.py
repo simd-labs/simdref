@@ -8,33 +8,10 @@ overlap, rapidfuzz similarity, SIMD width bonuses, and intent-based biasing
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
 
-try:
-    from rapidfuzz import fuzz
-except Exception:  # pragma: no cover - fallback when dependency is unavailable
-    from difflib import SequenceMatcher
+from rapidfuzz import fuzz
 
-    class _FallbackFuzz:
-        @staticmethod
-        def ratio(a: str, b: str) -> float:
-            return SequenceMatcher(a=a, b=b).ratio() * 100.0
-
-        @staticmethod
-        def partial_ratio(a: str, b: str) -> float:
-            return SequenceMatcher(a=a, b=b).ratio() * 100.0
-
-        @staticmethod
-        def token_set_ratio(a: str, b: str) -> float:
-            return (
-                SequenceMatcher(
-                    a=" ".join(sorted(set(a.split()))), b=" ".join(sorted(set(b.split())))
-                ).ratio()
-                * 100.0
-            )
-
-    fuzz = _FallbackFuzz()
-
+from simdref.catkey import X86_VECTOR_WIDTHS
 from simdref.models import Catalog
 
 
@@ -47,21 +24,27 @@ class SearchResult:
     score: float
 
 
-TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
-WIDTH_TOKEN_RE = re.compile(r"^(mm|mm\d+|xmm|ymm|zmm)$")
-
-
 def _normalize_tokens(value: str) -> list[str]:
-    text = value.replace("_", " ").replace(",", " ").replace("{", " ").replace("}", " ")
-    return [token.casefold() for token in TOKEN_RE.findall(text)]
+    tokens: list[str] = []
+    start = -1
+    for index, char in enumerate(value + " "):
+        if char.isascii() and char.isalnum():
+            if start < 0:
+                start = index
+        elif start >= 0:
+            tokens.append(value[start:index].casefold())
+            start = -1
+    return tokens
 
 
 def _normalize_text(value: str) -> str:
     return " ".join(_normalize_tokens(value))
 
 
-def _normalized_instruction_query(value: str) -> str:
-    return _normalize_text(value)
+def _is_width_token(token: str) -> bool:
+    if token in X86_VECTOR_WIDTHS:
+        return True
+    return token[:2] == "mm" and (len(token) == 2 or token[2:].isdecimal())
 
 
 def _classify_query(query: str) -> str:
@@ -71,12 +54,7 @@ def _classify_query(query: str) -> str:
         return "intrinsic"
     if "." in lowered and not lowered.startswith("_"):
         return "instruction"
-    if (
-        lowered == "v"
-        or lowered.startswith("zv")
-        or lowered.startswith("zve")
-        or lowered.startswith("rv")
-    ):
+    if _looks_like_isa_query(query):
         return "instruction"
     if (
         lowered.startswith("_mm")
@@ -131,8 +109,8 @@ def _token_overlap_count(query_tokens: list[str], candidate_tokens: list[str]) -
 def _width_family_bonus(query: str, candidate: str) -> float:
     query_tokens = _normalize_tokens(query)
     candidate_tokens = _normalize_tokens(candidate)
-    query_widths = {token for token in query_tokens if WIDTH_TOKEN_RE.match(token)}
-    candidate_widths = {token for token in candidate_tokens if WIDTH_TOKEN_RE.match(token)}
+    query_widths = {token for token in query_tokens if _is_width_token(token)}
+    candidate_widths = {token for token in candidate_tokens if _is_width_token(token)}
     if not query_widths or not candidate_widths:
         return 0.0
     if query_widths & candidate_widths:
@@ -141,7 +119,7 @@ def _width_family_bonus(query: str, candidate: str) -> float:
 
 
 def _meaningful_query_tokens(tokens: list[str]) -> list[str]:
-    return [token for token in tokens if not WIDTH_TOKEN_RE.match(token)]
+    return [token for token in tokens if not _is_width_token(token)]
 
 
 def _has_structural_overlap(query: str, candidate: str) -> bool:
@@ -199,12 +177,20 @@ def _intent_bias(query_kind: str, result_kind: str) -> float:
     return 0.0
 
 
+def _normalized_isa_tokens(isa_values: list[str]) -> set[str]:
+    tokens: set[str] = set()
+    for value in isa_values:
+        text = _normalize_text(value)
+        if text:
+            tokens.add(text)
+    return tokens
+
+
 def _isa_match_bias(query: str, isa_values: list[str], result_kind: str) -> float:
     normalized_query = _normalize_text(query)
     if not normalized_query:
         return 0.0
-    isa_tokens = {_normalize_text(value) for value in isa_values if _normalize_text(value)}
-    if normalized_query not in isa_tokens:
+    if normalized_query not in _normalized_isa_tokens(isa_values):
         return 0.0
     return 30.0 if result_kind == "instruction" else -15.0
 
@@ -213,9 +199,7 @@ def _is_pure_isa_query(query: str, isa_values: list[str]) -> bool:
     normalized_query = _normalize_text(query)
     if not normalized_query:
         return False
-    return normalized_query in {
-        _normalize_text(value) for value in isa_values if _normalize_text(value)
-    }
+    return normalized_query in _normalized_isa_tokens(isa_values)
 
 
 def _looks_like_isa_query(query: str) -> bool:
@@ -310,15 +294,15 @@ def find_intrinsic(catalog: Catalog, name: str):
 
 def find_instructions(catalog: Catalog, query: str) -> list:
     target = query.casefold()
-    normalized_target = _normalized_instruction_query(query)
+    normalized_target = _normalize_text(query)
     matches = []
     for item in catalog.instructions:
         if item.key.casefold() == target or item.mnemonic.casefold() == target:
             matches.append(item)
             continue
         if normalized_target and (
-            _normalized_instruction_query(item.key) == normalized_target
-            or _normalized_instruction_query(item.mnemonic) == normalized_target
+            _normalize_text(item.key) == normalized_target
+            or _normalize_text(item.mnemonic) == normalized_target
         ):
             matches.append(item)
     return matches

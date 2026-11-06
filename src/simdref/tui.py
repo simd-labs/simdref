@@ -135,7 +135,7 @@ from simdref.display import (
 )
 from simdref.perf import record_iclass, variant_perf_summary
 from simdref.queries import linked_instruction_records
-from simdref.search import SearchResult
+from simdref.search import SearchResult, _classify_query
 from simdref.storage import (
     load_instruction_from_db,
     load_intrinsic_from_db,
@@ -235,24 +235,6 @@ def _clipboard_commands(direction: str) -> list[list[str]]:
 # ---------------------------------------------------------------------------
 # FTS search
 # ---------------------------------------------------------------------------
-
-
-_MNEMONIC_HINT_TOKENS = frozenset({"add", "sub", "mul", "div", "mov", "cmp", "and", "or", "xor"})
-
-
-def _classify_query(query: str) -> str:
-    """Mirror the web SPA's `classifyQuery` so ranking biases match."""
-    lo = query.strip().lower()
-    if not lo:
-        return "neutral"
-    if lo.startswith("_mm") or lo.startswith("__m") or "_mm" in lo:
-        return "intrinsic"
-    parts = lo.replace("_", " ").split()
-    if parts:
-        first = parts[0]
-        if first in _MNEMONIC_HINT_TOKENS or first.startswith("v"):
-            return "instruction"
-    return "neutral"
 
 
 def _name_match_score(name: str, terms: list[str]) -> int:
