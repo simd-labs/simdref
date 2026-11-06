@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from simdref.annotate import _SYMBOL_TARGET_RE, _parse_objdump_instr
+from simdref.annotate import _drop_symbol_target, _parse_objdump_instr
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.asm_identity import _tool_path, identify, identify_lines
 from simdref.models import Catalog, InstructionRecord, SourceVersion
@@ -406,7 +406,7 @@ class TestObjdumpByteColumn:
         for line in (cls.FIXTURES / name).read_text().splitlines():
             parsed = _parse_objdump_instr(line)
             if parsed is not None:
-                items.append((_SYMBOL_TARGET_RE.sub(r"\1", parsed[1]).strip(), parsed[2]))
+                items.append((_drop_symbol_target(parsed[1]).strip(), parsed[2]))
         return items
 
     def test_byte_column_bytes_name_what_they_encode(self, tmp_path):

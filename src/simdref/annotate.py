@@ -21,6 +21,7 @@ from simdref import perf
 from simdref.asm_identity import isa_by_acceptance
 from simdref.lsp import NO_CATALOG_ROW, _CATALOG_ISA, _document_arch, identity_keys
 from simdref.models import InstructionRecord
+from simdref.regtable import REG_TABLE, reg_rows
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
 
 
@@ -48,12 +49,42 @@ class AsmLine:
 # Instruction head without trailing comment: the '#' comment (and GAS-style
 # annotations) is split off with str.partition — per the regex HOWTO, string
 # methods beat a lazy re group for a fixed single-character cut.
-_INSTR_RE = re.compile(
-    r"^(?P<indent>[ \t]*)"
-    r"(?P<mnemonic>[A-Za-z][A-Za-z0-9_.]*)"
-    r"(?:[ \t]+(?P<operands>.*))?$"
-)
-_LABEL_RE = re.compile(r"^[ \t]*[A-Za-z_.$][\w.$]*:")
+def _instr_head(text: str) -> tuple[str, str, str] | None:
+    """An instruction head: (indent, mnemonic, operands), or None."""
+    n = len(text)
+    i = 0
+    while i < n and text[i] in " \t":
+        i += 1
+    if i >= n or not ("a" <= text[i] <= "z" or "A" <= text[i] <= "Z"):
+        return None
+    j = i + 1
+    while j < n and (text[j].isascii() and (text[j].isalnum() or text[j] in "._")):
+        j += 1
+    if j < n and text[j] not in " \t":
+        return None
+    k = j
+    while k < n and text[k] in " \t":
+        k += 1
+    return text[:i], text[i:j], text[k:]
+
+
+def _is_label(text: str) -> bool:
+    """A label line: a name then ':' (hex-letter addresses too, issue #61)."""
+    n = len(text)
+    i = 0
+    while i < n and text[i] in " \t":
+        i += 1
+    if i >= n:
+        return False
+    head = text[i]
+    if not (head.isascii() and (head.isalpha() or head in "._$")):
+        return False
+    j = i + 1
+    while j < n and (text[j].isalnum() or text[j] in "._$"):
+        j += 1
+    return j < n and text[j] == ":"
+
+
 # objdump listings (issue #65): one format detection per listing, then one
 # rule per address line: the byte column holds next_address - address bytes.
 # objdump right-aligns the address with spaces; a TAB right before it marks a
@@ -162,25 +193,44 @@ def _is_instr_head(head: str) -> bool:
     return i == len(head) or head[i] in " \t"
 
 
-def _names_file_format(line: str) -> bool:
-    """The objdump ``file format NAME`` header phrase with its word boundaries."""
+def _file_format_name(line: str) -> str | None:
+    """The objdump ``file format NAME`` header: the format name, or None."""
     start = 0
     while True:
         i = line.find("file format", start)
         if i < 0:
-            return False
+            return None
         start = i + 1
         if i and (line[i - 1] == "_" or line[i - 1].isalnum()):
             continue
         j = k = i + len("file format")
         while k < len(line) and line[k].isspace():
             k += 1
-        if j < k < len(line):
-            return True
+        if k <= j or k >= len(line):
+            continue
+        j = k
+        while j < len(line) and not line[j].isspace():
+            j += 1
+        return line[k:j]
 
 
 # objdump -S injects "file:line" comment lines before the instruction block.
-_OBJDUMP_SRC_RE = re.compile(r"^\s*(?P<file>[^ \t/][^:]*):(?P<line>\d+)\s*$")
+def _objdump_source_marker(line: str) -> tuple[str, int] | None:
+    """An objdump -S source marker "file:line": (file, line), or None."""
+    s = line.strip()
+    colon = s.rfind(":")
+    if colon < 1 or s[0] == "/":
+        return None
+    number = s[colon + 1 :]
+    if not number.isdecimal():
+        return None
+    file = s[:colon]
+    # the old file first char class allowed ':', the rest could not contain it
+    colons = file.count(":")
+    if colons > 1 or (colons == 1 and file[0] != ":"):
+        return None
+    return file.strip(), int(number)
+
 
 # Legal x86 prefix tokens objdump prints as words before the mnemonic
 # ("data16 cs nopw ..."). The mnemonic is the first token after them.
@@ -203,10 +253,20 @@ _X86_PREFIX_TOKENS = frozenset(
     }
 )
 
+
 # A bare line holding one prefix token is the prefix instruction by itself
 # (issue #52 prefix padding, issue #60 class 4 silent drop). addr16/data32
 # and the REX spellings join the set objdump prints before a mnemonic.
-_LONE_PREFIX_RE = re.compile(r"rex(?:\.[A-Za-z]{1,4})?")
+def _is_lone_rex(token: str) -> bool:
+    """A lone REX prefix spelling ("rex", "rex.w"), full token."""
+    rest = token[3:] if token.startswith("rex") else None
+    if rest is None:
+        return False
+    return rest == "" or (
+        rest.startswith(".") and rest[1:].isascii() and rest[1:].isalpha() and len(rest) <= 5
+    )
+
+
 _LONE_PREFIX_TOKENS = _X86_PREFIX_TOKENS | {"addr16", "data32"}
 
 
@@ -263,7 +323,7 @@ def _objdump_records(lines: list[str]) -> dict[int, _ObjdumpRecord]:
     # lines are "addr:" lines with a TAB or a byte column after the colon (a
     # label with a same-line instruction, "\tadd: ret", has neither).
     shaped = [line for line in addr_lines if _objdump_shaped(_objdump_body(line))]
-    has_header = any(map(_names_file_format, lines[:10]))
+    has_header = any(map(_file_format_name, lines[:10]))
     if not has_header and not (content and len(shaped) * 2 > len(content)):
         return {}
     has_addr = len(addr_lines) * 2 > len(content)  # --no-leading-addr still prints data addresses
@@ -388,14 +448,14 @@ def _asm_line(stripped: str, obj: _ObjdumpRecord | None, track_positions: bool) 
     if obj is not None:
         address, _bytes, rest, _hex = obj
         head, comment = _split_comment(rest)
-        m = _INSTR_RE.match(_strip_prefix_tokens(head))
+        m = _instr_head(_strip_prefix_tokens(head))
         if m:
             return AsmLine(
                 kind=LineKind.INSTRUCTION,
                 raw=stripped,
                 indent=(stripped[: stripped.find(rest)] if rest in stripped else ""),
-                mnemonic=m.group("mnemonic") or "",
-                operands=(m.group("operands") or "").strip(),
+                mnemonic=m[1],
+                operands=m[2].strip(),
                 trailing_comment=comment.strip(),
                 address=address,
             )
@@ -406,19 +466,19 @@ def _asm_line(stripped: str, obj: _ObjdumpRecord | None, track_positions: bool) 
         # keywords ("return", "if", "for", ...) as mnemonics.
         return AsmLine(LineKind.COMMENT, stripped)
 
-    if _LABEL_RE.match(stripped):
+    if _is_label(stripped):
         return AsmLine(LineKind.LABEL, stripped)
 
     head, comment = _split_comment(stripped)
-    m = _INSTR_RE.match(head)
+    m = _instr_head(head)
     if not m:
         return AsmLine(LineKind.COMMENT, stripped)
     return AsmLine(
         kind=LineKind.INSTRUCTION,
         raw=stripped,
-        indent=m.group("indent") or "",
-        mnemonic=m.group("mnemonic") or "",
-        operands=(m.group("operands") or "").strip(),
+        indent=m[0],
+        mnemonic=m[1],
+        operands=m[2].strip(),
         trailing_comment=comment.strip(),
         address=None,
     )
@@ -457,24 +517,117 @@ def _isa_family(architecture: str | None) -> str | None:
     return "x86"
 
 
-_FILE_FORMAT_RE = re.compile(r"\bfile format\s+(\S+)")
-# AArch64-only register spellings and branches: w0-w30, v0-v31, b.<cond>.
-_A64_EXCL_RE = re.compile(
-    r"(?<![%\w])(?:w(?:[0-9]|[12][0-9]|30)|v(?:[0-9]|[12][0-9]|3[01]))(?![\w])"
-)
+# AArch64 condition-code branches: b.<cond>, no register table covers them.
 _A64_BCOND_RE = re.compile(
     r"(?<![\w])b\.(?:eq|ne|lt|le|gt|ge|hs|lo|hi|ls|mi|pl|vs|vc|al|nv)(?![\w])"
 )
-# x0-x30 and sp name both AArch64 and RISC-V registers.
-_A64_SHARED_RE = re.compile(r"(?<![%\w])(?:x(?:[0-9]|[12][0-9]|30)|sp)(?![\w])")
-# RISC-V register names: the ABI names and x31 (AArch64 stops at x30).
-_RISCV_ISA_RE = re.compile(r"(?<![%\w])(?:zero|ra|gp|tp|fp|t[0-6]|a[0-7]|x31)(?![\w])")
-# objdump symbol annotation ("jmp 50 <x0+0x50>"): a target label, never input.
-_SYMBOL_ANNOTATION_RE = re.compile(r"<[^>]*>")
-# Same annotation for the assembler input: keep the symbol expression and
-# drop the target address in front of it (lane C6: "b.le 114 <f+0x40>" must
-# reach llvm-mc as "b.le f+0x40"; llvm-mc rejects the bare numeric offset).
-_SYMBOL_TARGET_RE = re.compile(r"(?:0x[0-9a-fA-F]+|[0-9a-fA-F]+)?\s*<([^>]*)>")
+
+
+def _drop_symbol_annotations(text: str) -> str:
+    """Drop objdump symbol annotations ("<x0+0x50>"): a target, never input."""
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] != "<":
+            out.append(text[i])
+            i += 1
+            continue
+        j = text.find(">", i + 1)
+        if j < 0:
+            out.append(text[i:])
+            break
+        out.append(" ")
+        i = j + 1
+    return "".join(out)
+
+
+def _drop_symbol_target(text: str) -> str:
+    """Keep the symbol expression of "114 <f+0x40>", drop the target address.
+
+    lane C6: the bare numeric offset must not reach llvm-mc."""
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] != "<":
+            out.append(text[i])
+            i += 1
+            continue
+        j = text.find(">", i + 1)
+        if j < 0:
+            out.append(text[i:])
+            break
+        k = i
+        while k > 0 and text[k - 1].isspace():
+            k -= 1
+        m = k
+        while m > 0 and text[m - 1] in "0123456789abcdefABCDEF":
+            m -= 1
+        start = k
+        if m < k:
+            start = m
+            if m >= 2 and text[m - 2 : m] == "0x":
+                start = m - 2
+        if i > start:
+            out = out[: -(i - start)]
+        out.append(text[i + 1 : j])
+        i = j + 1
+    return "".join(out)
+
+
+def _voter_names():
+    """The ISA vote spellings, derived from the a64/riscv rows of the table.
+
+    The digit rules exclude wzr/xzr like the old regexes; v0-v31 stay
+    arm-exclusive (bug-compatible: finding C3)."""
+    excl_arm: set[str] = set()
+    shared: set[str] = set()
+    for name, rows in REG_TABLE.items():
+        for klass, _width, family in rows:
+            if family != "a64":
+                continue
+            if klass == "xw" and name[1:].isdigit() and int(name[1:]) <= 30:
+                (excl_arm if name[0] == "w" else shared).add(name)
+            elif klass == "v" and name[1:].isdigit() and int(name[1:]) <= 31:
+                excl_arm.add(name)
+    shared.add("sp")
+    riscv = {
+        name
+        for name, rows in REG_TABLE.items()
+        if any(k == "rvabi" and f == "riscv" for k, _w, f in rows)
+        and not any(k == "fp" and f == "a64" for k, _w, f in rows)
+    }
+    riscv.discard("sp")
+    riscv |= {"fp", "x31"}
+    return frozenset(excl_arm), frozenset(shared), frozenset(riscv)
+
+
+_EXCL_ARM, _SHARED, _RISCV = _voter_names()
+
+
+def _isa_votes(text: str) -> tuple[int, int, int]:
+    """(excl_arm, excl_riscv, shared) register votes of one instruction text."""
+    excl_arm = excl_riscv = shared = 0
+    i = 0
+    n = len(text)
+    while i < n:
+        if not (text[i] == "_" or text[i].isalnum()):
+            i += 1
+            continue
+        j = i
+        while j < n and (text[j] == "_" or text[j].isalnum()):
+            j += 1
+        token = text[i:j]
+        if i == 0 or text[i - 1] != "%":
+            if token in _EXCL_ARM:
+                excl_arm += 1
+            elif token in _SHARED:
+                shared += 1
+            elif token in _RISCV:
+                excl_riscv += 1
+        i = j
+    return excl_arm, excl_riscv, shared
 
 
 def detect_isa(lines: Iterable[str]) -> str | None:
@@ -491,9 +644,9 @@ def detect_isa(lines: Iterable[str]) -> str | None:
     """
     excl_arm = excl_riscv = shared = 0
     for line in lines:
-        fmt = _FILE_FORMAT_RE.search(line)
-        if fmt:
-            name = fmt.group(1).lower()
+        name = _file_format_name(line)
+        if name:
+            name = name.lower()
             if "riscv" in name:
                 return "riscv"
             return "arm" if "aarch64" in name or "arm" in name else "x86"
@@ -502,10 +655,11 @@ def detect_isa(lines: Iterable[str]) -> str | None:
             continue
         # Strip objdump symbol annotations: "<x0+0x50>" names a target, not
         # a register (review finding 1).
-        text = _SYMBOL_ANNOTATION_RE.sub(" ", f"{parsed.mnemonic} {parsed.operands}")
-        excl_arm += len(_A64_EXCL_RE.findall(text)) + len(_A64_BCOND_RE.findall(text))
-        excl_riscv += len(_RISCV_ISA_RE.findall(text))
-        shared += len(_A64_SHARED_RE.findall(text))
+        text = _drop_symbol_annotations(f"{parsed.mnemonic} {parsed.operands}")
+        vote_arm, vote_riscv, vote_shared = _isa_votes(text)
+        excl_arm += vote_arm + len(_A64_BCOND_RE.findall(text))
+        excl_riscv += vote_riscv
+        shared += vote_shared
     if excl_arm or excl_riscv:
         return "arm" if excl_arm >= excl_riscv else "riscv"
     return "arm" if shared else None
@@ -518,7 +672,7 @@ def _line_isa(text: str) -> str | None:
     strong operand votes ``_document_arch`` feeds byte identity. Returns
     None for a neutral line: its family is the stream's.
     """
-    text = _SYMBOL_ANNOTATION_RE.sub(" ", text)
+    text = _drop_symbol_annotations(text)
     vote = detect_isa([text])
     if vote:
         return vote
@@ -543,17 +697,27 @@ _SIZE_SPECIFIER_RE = re.compile(
     r"\b(byte|word|dword|qword|xmmword|ymmword|zmmword)\s+ptr\b",
     re.IGNORECASE,
 )
-# Register classes ordered so longer/wider names match first.
-_REG_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(?:r[abcd]x|r[sd]i|rbp|rsp|r(?:8|9|1[0-5]))\b"), "R64"),
-    (re.compile(r"\b(?:e[abcd]x|e[sd]i|ebp|esp|r(?:8|9|1[0-5])d)\b"), "R32"),
-    (re.compile(r"\b(?:[abcd]x|[sd]i|bp|sp|r(?:8|9|1[0-5])w)\b"), "R16"),
-    (re.compile(r"\b(?:[abcd][lh]|[sd]il|bpl|spl|r(?:8|9|1[0-5])b)\b"), "R8"),
-    (re.compile(r"\bxmm\d+\b"), "XMM"),
-    (re.compile(r"\bymm\d+\b"), "YMM"),
-    (re.compile(r"\bzmm\d+\b"), "ZMM"),
-    (re.compile(r"\bk[0-7]\b"), "K"),
-)
+
+
+def _x86_reg_class(name: str) -> str | None:
+    """The x86 register class token of one spelling, or None.
+
+    klass "mm" stays unclassified: the old regexes never listed mmx."""
+    for klass, width, family in reg_rows(name):
+        if family != "x86":
+            continue
+        if klass == "gpr":
+            return f"R{width}"
+        if klass == "vec":
+            return {128: "XMM", 256: "YMM", 512: "ZMM"}[width]
+        if klass == "k":
+            return "K"
+    return None
+
+
+def _is_vec_shaped(name: str) -> bool:
+    # shortcut: the old regexes classed table-less vector names like xmm99, the table answers "?" (approved change C2); upgrade if a form pick ever needs them classed
+    return name[:3] in ("xmm", "ymm", "zmm") and name[3:].isdecimal()
 
 
 # ---- Operand-shape parser for variant selection ----------------------------
@@ -562,18 +726,6 @@ _REG_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 # typed slots so we can reject variants whose shape doesn't match (e.g. a
 # memory-destination form when there's no memory operand in the input) and
 # recognise zeroing idioms (``xor %eax, %eax``) by operand aliasing.
-
-
-_REG_TOKEN_RE = re.compile(
-    r"%(?P<name>"
-    r"[abcd][lh]|[sd]il|bpl|spl|r(?:8|9|1[0-5])b|"  # r8
-    r"[abcd]x|[sd]i|bp|sp|r(?:8|9|1[0-5])w|"  # r16
-    r"e[abcd]x|e[sd]i|ebp|esp|r(?:8|9|1[0-5])d|"  # r32
-    r"r[abcd]x|r[sd]i|rbp|rsp|r(?:8|9|1[0-5])|"  # r64
-    r"[xyz]mm\d+|k[0-7]"
-    r")\b",
-    re.IGNORECASE,
-)
 
 
 def _split_operands(operands: str) -> list[str]:
@@ -635,13 +787,10 @@ def _classify_operand(op: str) -> tuple[str, str | None]:
     if "(" in s or "[" in s or _SIZE_SPECIFIER_RE.search(s):
         return "M", None
     # Pure register?
-    rm = _REG_TOKEN_RE.fullmatch(s) or _REG_TOKEN_RE.fullmatch("%" + s)
-    if rm:
-        name = rm.group("name").lower()
-        for regex, tok in _REG_PATTERNS:
-            if regex.fullmatch(name):
-                return tok, name
-        return "?", name
+    name = (s[1:] if s[:1] == "%" else s).casefold()
+    tok = _x86_reg_class(name)
+    if tok is not None or _is_vec_shaped(name):
+        return tok or "?", name
     # Plain symbol (branch target) or unknown.
     if re.fullmatch(r"[A-Za-z_.$][\w.$@]*", s):
         return "REL", None
@@ -1194,7 +1343,7 @@ def _annotate_instruction(
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
     token = parsed.mnemonic.lower()
-    if not parsed.operands and (token in _LONE_PREFIX_TOKENS or _LONE_PREFIX_RE.fullmatch(token)):
+    if not parsed.operands and (token in _LONE_PREFIX_TOKENS or _is_lone_rex(token)):
         # A lone x86 prefix assembles to its prefix byte and its row is the
         # prefix record: never a neighbour form and never a silent drop.
         summary = f"Instruction prefix ({token})."
@@ -1413,7 +1562,7 @@ def annotate_stream(
             continue
         obj = records.get(index)
         text = obj[2] if obj is not None else parsed.raw
-        items.append((index, _SYMBOL_TARGET_RE.sub(r"\1", text).strip()))
+        items.append((index, _drop_symbol_target(text).strip()))
         byte_columns.append(obj[3] if obj is not None else None)
     identity = {
         index: key
@@ -1456,14 +1605,10 @@ def annotate_stream(
             else:
                 # `-S` source interleave: objdump injects "file:line" marker
                 # lines immediately before the block they describe. Only
-                # non-instruction lines reach the (pricier) marker regex.
-                src_m = _OBJDUMP_SRC_RE.match(parsed.raw)
-                if src_m:
-                    pending_src_file = src_m.group("file").strip()
-                    try:
-                        pending_src_line = int(src_m.group("line"))
-                    except ValueError:
-                        pending_src_line = None
+                # non-instruction lines reach the (pricier) marker scan.
+                src = _objdump_source_marker(parsed.raw)
+                if src:
+                    pending_src_file, pending_src_line = src
                     if not collecting_json:
                         yield parsed.raw + "\n"
                     continue

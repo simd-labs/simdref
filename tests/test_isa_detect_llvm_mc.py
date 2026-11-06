@@ -21,7 +21,7 @@ from simdref import annotate as annotate_mod
 from simdref.annotate import (
     AnnotateOptions,
     LineKind,
-    _SYMBOL_ANNOTATION_RE,
+    _drop_symbol_annotations,
     _parse_objdump_instr,
     annotate_stream,
     parse_asm_line,
@@ -56,7 +56,7 @@ def _cleaned(text: str) -> str | None:
     if parsed.kind != LineKind.INSTRUCTION:
         return None
     obj = _parse_objdump_instr(parsed.raw)
-    return _SYMBOL_ANNOTATION_RE.sub(" ", obj[1] if obj is not None else parsed.raw).strip()
+    return _drop_symbol_annotations(obj[1] if obj is not None else parsed.raw).strip()
 
 
 def _doc(name: str) -> list[str]:

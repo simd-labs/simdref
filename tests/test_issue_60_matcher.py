@@ -12,7 +12,7 @@ import pytest
 
 from simdref.annotate import (
     AnnotateOptions,
-    _SYMBOL_TARGET_RE,
+    _drop_symbol_target,
     annotate_stream,
 )
 from simdref.asm_identity import _bytes_to_words, _probe_lines, _tool_path, _xed_facts
@@ -79,7 +79,7 @@ def _fixture_db(tmp_path: Path) -> Path:
     rows: list[InstructionRecord] = []
     seen: set[str] = set()
     for syntax in ("att", "intel"):
-        cleaned = {line: _SYMBOL_TARGET_RE.sub(r"\1", line).strip() for line in X86_LINES}
+        cleaned = {line: _drop_symbol_target(line).strip() for line in X86_LINES}
         lines = [
             cleaned[line]
             for line in X86_LINES
@@ -186,10 +186,7 @@ class TestSymbolExpression:
     def test_strip_keeps_the_symbol_expression(self):
         # Lane C6: "b.le 114 <my_memcmp+0x40>" must reach llvm-mc as
         # "b.le my_memcmp+0x40"; llvm-mc rejects the bare numeric offset.
-        assert (
-            _SYMBOL_TARGET_RE.sub(r"\1", "b.le\t114 <my_memcmp+0x40>").strip()
-            == "b.le\tmy_memcmp+0x40"
-        )
+        assert _drop_symbol_target("b.le\t114 <my_memcmp+0x40>").strip() == "b.le\tmy_memcmp+0x40"
 
     @needs_tools
     def test_b_le_symbol_line_resolves_to_the_b_cond_row(self, conn):
