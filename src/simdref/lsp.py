@@ -1042,11 +1042,7 @@ def _identity_batch(
     # The document vote only names the family whose assembler to try for
     # lines no per-line acceptance answer exists for. No line is dropped.
     picked = _document_arch(texts, intel, syntax)
-    fallback_family = (
-        {"x86": "x86", "aarch64": "arm", "riscv64": "riscv"}.get(picked[0])
-        if picked is not None
-        else None
-    )
+    fallback_family = catkey.ISA_FAMILY.get(picked[0]) if picked is not None else None
     try:
         results = identify_lines(
             list(zip(texts, byte_cols)),
@@ -1094,10 +1090,6 @@ def _mnemonic_has_rows(conn, text: str, semicolon_is_comment: bool) -> bool:
         ).fetchone()
         is not None
     )
-
-
-# llvm-mc arch names mapped to the catalog's architecture column values.
-_CATALOG_ISA = {"x86": "x86", "aarch64": "arm", "riscv64": "riscv"}
 
 
 def _exact_key_beats_identity(conn, text: str, intel: bool, slot: str) -> bool:
@@ -1160,7 +1152,7 @@ def identity_keys(
         # The doc arch feeds the fallback matcher when byte identity cannot run.
         picked = _document_arch(items, vote, bool(intel))
         if picked is not None:
-            arch_out.append(_CATALOG_ISA.get(picked[0], picked[0]))
+            arch_out.append(catkey.ISA_FAMILY.get(picked[0], picked[0]))
     try:
         row = conn.execute("PRAGMA database_list").fetchone()
     except (sqlite3.Error, AttributeError):

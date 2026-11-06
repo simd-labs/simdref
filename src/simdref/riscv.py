@@ -8,28 +8,11 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
+from simdref.catkey import normalize_isa as _normalize_isa
 from simdref.htmltext import strip_html, tag_at, tighten
 from simdref.models import InstructionRecord, IntrinsicRecord
 
 RISCV_RVV_INTRINSICS_PROJECT_URL = "https://github.com/riscv-non-isa/riscv-rvv-intrinsic-doc"
-
-
-def _normalize_isa(value: Any) -> list[str]:
-    if isinstance(value, dict):
-        normalized: list[str] = []
-        for key in ("isa", "extensions", "extension", "name", "value"):
-            normalized.extend(_normalize_isa(value.get(key)))
-        if normalized:
-            return list(dict.fromkeys(normalized))
-        return [str(key).strip() for key, enabled in value.items() if enabled and str(key).strip()]
-    if isinstance(value, list):
-        normalized: list[str] = []
-        for item in value:
-            normalized.extend(_normalize_isa(item))
-        return list(dict.fromkeys(normalized))
-    if isinstance(value, str):
-        return [part.strip() for part in re.split(r"[,/|]\s*|\s{2,}", value) if part.strip()]
-    return []
 
 
 # The unified-db bundle writes this when the upstream YAML has no text.

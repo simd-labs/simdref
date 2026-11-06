@@ -7,6 +7,8 @@ name the classes lsp.py mints in _operand_class.
 
 from __future__ import annotations
 
+from typing import Any
+
 from simdref.asmline import split_operands
 from simdref.regtable import reg_width
 
@@ -56,6 +58,48 @@ def split_isa_parts(value: str) -> list[str]:
         index += 1
     parts.append(value[start:])
     return [part.strip() for part in parts if part.strip()]
+
+
+# llvm-mc and record architecture names mapped to catalog architecture values.
+ISA_FAMILY = {"x86": "x86", "aarch64": "arm", "arm": "arm", "riscv32": "riscv", "riscv64": "riscv"}
+
+
+def isa_family(architecture: str | None) -> str | None:
+    """Map an ISA option or a record architecture to one catalog family."""
+    name = (architecture or "").lower()
+    if not name or name == "auto":
+        return None
+    if name in ISA_FAMILY:
+        return ISA_FAMILY[name]
+    if name.startswith(("arm", "aarch")):
+        return "arm"
+    if name.startswith("riscv"):
+        return "riscv"
+    return "x86"
+
+
+def normalize_isa(value: Any) -> list[str]:
+    """The ISA tags of one source value: dict, list or string.
+
+    A dict reads its known keys in order else its enabled keys, a list
+    flattens and deduplicates its items, a string splits into parts.
+    Tags are stripped and empty tags drop.
+    """
+    if isinstance(value, dict):
+        tags: list[str] = []
+        for key in ("isa", "extensions", "extension", "name", "value"):
+            tags.extend(normalize_isa(value.get(key)))
+        if tags:
+            return list(dict.fromkeys(tags))
+        return [str(key).strip() for key, enabled in value.items() if enabled and str(key).strip()]
+    if isinstance(value, list):
+        tags: list[str] = []
+        for item in value:
+            tags.extend(normalize_isa(item))
+        return list(dict.fromkeys(tags))
+    if isinstance(value, str):
+        return split_isa_parts(value)
+    return []
 
 
 def parse_key(key: str) -> tuple[str, str]:

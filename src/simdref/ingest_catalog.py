@@ -16,7 +16,12 @@ from typing import Any, Callable
 from urllib.parse import quote, urljoin
 
 from simdref.arm_instructions import parse_arm_instruction_payload
-from simdref.catkey import build_key, parse_key, split_isa_parts, substitute_placeholders
+from simdref.catkey import (
+    build_key,
+    normalize_isa as _normalize_isa,
+    parse_key,
+    substitute_placeholders,
+)
 from simdref.display import strip_instruction_decorators, strip_leading_tags
 from simdref.htmltext import squeeze, strip_html, tidy, unwrap_anchors
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
@@ -62,19 +67,6 @@ def _iter_xml_elements(source: str | Path, tag: str):
 
 def _intern_small(value: str) -> str:
     return sys.intern(value) if value and len(value) <= 32 else value
-
-
-def _normalize_isa(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [_intern_small(str(item)) for item in value if item]
-    if isinstance(value, str):
-        return list(_normalize_isa_string(value))
-    return []
-
-
-@lru_cache(maxsize=512)
-def _normalize_isa_string(value: str) -> tuple[str, ...]:
-    return tuple(_intern_small(part) for part in split_isa_parts(value))
 
 
 @lru_cache(maxsize=128)

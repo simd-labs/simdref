@@ -19,7 +19,8 @@ from typing import Any, Iterable, Iterator
 
 from simdref import perf
 from simdref.asm_identity import isa_by_acceptance
-from simdref.lsp import NO_CATALOG_ROW, _CATALOG_ISA, _document_arch, identity_keys
+from simdref.catkey import ISA_FAMILY, isa_family as _isa_family
+from simdref.lsp import NO_CATALOG_ROW, _document_arch, identity_keys
 from simdref.models import InstructionRecord
 from simdref.regtable import REG_TABLE, reg_rows
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
@@ -505,18 +506,6 @@ def _lookup_variants(mnemonic: str) -> list[str]:
     return out
 
 
-def _isa_family(architecture: str | None) -> str | None:
-    """Map an ISA option or a record architecture to one catalog family."""
-    name = (architecture or "").lower()
-    if not name or name == "auto":
-        return None
-    if name.startswith(("arm", "aarch")):
-        return "arm"
-    if name.startswith("riscv"):
-        return "riscv"
-    return "x86"
-
-
 # AArch64 condition-code branches: b.<cond>, no register table covers them.
 _A64_BCOND_RE = re.compile(
     r"(?<![\w])b\.(?:eq|ne|lt|le|gt|ge|hs|lo|hi|ls|mi|pl|vs|vc|al|nv)(?![\w])"
@@ -677,7 +666,7 @@ def _line_isa(text: str) -> str | None:
     if vote:
         return vote
     picked = _document_arch((text,), False, False)
-    return _CATALOG_ISA.get(picked[0]) if picked else None
+    return ISA_FAMILY.get(picked[0]) if picked else None
 
 
 def lookup(

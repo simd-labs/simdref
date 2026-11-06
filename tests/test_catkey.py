@@ -5,9 +5,12 @@ import json
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.catkey import (
     IMMEDIATE_ACCEPT,
+    ISA_FAMILY,
     build_key,
     form_accept,
+    isa_family,
     key_operand_bits,
+    normalize_isa,
     operands_of_key,
     split_isa_parts,
 )
@@ -68,6 +71,30 @@ def test_split_isa_parts_splits_on_separators_and_space_runs():
         "x",
     ]
     assert split_isa_parts("AArch64 Base") == ["AArch64 Base"]
+
+
+def test_normalize_isa_reads_dicts_lists_and_strings():
+    assert normalize_isa("SVE2 / SME, NEON") == ["SVE2", "SME", "NEON"]
+    assert normalize_isa([" V ", "V", {"isa": ["Zve32x"]}]) == ["V", "Zve32x"]
+    assert normalize_isa({"isa": "V", "extensions": ["V", "Zve32x"]}) == ["V", "Zve32x"]
+    assert normalize_isa({"V": True, "D": False}) == ["V"]
+    assert normalize_isa(None) == []
+
+
+def test_isa_family_maps_every_catalog_family():
+    assert ISA_FAMILY == {
+        "x86": "x86",
+        "aarch64": "arm",
+        "arm": "arm",
+        "riscv32": "riscv",
+        "riscv64": "riscv",
+    }
+    assert isa_family("AArch64") == "arm"
+    assert isa_family("armv8-a") == "arm"
+    assert isa_family("riscv64") == "riscv"
+    assert isa_family("skylake") == "x86"
+    assert isa_family("auto") is None
+    assert isa_family(None) is None
 
 
 def test_ba_placeholder_row_resolves():

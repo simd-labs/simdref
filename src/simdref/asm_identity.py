@@ -34,6 +34,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from simdref.catkey import ISA_FAMILY
+
 # Measured invocation of the 144/401/703 corpora probes (asm-pip/probe).
 _ARCH_CFG: dict[str, dict] = {
     "x86": {
@@ -534,13 +536,7 @@ class _Catalog:
             if "enc_mask" not in columns:
                 self.keyless = True
                 return
-            want = {
-                "x86": "x86",
-                "aarch64": "arm",
-                "arm": "arm",
-                "riscv32": "riscv",
-                "riscv64": "riscv",
-            }[arch]
+            want = ISA_FAMILY[arch]
             for raw in conn.execute(
                 f"SELECT {_ROW_COLUMNS} FROM instructions_data WHERE architecture = ?", (want,)
             ):

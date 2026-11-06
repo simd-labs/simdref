@@ -10,18 +10,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from simdref.catkey import RULE_PLACEHOLDER_BY_FOLD, build_key, split_isa_parts
+from simdref.catkey import RULE_PLACEHOLDER_BY_FOLD, build_key, normalize_isa as _normalize_isa
 from simdref.htmltext import squash, strip_html
 from simdref.ingest_sources import read_local_arm_a64_xml_briefs
 from simdref.models import InstructionRecord
-
-
-def _normalize_isa(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, str):
-        return split_isa_parts(value)
-    return []
 
 
 # Arm ARM titles for mnemonics the AARCHMRS payload and the ACLE intrinsics

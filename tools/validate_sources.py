@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import msgpack
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -17,7 +16,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from simdref.arm_instructions import parse_arm_instruction_payload
-from simdref.catkey import build_key
+from simdref.catkey import build_key, normalize_isa as _normalize_isa_list
 from simdref.display import strip_instruction_decorators
 from simdref.ingest_catalog import (
     _arm_live_instruction_refs,
@@ -53,14 +52,6 @@ def _fail(message: str) -> None:
 
 def _strip(value: Any) -> str:
     return str(value or "").strip()
-
-
-def _normalize_isa_list(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if isinstance(value, str):
-        return [part.strip() for part in re.split(r"[,/|]\s*|\s{2,}", value) if part.strip()]
-    return []
 
 
 _X86_SDM_EXPECTATIONS: dict[str, dict[str, object]] = {
