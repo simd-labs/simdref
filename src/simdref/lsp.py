@@ -3,14 +3,22 @@ from __future__ import annotations
 import functools
 import json
 import os
-import re
 import sqlite3
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from simdref import asmline, catkey
 from simdref.display import instruction_markdown, web_deep_link
+from simdref.operands import (
+    INTEL_SIZE_BITS,
+    brace_members,
+    first_member,
+    intel_size_bits,
+    is_int_literal,
+    strip_braces,
+)
 from simdref.perf import best_cpi, best_latency, record_iclass
 from simdref.queries import linked_instruction_records
 from simdref.regtable import reg_has, reg_rows, reg_width
@@ -27,28 +35,6 @@ from simdref.storage import (
 )
 
 
-WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
-MNEMONIC_RE = re.compile(r"^[A-Za-z][A-Za-z0-9.]*$")
-# Matches an asm comment marker: '#', '//' or a '/* ... */' block. The '#'
-# context check lives in _strip_asm_comment, because a '#' can open an
-# AArch64 immediate operand.
-ASM_COMMENT_RE = re.compile(r"#|//|/\*.*?\*/")
-# In a .asm file (NASM/MASM) ";" starts a comment. A .s/.S file in GAS syntax
-# uses ";" as a statement separator, so it stays.
-ASM_SEMICOLON_COMMENT_RE = re.compile(r";.*$")
-# Matches a string literal or a comment. The scanner blanks comments and keeps strings.
-# ponytail: character literals ('"') and raw strings are not handled.
-C_TOKEN_RE = re.compile(r'"(?:[^"\\\n]|\\.)*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
-# asm("..."), __asm__("..."), __asm("..."), with optional qualifiers. Adjacent
-# string literals concatenate. Extended asm (": outputs : inputs") ends at ':'.
-ASM_STRING_RE = re.compile(
-    r"(?<![A-Za-z0-9_])(?:__asm__|__asm|asm)"
-    r"(?:\s+(?:volatile|__volatile__|goto|inline))*\s*\(\s*"
-    r'("(?:[^"\\]|\\.)*"(?:\s*"(?:[^"\\]|\\.)*")*)'
-    r"(?=\s*[:)])"
-)
-STRING_PART_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
-ASM_SPLIT_RE = re.compile(r"\\n|;")
 C_EXTENSIONS = (".c", ".cc", ".cpp", ".cxx", ".c++", ".h", ".hpp", ".hh", ".hxx", ".cu", ".cuh")
 CATALOG_MISSING = "simdref catalog not found. Run: isa update, then restart the editor."
 
@@ -88,11 +74,7 @@ def _word_at(text: str, line: int, character: int) -> str | None:
     if line >= len(lines):
         return None
     current = lines[line]
-    character = _code_point_index(current, character)
-    for match in WORD_RE.finditer(current):
-        if match.start() <= character <= match.end():
-            return match.group(0)
-    return None
+    return asmline.word_at(current, _code_point_index(current, character))
 
 
 def _code_point_index(line: str, character: int) -> int:
@@ -114,34 +96,67 @@ def _line_prefix(text: str, line: int, character: int) -> str:
     if line >= len(lines):
         return ""
     current = lines[line][: _code_point_index(lines[line], character)]
-    match = re.search(WORD_RE.pattern + r"$", current)
-    return match.group(0) if match else ""
+    return asmline.word_at(current, len(current)) or ""
 
 
 _ATT_SUFFIX_WIDTH = {"b": 8, "w": 16, "l": 32, "q": 64}
-# Intel size keywords ("byte ptr [rdx]", NASM "byte [rdx]") name the memory width.
-_INTEL_SIZE_BITS = {
-    "byte": 8,
-    "word": 16,
-    "dword": 32,
-    "fword": 48,
-    "qword": 64,
-    "tbyte": 80,
-    "oword": 128,
-    "xmmword": 128,
-    "ymmword": 256,
-    "zmmword": 512,
-}
-_INTEL_SIZE_RE = re.compile(
-    rf"({'|'.join(_INTEL_SIZE_BITS)})\s+(?:ptr\s+)?(?:[a-z]{{2,}}:\s*)?\[", re.IGNORECASE
-)
-_ACCUMULATOR = {"al": "r8", "ax": "r16", "eax": "r32", "rax": "r64"}
-_STRING_OP_RE = re.compile(r"(movs|cmps|scas|lods|stos|ins|outs)[bwdq]", re.IGNORECASE)
-_X86_VECTOR_WIDTHS = {"xmm": "v128", "ymm": "v256", "zmm": "v512"}
+# GAS string-move names the catalog holds under Intel names. The AT&T
+# zero/sign-extend strip must not resolve movsbl to the string move movsb.
+_STRING_OPS = frozenset({"movs", "cmps", "scas", "lods", "stos", "ins", "outs"})
 
-# A single SME ZA tile element ("za0h.b[w12, 0]"), never a multi-tile range
-# ("za0h.b[w12, 0:1]") or a vector-length-grouped array ("za.b[w8, 0, vgx2]").
-_A64_ZA_TILE_RE = re.compile(r"za\d+[vh]?\.[bhsd]\[\s*w\d+\s*,\s*#?\d+\s*\]", re.IGNORECASE)
+
+def _is_string_op(stem: str) -> bool:
+    """True for a string-move spelling: a name plus one width letter."""
+    return (
+        len(stem) >= 2
+        and stem[-1:].casefold() in ("b", "w", "d", "q")
+        and stem[:-1].casefold() in _STRING_OPS
+    )
+
+
+def _za_tile_element(name: str) -> bool:
+    """True for one ZA tile element ("za0h.b[w12, 0]"), never a range."""
+    text = name.casefold()
+    if not text.startswith("za"):
+        return False
+    end = 2
+    while text[end : end + 1].isdecimal():
+        end += 1
+    if end == 2:
+        return False
+    index = end + (1 if text[end : end + 1] in ("v", "h") else 0)
+    if text[index : index + 2] not in (".b", ".h", ".s", ".d"):
+        return False
+    index += 2
+    if text[index : index + 1] != "[":
+        return False
+    index = _skip_space(text, index + 1)
+    if text[index : index + 1] != "w":
+        return False
+    end = index + 1
+    while text[end : end + 1].isdecimal():
+        end += 1
+    if end == index + 1:
+        return False
+    index = _skip_space(text, end)
+    if text[index : index + 1] != ",":
+        return False
+    index = _skip_space(text, index + 1)
+    if text[index : index + 1] == "#":
+        index += 1
+    end = index
+    while text[end : end + 1].isdecimal():
+        end += 1
+    close = _skip_space(text, end)
+    return end > index and text[close : close + 1] == "]" and close + 1 == len(text)
+
+
+def _skip_space(text: str, index: int) -> int:
+    while index < len(text) and text[index].isspace():
+        index += 1
+    return index
+
+
 # Register spellings come from the generated regtable: names, classes,
 # widths and families from the pinned LLVM's register data. The edge-case
 # rules stay in code: sp/bp/si/di are x86 only with a '%' prefix (the
@@ -404,13 +419,13 @@ def _split_asm_operands(operands: str) -> tuple[list[str], list[str | None]]:
         return [], []
     parts: list[str] = []
     marks: list[str | None] = []
-    for index, piece in enumerate(re.split(r",(?![^(\[{]*[)\]}])", operands)):
-        token = piece.strip().split(None, 1)[0].casefold() if piece.strip() else ""
+    for index, piece in enumerate(asmline.split_line_operands(operands)):
+        token = piece.split(None, 1)[0].casefold() if piece else ""
         if index and token in _ASM_SHIFT_KEYWORDS:
             if marks:
                 marks[-1] = "e" if token in _EXTEND_SHIFT_KEYWORDS else "s"
             continue
-        parts.append(piece.strip())
+        parts.append(piece)
         marks.append(None)
     return parts, marks
 
@@ -439,15 +454,6 @@ _ATT_EXTEND_ALIAS = {
     "cltd": ("CDQ", None, None),
     "cqto": ("CQO", None, None),
 }
-
-
-def _key_operand_bits(key: str) -> tuple:
-    """The operand widths of a catalog key in order: R8l -> 8, M16 -> 16."""
-    bits = []
-    for op in _operands_of_key(key):
-        match = re.search(r"\d+", op)
-        bits.append(int(match.group(0)) if match else None)
-    return tuple(bits)
 
 
 def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
@@ -489,8 +495,10 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
         # The name carries both widths: movzwq is MOVZX (R64, R16) or MOVZX
         # (R64, M16) only, never the M8 rows the Intel spelling can also name.
         if dst_bits is not None:
-            rows = [form for form in rows if _key_operand_bits(form.key) == (dst_bits, src_bits)]
-    elif width and not _STRING_OP_RE.fullmatch(mnemonic[:-1]):
+            rows = [
+                form for form in rows if catkey.key_operand_bits(form.key) == (dst_bits, src_bits)
+            ]
+    elif width and not _is_string_op(mnemonic[:-1]):
         # movsbl is a sign-extend, not the string op movsb.
         rows = [
             form
@@ -529,11 +537,8 @@ def _classify_line(
             strong.add("x86")
         elif prefixed and reg:
             strong.add("x86")
-        elif (bare := re.fullmatch(r"\{([^}]*)\}", op)) and (
-            _is_arrangement(
-                re.split(r"[,\-]", bare.group(1).strip().casefold(), maxsplit=1)[0].strip()
-            )
-            or bare.group(1).strip().casefold().startswith("za")
+        elif (bare := brace_members(op)) and (
+            _is_arrangement(first_member(bare)) or bare.strip().casefold().startswith("za")
         ):
             # An SVE register list ("{z0.b}"), range or ZA tile list votes AArch64.
             strong.add("arm")
@@ -606,11 +611,12 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if not op:
         return None
     name = op.lstrip("*").lstrip("%").casefold()
-    if re.fullmatch(r"\$?0+", op):
+    digits = op[1:] if op.startswith("$") else op
+    if digits and set(digits) == {"0"}:
         return "lit0"
-    if re.fullmatch(r"\$?0*1", op):
+    if digits.endswith("1") and set(digits[:-1]) <= {"0"}:
         return "lit1"
-    if op.startswith("$") or re.fullmatch(r"-?(0x[0-9a-f]+|\d+)", op, re.IGNORECASE):
+    if op.startswith("$") or is_int_literal(op):
         return "i"
     # AArch64 marks immediates with '#' ("#-16", "#0x10", "#:lo12:sym").
     if op.startswith("#"):
@@ -618,21 +624,21 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if "{1to" in op:
         return "mbc"
     if "arm" in arch:
-        list_match = re.fullmatch(r"\{([^}]*)\}", op.strip())
-        if list_match:
+        inner = brace_members(op.strip())
+        if inner is not None:
             # The class of a brace list is decided by its shape.
-            return _brace_list_class(list_match.group(1).strip())
+            return _brace_list_class(inner.strip())
         if _is_png(name):
             return "png"
         if _is_pred(name):
             return "pred"
     if "{" in op:
-        op = re.sub(r"\{[^}]*\}", "", op).strip()
+        op = strip_braces(op).strip()
         name = op.lstrip("*").lstrip("%").casefold()
     if "(" in op or "[" in op:
-        sized = _INTEL_SIZE_RE.match(op)
+        sized = intel_size_bits(op)
         if sized:
-            return f"m{_INTEL_SIZE_BITS[sized.group(1).casefold()]}"
+            return f"m{sized}"
         if "[" in op and "arm" in arch:
             return _a64_address_class(op)
         return "m"
@@ -646,7 +652,7 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
             return "k"
         if name[0] == "m":
             return "mm"
-        return _X86_VECTOR_WIDTHS[name[:3]]
+        return catkey.X86_VECTOR_WIDTHS[name[:3]]
     if not intel and op.startswith("*"):
         return "m"
     if "arm" in arch:
@@ -669,14 +675,12 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     return None
 
 
-_IMMEDIATE_ACCEPT = frozenset({"i", "lit0", "lit1"})
-_LITERAL_ACCEPT = {frozenset({"lit0"}), frozenset({"lit1"})}
 _CLASS_KIND = dict(
     [(c, "register") for c in ("r8", "r16", "r32", "r64")]
     + [(c, "vector") for c in ("v128", "v256", "v512", "k", "mm", "dfp", "pred", "png")]
     + [(c, "vector") for c in ("av", "avb", "avh", "avs", "avd", "avq", "av2", "av4")]
     + [(c, "memory") for c in ("m", "moffs", "mbc", "mo", "mpre", "mreg")]
-    + [(f"m{bits}", "memory") for bits in set(_INTEL_SIZE_BITS.values())]
+    + [(f"m{bits}", "memory") for bits in set(INTEL_SIZE_BITS.values())]
     + [(c, "immediate") for c in ("i", "lit0", "lit1")]
     + [
         (c, "scalar")
@@ -703,108 +707,26 @@ _CLASS_KIND = dict(
     + [("rel", "rel")]
 )
 
-
-def _form_accept(op: str) -> frozenset:
-    """The line classes a catalog-key operand accepts, as one frozenset.
-
-    An immediate-width key (i8..i64) takes every immediate class. A literal 0/1
-    takes only its own value: a fixed-1 shift is not the line's "2". An AArch64
-    placeholder maps to the register family it encodes (<XNSP> = x or sp).
-    """
-    o = op.casefold()
-    if o in ("0", "1"):
-        return frozenset({"lit" + o})
-    if re.fullmatch(r"i\d+", o):
-        return _IMMEDIATE_ACCEPT
-    if o in _ACCUMULATOR or o == "cl":
-        return frozenset({_ACCUMULATOR.get(o, "r8")})
-    m = re.fullmatch(r"r(8|16|32|64)[hl]?", o)
-    if m:
-        return frozenset({"r" + m.group(1)})
-    if o in _X86_VECTOR_WIDTHS or o in ("k", "mm"):
-        return frozenset({_X86_VECTOR_WIDTHS.get(o, o)})
-    if re.fullmatch(r"m\d+_\d+to\d+", o):
-        return frozenset({"mbc"})
-    if re.fullmatch(r"m\d+", o):
-        return frozenset({o, "m"})
-    if re.fullmatch(r"moffs\d+", o):
-        return frozenset({"moffs"})
-    if re.fullmatch(r"rel\d*", o):
-        return frozenset({"rel"})
-    if op.startswith("["):
-        # An AArch64 bracket key encodes the index mode: pre-index carries
-        # '!' ("[<XNSP>, <HASH>#0]!"), a register offset holds a bare comma
-        # ("[<XNSP>, <WORX>]"), an immediate offset keeps its '#' ("[#0]"),
-        # and a plain base has neither ("[<XNSP>]"). "m" stays acceptable to
-        # the unsigned-offset key, whose '#imm' defaults to 0 on the line.
-        if "!" in op:
-            return frozenset({"mpre"})
-        body = op[1 : op.index("]")] if "]" in op else op[1:]
-        if "," in body:
-            return frozenset({"mreg"})
-        if "#" in body:
-            return frozenset({"mo", "m"})
-        return frozenset({"m"})
-    name = re.sub(r"(#\d+)+$", "", op.upper())
-    if "<HASH>" in name:
-        return _IMMEDIATE_ACCEPT
-    # A ZA tile operand ("<ZAT...>[W1, #0]") is not a plain vector register.
-    if "<ZAT" in name:
-        return frozenset({"za"})
-    if re.match(r"V\d+<|^[ZV]\d+\.|^\{", name):
-        # A counted register list accepts only the same count.
-        zts = re.findall(r"<ZT(\d)", name)
-        if zts:
-            return frozenset({f"av{max(int(number) for number in zts)}"})
-        count = name.count(",") + 1
-        if count in (2, 4):
-            return frozenset({f"av{count}"})
-        # A Z-register arrangement element ("Z0.S") accepts its class ("avs"),
-        # so the same-lane row outranks the other Z-register rows.
-        element = re.search(r"Z\d+\.\d*([BHSDQ])", name)
-        return frozenset({"av", f"av{element.group(1).casefold()}"} if element else {"av"})
-    # Numbered scalar FP placeholders: D0 or S1 style numbers, <BT> or <QT1> style aliases.
-    if re.fullmatch(r"[BHSDQ]\d+", name):
-        return frozenset({name[0].lower()})
-    if re.fullmatch(r"<[BHSDQ]T\d*>", name):
-        return frozenset({name[1].lower()})
-    if re.match(r"^D<|^<FPFAR_DT>$", name):
-        return frozenset({"dfp"})
-    if "PNG" in name:
-        return frozenset({"png"})
-    if re.match(r"^P\d", name):
-        return frozenset({"pred"})
-    # An extend-flavored placeholder (a name with EXTEND) takes the extend
-    # marker class; every register placeholder also takes the shift marker.
-    extend = "EXTEND" in name
-    if "WORX" in name or "R_OPTION" in name:
-        return frozenset({"w", "x"} | ({"we", "xe"} if extend else {"ws", "xs"}))
-    if "WZR" in name:
-        return frozenset({"w", "wzr"} | ({"we"} if extend else {"ws"}))
-    if "XZR" in name:
-        return frozenset({"x", "xzr"} | ({"xe"} if extend else {"xs"}))
-    if "WSP" in name:
-        return frozenset({"w", "wsp"})
-    if "SP" in name:
-        return frozenset({"x", "sp"})
-    return frozenset()
+# The line classes names in _operand_class mint: an "m" digit class per
+# size keyword, never a "mo" (memory offset) or "mbc" (broadcast) class.
+_MEMORY_CLASSES = frozenset(f"m{bits}" for bits in INTEL_SIZE_BITS.values())
 
 
 def _form_takes_line(form, classes: list) -> bool:
     """The form accepts the line's operand classes position by position.
 
-    A bare key constrains nothing; neither does a placeholder _form_accept
+    A bare key constrains nothing; neither does a placeholder catkey.form_accept
     leaves empty. Rejecting on an empty set hid the AArch64 scalar saturating
     family (<V_OPTION><D> maps to no class). An operand the classifier gave no
     class (None) constrains nothing either.
     """
-    ops = _operands_of_key(form.key)
+    ops = catkey.operands_of_key(form.key)
     if not ops:
         return True
     if len(ops) != len(classes):
         return False
     for cls, op in zip(classes, ops):
-        accept = _form_accept(op)
+        accept = catkey.form_accept(op)
         if cls is not None and accept and cls not in accept:
             return False
     return True
@@ -818,12 +740,12 @@ def _form_takes_line_lenient(form, classes: list) -> bool:
     admits the line when each of its operands accepts some class the line
     carries. A bare key still constrains nothing.
     """
-    ops = _operands_of_key(form.key)
+    ops = catkey.operands_of_key(form.key)
     if not ops or len(ops) != len(classes):
         return False
     have = {cls for cls in classes if cls}
     for cls, op in zip(classes, ops):
-        accept = _form_accept(op)
+        accept = catkey.form_accept(op)
         if cls is not None and accept and not (accept & have):
             return False
     return True
@@ -902,23 +824,20 @@ def _match_form(
     # with the keyword removed (VMOVDQU has no M512 row, and "vmovdqu zmm0,
     # zmmword ptr [rdx]" keeps the unsized load form). The keyword reward in
     # _rank still prefers the form that names the width exactly.
-    if classes and any(c and re.fullmatch(r"m\d+", c) for c in classes):
+    if classes and any(c in _MEMORY_CLASSES for c in classes):
         accepted_memory = {
             accept
             for form in matches
-            for op in _operands_of_key(form.key)
-            for accept in _form_accept(op)
+            for op in catkey.operands_of_key(form.key)
+            for accept in catkey.form_accept(op)
         }
-        classes = [
-            "m" if c and re.fullmatch(r"m\d+", c) and c not in accepted_memory else c
-            for c in classes
-        ]
+        classes = ["m" if c in _MEMORY_CLASSES and c not in accepted_memory else c for c in classes]
     # The line's classified parts are authoritative: a shift/extend suffix
     # folded into its register operand, so the parsed comma count can lag.
     count = len(classes) if classes else operand_count
     if count is None:
         return matches[0] if matches else None
-    same = [m for m in matches if len(_operands_of_key(m.key)) == count]
+    same = [m for m in matches if len(catkey.operands_of_key(m.key)) == count]
     pool = same or matches
     if not pool:
         return None
@@ -927,10 +846,10 @@ def _match_form(
     line_kinds = {_CLASS_KIND[c] for c in line_set if c in _CLASS_KIND}
 
     def _rank(form):
-        accepts = [_form_accept(op) for op in _operands_of_key(form.key)]
+        accepts = [catkey.form_accept(op) for op in catkey.operands_of_key(form.key)]
         set_score = position = in_over_lit = width = keyword = 0
         for acc in accepts:
-            if acc in _LITERAL_ACCEPT:
+            if acc in catkey.LITERAL_ACCEPT:
                 set_score += 0 if acc & line_set else -1
             elif acc & line_set:
                 set_score += 1
@@ -941,19 +860,19 @@ def _match_form(
             if any(
                 c in line_set and int(c[1:]) == suffix_bits
                 for c in acc
-                if re.fullmatch(r"[rv]\d+", c)
+                if c[:1] in ("r", "v") and c[1:].isdecimal()
             ):
                 width += 1
             # An Intel size keyword names the memory width.
-            if any(re.fullmatch(r"m\d+", c) and c in line_set for c in acc):
+            if any(c in _MEMORY_CLASSES and c in line_set for c in acc):
                 keyword += 1
         for cls, acc in zip(ordered, accepts):
             if cls in acc:
                 position += 1
             if cls in ("i", "lit0", "lit1"):
-                if acc == _IMMEDIATE_ACCEPT:
+                if acc == catkey.IMMEDIATE_ACCEPT:
                     in_over_lit += 1
-                elif acc in _LITERAL_ACCEPT:
+                elif acc in catkey.LITERAL_ACCEPT:
                     in_over_lit -= 1
         return (-keyword, -set_score, -position, -in_over_lit, -width, len(accepts), form.key)
 
@@ -1000,7 +919,7 @@ def _a64_alias_for_line(mnemonic: str, arch: frozenset, operands: str):
         # MOVA: one ZA tile element, a governing predicate, one Z register.
         if (
             len(parts) == 3
-            and any(_A64_ZA_TILE_RE.fullmatch(name) for name in names)
+            and any(_za_tile_element(name) for name in names)
             and any(_is_pred(name) for name in names)
             and any(_is_arrangement(name) for name in names)
         ):
@@ -1385,7 +1304,7 @@ def _hover_markdown(
                 instruction = None
             elif (
                 operand_count is not None
-                and len(_operands_of_key(instruction.key)) != operand_count
+                and len(catkey.operands_of_key(instruction.key)) != operand_count
             ):
                 instruction = None
         if instruction is None:
@@ -1450,14 +1369,13 @@ def _asm_line_at(text: str, language_id: str, uri: str, offset: int) -> str | No
     """
     if _is_c_doc(language_id, uri):
         spaced = text.replace("\\t", " ")
-        for start, body in _asm_literals(spaced):
+        for start, body in asmline.c_asm_literals(spaced):
             if start <= offset <= start + len(body):
-                cut = 0
-                for split in ASM_SPLIT_RE.finditer(body):
-                    if cut <= offset - start < split.start():
-                        return body[cut : split.start()]
-                    cut = split.end()
-                return body[cut:]
+                spans = asmline.statement_spans(body)
+                for low, high in spans:
+                    if low <= offset - start < high:
+                        return body[low:high]
+                return body[spans[-1][0] :]
         return None
     lines = text.split("\n")
     for line, source_line in enumerate(lines):
@@ -1467,39 +1385,31 @@ def _asm_line_at(text: str, language_id: str, uri: str, offset: int) -> str | No
     return None
 
 
-def _asm_literals(text: str) -> list[tuple[int, str]]:
-    """Return (offset, body) for each string literal inside an asm(...) call in C source."""
-    masked = C_TOKEN_RE.sub(
-        lambda m: m.group(0) if m.group(0)[0] == '"' else re.sub(r"[^\n]", " ", m.group(0)),
-        text,
-    )
-    return [
-        (match.start(1) + part.start(1), part.group(1))
-        for match in ASM_STRING_RE.finditer(masked)
-        for part in STRING_PART_RE.finditer(match.group(1))
-    ]
-
-
 def _in_asm_string(text: str, line: int, character: int) -> bool:
     offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
         text.split("\n")[line], character
     )
-    return any(start <= offset <= start + len(body) for start, body in _asm_literals(text))
+    return any(start <= offset <= start + len(body) for start, body in asmline.c_asm_literals(text))
 
 
-def _operand_count(operands: str) -> int:
-    """Count top-level commas: "(%rax,%rbx,4)" and "{1to16}" count as one operand."""
-    if not operands.strip():
-        return 0
-    depth, count = 0, 1
-    for char in operands:
-        if char in "([{":
-            depth += 1
-        elif char in ")]}":
-            depth -= 1
-        elif char == "," and depth == 0:
-            count += 1
-    return count
+def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
+    """Return (mnemonic, operand_count, operands) for an asm line, or None."""
+    line = asmline.cut_asm_comment(line, _hash_opens_operand)
+    if semicolon_is_comment:
+        line = asmline.cut_semicolon(line)
+    line = line.strip()
+    if not line or line.startswith("."):
+        return None
+    parts = line.split(None, 1)
+    if parts[0].endswith(":"):
+        line = parts[1].strip() if len(parts) > 1 else ""
+        if not line or line.startswith("."):
+            return None
+        parts = line.split(None, 1)
+    if not asmline.is_mnemonic(parts[0]):
+        return None
+    operands = parts[1] if len(parts) > 1 else ""
+    return parts[0], len(asmline.split_operands(operands)), operands
 
 
 def _hash_opens_operand(prefix: str, rest: str) -> bool:
@@ -1516,63 +1426,6 @@ def _hash_opens_operand(prefix: str, rest: str) -> bool:
     # shortcut: no mnemonic table, so "nop #2" reads as an immediate; upgrade
     # when the catalog can name first-immediate mnemonics.
     return len(words) == 1 and bool(rest) and rest[0] in "0123456789+-(:"
-
-
-def _strip_asm_comment(line: str) -> str:
-    """Strip one asm comment. A '#' that opens an immediate operand stays."""
-    out, pos = [], 0
-    for match in ASM_COMMENT_RE.finditer(line):
-        token = match.group()
-        if token.startswith("/*"):
-            out.append(line[pos : match.start()])
-            pos = match.end()
-            continue
-        if token == "#" and _hash_opens_operand(line[: match.start()], line[match.end() :]):
-            continue
-        out.append(line[pos : match.start()])
-        return "".join(out)  # a '#' or '//' comment runs to end of line
-    out.append(line[pos:])
-    return "".join(out)
-
-
-def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
-    """Return (mnemonic, operand_count, operands) for an asm line, or None."""
-    line = _strip_asm_comment(line)
-    if semicolon_is_comment:
-        line = ASM_SEMICOLON_COMMENT_RE.sub("", line)
-    line = line.strip()
-    if not line or line.startswith("."):
-        return None
-    parts = line.split(None, 1)
-    if parts[0].endswith(":"):
-        line = parts[1].strip() if len(parts) > 1 else ""
-        if not line or line.startswith("."):
-            return None
-        parts = line.split(None, 1)
-    if not MNEMONIC_RE.match(parts[0]):
-        return None
-    operands = parts[1] if len(parts) > 1 else ""
-    return parts[0], _operand_count(operands), operands
-
-
-def _operands_of_key(key: str) -> list[str]:
-    start, end = key.find("("), key.rfind(")")
-    inner = key[start + 1 : end].strip() if 0 <= start < end else ""
-    if not inner:
-        return []
-    # AArch64 address operands hold their own commas ("[<XNSP>, <HASH>#0]!"),
-    # so only a comma outside every bracket separates operands.
-    ops, depth, cut = [], 0, 0
-    for index, char in enumerate(inner):
-        if char in "([{":
-            depth += 1
-        elif char in ")]}":
-            depth -= 1
-        elif char == "," and depth == 0:
-            ops.append(inner[cut:index].strip())
-            cut = index + 1
-    ops.append(inner[cut:].strip())
-    return ops
 
 
 def _cut_label(text: str) -> str:
@@ -1628,9 +1481,10 @@ def _asm_candidates(text: str, language_id: str, uri: str) -> list[tuple[int, st
     """
     if _is_c_doc(language_id, uri):
         return [
-            (text.count("\n", 0, offset), segment)
-            for offset, body in _asm_literals(text)
-            for segment in ASM_SPLIT_RE.split(body.replace("\\t", " "))
+            (text.count("\n", 0, offset), spaced[low:high])
+            for offset, body in asmline.c_asm_literals(text)
+            for spaced in (body.replace("\\t", " "),)
+            for low, high in asmline.statement_spans(spaced)
         ]
     return list(enumerate(line.rstrip("\r") for line in text.split("\n")))
 
