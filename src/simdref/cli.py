@@ -783,7 +783,7 @@ def _llm_timing(arch_details, iclass: str | None = None, operands=None) -> dict[
     *iclass*, loses its cpi, uops and ports together.
     """
     from simdref.annotate import _cpi_for, _latency_for, _per_arch_value, _ports_for
-    from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
+    from simdref.perf_sources.merge import borrowed_field_sources, slot_kind
 
     if not isinstance(arch_details, dict):
         return {}
@@ -802,10 +802,7 @@ def _llm_timing(arch_details, iclass: str | None = None, operands=None) -> dict[
             "cpi": cpi,
             "source_kind": slot_kind(details),
         }
-        for field, key in _FIELD_SOURCE_KEYS.items():
-            # A borrowed field keeps its own donor label (#65).
-            if details.get(key) and _has_field(details, field):
-                entry[key] = details[key]
+        entry.update(borrowed_field_sources(details))
         if ports:
             entry["ports"] = ports
         uops = (details.get("measurement") or {}).get("uops")
@@ -1025,7 +1022,7 @@ def _print_non_interactive_summary(
         fmt_arch_latency,
     )
     from simdref.perf_sources.cores import canonical_core_id
-    from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
+    from simdref.perf_sources.merge import borrowed_field_sources, slot_kind
 
     canonical_arch = canonical_core_id(arch) if arch is not None else None
     if arch is not None and canonical_arch is None:
@@ -1075,10 +1072,7 @@ def _print_non_interactive_summary(
                     "source_kind": slot_kind(details),
                     "ports": ports,
                 }
-                for field, key in _FIELD_SOURCE_KEYS.items():
-                    # A borrowed field keeps its own donor label (#65).
-                    if details.get(key) and _has_field(details, field):
-                        entry[key] = details[key]
+                entry.update(borrowed_field_sources(details))
                 per_arch.append(entry)
             summary = aggregate_perf(rec, mode="avg", include_modeled=False)
             payload["variants"].append(
@@ -1522,7 +1516,7 @@ def _record_has_source_kind(rec: dict, wanted: str) -> bool:
     Each field counts under its own source: a slot with a borrowed latency
     holds both its owner's kind and its donor's (#65).
     """
-    from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, source_kind_for
+    from simdref.perf_sources.merge import donor_source_kinds
 
     slim = rec.get("source_kinds")
     if isinstance(slim, list) and any(k == wanted for k in slim):
@@ -1530,15 +1524,8 @@ def _record_has_source_kind(rec: dict, wanted: str) -> bool:
     arch_details = rec.get("arch_details") or {}
     if isinstance(arch_details, dict):
         for details in arch_details.values():
-            if isinstance(details, dict):
-                kinds = {details.get("source_kind") or "measured"}
-                kinds |= {
-                    source_kind_for(details.get(key))
-                    for key in _FIELD_SOURCE_KEYS.values()
-                    if details.get(key)
-                }
-                if wanted in kinds:
-                    return True
+            if isinstance(details, dict) and wanted in donor_source_kinds(details):
+                return True
     for nested_key in ("instruction", "instructions", "results"):
         nested = rec.get(nested_key)
         if isinstance(nested, dict):

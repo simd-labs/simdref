@@ -24,8 +24,14 @@ from simdref.perf import (
     variant_perf_summary,
 )
 from simdref.pdfrefs import normalize_pdf_refs, pdf_ref_label
-from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
+from simdref.perf_sources.merge import (
+    SOURCE_UOPS_INFO,
+    _FIELD_SOURCE_KEYS,
+    borrowed_field_sources,
+    slot_kind,
+)
 from simdref.queries import linked_instruction_records
+from simdref.search import _normalize_text
 
 if TYPE_CHECKING:
     import sqlite3
@@ -652,14 +658,7 @@ def display_instruction_title(item) -> str:
 
 def normalize_instruction_query(value: str) -> str:
     """Normalize an instruction query to lowercase alphanumeric tokens."""
-    text = value.replace("_", " ").replace(",", " ").replace("{", " ").replace("}", " ")
-    tokens = []
-    for ch in text:
-        if ch.isalnum():
-            tokens.append(ch.lower())
-        elif tokens and tokens[-1] != " ":
-            tokens.append(" ")
-    return "".join(tokens).strip()
+    return _normalize_text(value)
 
 
 def natural_query_sort_key(value: str) -> tuple[object, ...]:
@@ -721,10 +720,8 @@ def measurement_rows(item) -> list[dict]:
             row["source"] = slot_kind(details)
             # Per-row source label. Entries without a stored source are
             # uops.info rows, the same default merge._entry_rank uses.
-            row["source_tool"] = details.get("source") or "uops.info"
-            for field, key in _FIELD_SOURCE_KEYS.items():
-                if details.get(key) and _has_field(details, field):
-                    row[key] = details[key]
+            row["source_tool"] = details.get("source") or SOURCE_UOPS_INFO
+            row.update(borrowed_field_sources(details))
             # The version and citation keys ride along for the footnote;
             # the exclude set keeps them out of the table columns.
             for stored, key in (

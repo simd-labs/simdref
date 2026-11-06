@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import re
 import shutil
 from collections import defaultdict
 from dataclasses import asdict
@@ -52,7 +51,7 @@ from simdref.perf import (
 )
 from simdref.pdfrefs import normalize_pdf_refs
 from simdref.perf_sources.cores import CANONICAL_CORES
-from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, _has_field, slot_kind
+from simdref.perf_sources.merge import SOURCE_UOPS_INFO, borrowed_field_sources, slot_kind
 from simdref.storage import derive_arm_arch
 
 # Bumped whenever a JSON output's shape changes in a way the web repo's
@@ -83,12 +82,14 @@ def _web_measurements(item) -> list[dict]:
             "sourceKind": slot_kind(details),
             # Per-row source label. Entries without a stored source are
             # uops.info rows, the same default merge._entry_rank uses.
-            "source": details.get("source") or "uops.info",
+            "source": details.get("source") or SOURCE_UOPS_INFO,
         }
-        for field, key in _FIELD_SOURCE_KEYS.items():
-            # A borrowed field keeps its own donor label (#65).
-            if details.get(key) and _has_field(details, field):
-                row[key.replace("_source", "Source")] = details[key]
+        row.update(
+            {
+                key.replace("_source", "Source"): value
+                for key, value in borrowed_field_sources(details).items()
+            }
+        )
         family = perf_family_label(uarch)
         if family:
             row["family"] = family
@@ -126,10 +127,6 @@ def _chunk_prefix(mnemonic: str) -> str:
     return clean[:3] if len(clean) >= 3 else clean
 
 
-_INTRINSIC_PREFIX_STRIP = re.compile(r"^(?:mm\d*|sv|vq?)_?", re.IGNORECASE)
-_INTRINSIC_ALNUM = re.compile(r"[A-Za-z0-9]")
-
-
 def _intrinsic_chunk_prefix(name: str) -> str:
     """3-char bucket key for grouping intrinsics by their op name.
 
@@ -148,11 +145,26 @@ def _intrinsic_chunk_prefix(name: str) -> str:
     s = name.lstrip("_")
     if s[:6].lower() == "riscv_":
         s = s[6:]
-    m = _INTRINSIC_PREFIX_STRIP.match(s)
-    if m and m.end() < len(s):
-        s = s[m.end() :]
+    lowered = s.lower()
+    end = 0
+    if lowered.startswith("mm"):
+        end = 2
+        while end < len(s) and s[end].isdecimal():
+            end += 1
+    elif lowered.startswith("sv"):
+        end = 2
+    elif lowered.startswith("vq"):
+        end = 2
+    elif lowered.startswith("v"):
+        end = 1
+    if end:
+        if end < len(s) and s[end] == "_":
+            end += 1
+        # A prefix that consumes the whole name strips nothing.
+        if end < len(s):
+            s = s[end:]
     s = s.lstrip("_")
-    clean = "".join(_INTRINSIC_ALNUM.findall(s)).lower()
+    clean = "".join(ch for ch in s if ch.isascii() and ch.isalnum()).lower()
     if len(clean) < 2:
         return "misc"
     return clean[:3]

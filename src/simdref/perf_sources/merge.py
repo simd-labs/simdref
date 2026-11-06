@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from functools import lru_cache
 import json
-import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -137,6 +136,24 @@ def slot_kind(details: dict[str, Any]) -> str:
     if len(kinds) == 1:
         return kinds.pop()
     return "mixed" if kinds else (details.get("source_kind") or "measured")
+
+
+def donor_source_kinds(details: dict[str, Any]) -> set[str]:
+    """Provenance kinds of one slot: its owner kind plus each donor's."""
+    kinds = {details.get("source_kind") or "measured"}
+    kinds |= {
+        source_kind_for(details.get(key)) for key in _FIELD_SOURCE_KEYS.values() if details.get(key)
+    }
+    return kinds
+
+
+def borrowed_field_sources(details: dict[str, Any]) -> dict[str, str]:
+    """``<field>_source`` donor labels of a slot's borrowed fields (#65)."""
+    return {
+        key: details[key]
+        for field, key in _FIELD_SOURCE_KEYS.items()
+        if details.get(key) and _has_field(details, field)
+    }
 
 
 def slot_kind_label(details: dict[str, Any]) -> str:
@@ -282,9 +299,12 @@ def _key_operand_class(token: str) -> str:
     c = token.strip().casefold()
     if c.startswith("vsib") or c.startswith("moffs") or c == "agen":
         return "mem0"
-    mem = re.fullmatch(r"m(\d+).*", c)
-    if mem:
-        return f"mem{int(mem.group(1))}"
+    if c.startswith("m"):
+        end = 1
+        while end < len(c) and c[end].isdecimal():
+            end += 1
+        if end > 1:
+            return f"mem{int(c[1:end])}"
     if c == "m":
         return "mem0"
     if c in ("xmm", "ymm", "zmm", "mm", "k"):
@@ -306,10 +326,11 @@ def _key_operand_class(token: str) -> str:
 def _record_form_classes(form: str) -> tuple[str, ...]:
     # Operand classes of one catalog form, read from the key text so every
     # source (uops.info, SDM, vendored) maps the same way.
-    match = re.match(r"^[^(]+\((.*)\)", form)
-    if not match:
+    before, opened, rest = form.partition("(")
+    inner, closed, _ = rest.rpartition(")")
+    if not before or not opened or not closed:
         return ()
-    return tuple(_key_operand_class(part) for part in match.group(1).split(","))
+    return tuple(_key_operand_class(part) for part in inner.split(","))
 
 
 def _form_class_match(
@@ -318,7 +339,10 @@ def _form_class_match(
     if len(row_classes) != len(record_classes):
         return False
     for allowed, actual in zip(row_classes, record_classes):
-        base = re.match(r"[a-z]+", actual).group(0) + "*"
+        end = 0
+        while end < len(actual) and "a" <= actual[end] <= "z":
+            end += 1
+        base = actual[:end] + "*"
         if actual not in allowed and base not in allowed:
             return False
     return True

@@ -12,7 +12,7 @@ import sqlite3
 from typing import TYPE_CHECKING
 
 from simdref.perf import record_iclass, variant_perf_summary
-from simdref.perf_sources.merge import _FIELD_SOURCE_KEYS, source_kind_for
+from simdref.perf_sources.merge import donor_source_kinds
 from simdref.storage import load_instruction_from_db
 
 
@@ -32,13 +32,7 @@ def filter_arch_details_by_source_kind(
         return arch_details
     kept: dict[str, dict[str, object]] = {}
     for core, details in arch_details.items():
-        kinds = {details.get("source_kind") or "measured"}
-        kinds |= {
-            source_kind_for(details.get(key))
-            for key in _FIELD_SOURCE_KEYS.values()
-            if details.get(key)
-        }
-        if source_kind in kinds:
+        if source_kind in donor_source_kinds(details):
             kept[core] = details
     return kept
 
