@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import itertools
 import json
-import re
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
@@ -119,23 +118,17 @@ class _Candidate:
     name_line: int = -1  # line the name started on; later lines hold notes
 
 
-_TITLE_RE = re.compile(r"Table\s+(\d+-\d+)\.")
-_JUNK_RES = [
-    re.compile(r"Document #"),
-    re.compile(r"INSTRUCTION LATENCY AND THROUGHPUT"),
-    re.compile(r"EARLIER GENERATIONS OF INTEL ATOM"),
-    re.compile(r"DisplayFamily_DisplayModel"),
-    re.compile(r"•"),
-    re.compile(r"^\s*\d+\.\s+[A-Z]"),
-    re.compile(r"^\s*[a-c]:\s"),
-    re.compile(r"^\s*\*"),
-    re.compile(r"NOTES:"),
-    re.compile(r"^\s*7\.3\."),
-    re.compile(r"^\s*Processors(\s*\(Contd\.\))?\s*$"),
-    re.compile(r"^\s*[a-c]\s*$"),
-    re.compile(r"\((EP )?GLP\)"),
-    re.compile(r"^\s*Processors"),
-]
+_JUNK_MARKERS = (
+    "Document #",
+    "INSTRUCTION LATENCY AND THROUGHPUT",
+    "EARLIER GENERATIONS OF INTEL ATOM",
+    "DisplayFamily_DisplayModel",
+    "•",
+    "NOTES:",
+    "(GLP)",
+    "(EP GLP)",
+)
+_JUNK_PREFIXES = ("7.3.", "*", "Processors")
 _NAME_DROP = {"N", "Y", "NA"}  # 6-19 MSROM flags trailing every Atom row
 
 
@@ -147,10 +140,73 @@ def _is_value(tok: str) -> bool:
     return tok == "-" or value_shape(tok)
 
 
+def _digit_dot_units(s: str) -> tuple[int, int]:
+    # Leading "digit-run." units of *s*; (count, index past the last dot).
+    i, n, units = 0, len(s), 0
+    while i < n:
+        j = i
+        while j < n and s[j].isdecimal():
+            j += 1
+        if j == i or j >= n or s[j] != ".":
+            return units, i
+        units += 1
+        i = j + 1
+    return units, i
+
+
+def _letter_after_blank(s: str, i: int) -> bool:
+    # One or more blanks from index i, then an uppercase letter.
+    n = len(s)
+    if i >= n or not s[i].isspace():
+        return False
+    i += 1
+    while i < n and s[i].isspace():
+        i += 1
+    return i < n and "A" <= s[i] <= "Z"
+
+
 def _is_junk_line(line: str) -> bool:
     if "Throughput" in line and "Latency" in line:
         return True  # repeated column header on every page
-    return any(rx.search(line) for rx in _JUNK_RES)
+    if any(mark in line for mark in _JUNK_MARKERS):
+        return True
+    s = line.lstrip()
+    if any(s.startswith(p) for p in _JUNK_PREFIXES):
+        return True
+    if len(s) >= 3 and s[0] in "abc" and s[1] == ":" and s[2].isspace():
+        return True  # lettered footnote "a: "
+    if s.strip() in ("a", "b", "c"):
+        return True  # bare footnote letter
+    units, i = _digit_dot_units(s)
+    return units == 1 and _letter_after_blank(s, i)
+
+
+def _section_head(line: str) -> bool:
+    # "5.2.3. Notes" section headers and "NOTES:" blocks end the open table.
+    # Anchored at column 0: an indented "1. ..." is not a section header.
+    if line.startswith("NOTES:"):
+        return True
+    units, i = _digit_dot_units(line)
+    return units >= 1 and _letter_after_blank(line, i)
+
+
+def _table_key(line: str) -> str | None:
+    # "Table 7-16." starts a tracked table; return the number, else None.
+    i = 0
+    while True:
+        i = line.find("Table", i)
+        if i < 0:
+            return None
+        j = i + 5
+        while j < len(line) and line[j].isspace():
+            j += 1
+        if j > i + 5:
+            token, _, _ = line[j:].partition(" ")
+            core, dot, _ = token.partition(".")
+            head, dash, tail = core.partition("-")
+            if dot and dash and head.isdecimal() and tail.isdecimal():
+                return core
+        i += 1
 
 
 def _split_group_form(tokens: list[str]) -> tuple[list[str], str]:
@@ -173,7 +229,7 @@ def _glues(prev: str, tok: str) -> bool:
     # then "MPGTW". Join when the fragment is demonstrably incomplete.
     if prev.endswith(("/", ",", ";")):
         return True
-    frag = re.split(r"[/;]", prev)[-1].rstrip(",")
+    frag = prev[max(prev.rfind("/"), prev.rfind(";")) + 1 :].rstrip(",")
     if not frag.isupper():
         return False
     parts = tok.split("/")
@@ -219,8 +275,11 @@ def _strip_footnote_digits(mnemonic: str) -> str:
     # Rows glue their table footnote number onto the name: LFENCE3,
     # CLFLUSH12, DIVPD1. Real trailing digits (SHA1RNDS4, F2XM1) only
     # survive when the mnemonic carries an earlier digit.
-    stripped = re.sub(r"\d+$", "", mnemonic)
-    return stripped if stripped and not re.search(r"\d", stripped) else mnemonic
+    i = len(mnemonic)
+    while i > 0 and mnemonic[i - 1].isdecimal():
+        i -= 1
+    stripped = mnemonic[:i]
+    return stripped if stripped and not any(c.isdecimal() for c in stripped) else mnemonic
 
 
 def _mnemonics(group: list[str]) -> list[str]:
@@ -251,15 +310,15 @@ def _parse_text_lines(text: str) -> dict[str, list[_Candidate]]:
 
     for lineno, raw in enumerate(text.splitlines()):
         line = raw.lstrip("\f")
-        title = _TITLE_RE.search(line)
-        if title:
+        tkey = _table_key(line)
+        if tkey is not None:
             flush()
-            key = title.group(1) if title.group(1) in _TABLES else None
+            key = tkey if tkey in _TABLES else None
             continue
         if _is_junk_line(line):
             flush()
             continue
-        if re.match(r"^(\d+\.)*\d+\.\s+[A-Z]|^NOTES:", line):
+        if _section_head(line):
             # Section headers and footnote blocks end the open table.
             flush()
             key = None

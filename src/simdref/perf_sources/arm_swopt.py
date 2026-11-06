@@ -27,7 +27,6 @@ the same documentation-service.arm.com download as the other guides.
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -105,15 +104,37 @@ _CPU_BY_NAME = {c.cpu: c for c in CPUS}
 
 # A table row ends in: latency, throughput, pipelines and optional notes.
 # tablecols.row_tail parses that tail.
-_MNEM = re.compile(r"^[A-Z][A-Z0-9]*(?:\(\d\))?(?:\{[A-Z]+\})?$")
-_MNEM_CHAR = re.compile(r"[A-Z0-9{(\]},]")
-_NOISE = re.compile(r"Copyright|Non-Confidential|Page \d|Issue \d|Arm®|PJDOC|^\s*$")
-_FOOT = re.compile(r"^\s*\d+\.\s+[A-Z§]")
-_SECT = re.compile(r"^\s*3\.\d+ [A-Z]")
+_NOISE_MARKERS = ("Copyright", "Non-Confidential", "Arm®", "PJDOC")
 
 
-def _toks(seg: str) -> list[str]:
-    return [t for t in seg.replace(",", " ").split() if _MNEM.match(t) and (len(t) > 1 or t == "B")]
+def _is_mnem(tok: str) -> bool:
+    # [A-Z][A-Z0-9]* with optional "(d)" and "{UPPER}" suffixes.
+    n = len(tok)
+    if n == 0 or not "A" <= tok[0] <= "Z":
+        return False
+    i = 1
+    while i < n and ("A" <= tok[i] <= "Z" or "0" <= tok[i] <= "9"):
+        i += 1
+    if i < n and tok[i] == "(":
+        if i + 3 > n or not tok[i + 1].isdecimal() or tok[i + 2] != ")":
+            return False
+        i += 3
+    if i < n and tok[i] == "{":
+        i += 1
+        if i >= n or not "A" <= tok[i] <= "Z":
+            return False
+        i += 1
+        while i < n and "A" <= tok[i] <= "Z":
+            i += 1
+        if i >= n or tok[i] != "}":
+            return False
+        i += 1
+    return i == n
+
+
+def _is_mnem_char(ch: str) -> bool:
+    # One char of a mnemonic token: A-Z, 0-9, {, (, ], }, ,.
+    return "A" <= ch <= "Z" or "0" <= ch <= "9" or ch in "{(],},"
 
 
 def _snap_a(line: str, col: int) -> int:
@@ -121,14 +142,67 @@ def _snap_a(line: str, col: int) -> int:
     if col <= 0 or col > len(line) or line[col - 1] == " ":
         return col
     start = col
-    while start > 0 and line[start - 1] != " " and _MNEM_CHAR.match(line[start - 1]):
+    while start > 0 and _is_mnem_char(line[start - 1]):
         start -= 1
         if col - start > 10:
             return col
     tok = line[start:col].split(",")[0]
-    if _MNEM.match(tok.lstrip("{(")) or _MNEM.match(tok):
+    if _is_mnem(tok.lstrip("{(")) or _is_mnem(tok):
         return start
     return col
+
+
+def _is_noise(line: str) -> bool:
+    if not line.strip():
+        return True
+    if any(mark in line for mark in _NOISE_MARKERS):
+        return True
+    for label in ("Page ", "Issue "):
+        i = line.find(label)
+        while i >= 0:
+            if i + len(label) < len(line) and line[i + len(label)].isdecimal():
+                return True
+            i = line.find(label, i + 1)
+    return False
+
+
+def _is_foot(line: str) -> bool:
+    # Footnote line: "1. Text", digit-dot, blanks, uppercase or "§".
+    s = line.lstrip()
+    i, n = 0, len(s)
+    while i < n and s[i].isdecimal():
+        i += 1
+    if i == 0 or i >= n or s[i] != ".":
+        return False
+    i += 1
+    if i >= n or not s[i].isspace():
+        return False
+    i += 1
+    while i < n and s[i].isspace():
+        i += 1
+    return i < n and ("A" <= s[i] <= "Z" or s[i] == "§")
+
+
+def _is_sect(line: str) -> bool:
+    # Chapter-3 section header: "3.1 Text".
+    s = line.lstrip()
+    if not s.startswith("3.") or len(s) <= 2 or not s[2].isdecimal():
+        return False
+    i = 3
+    n = len(s)
+    while i < n and s[i].isdecimal():
+        i += 1
+    return i < n and s[i] == " " and i + 1 < n and "A" <= s[i + 1] <= "Z"
+
+
+def _is_table_title(line: str) -> bool:
+    # "Table 26: AArch64 ..." starts a new table block.
+    s = line.lstrip()
+    return s.startswith("Table ") and len(s) > 6 and not s[6].isspace()
+
+
+def _toks(seg: str) -> list[str]:
+    return [t for t in seg.replace(",", " ").split() if _is_mnem(t) and (len(t) > 1 or t == "B")]
 
 
 def _snap_e(line: str, col: int) -> int:
@@ -150,7 +224,7 @@ def _peel(head: str, seg: list[str]) -> tuple[str, list[str]]:
     while rest:
         word, _, tail = rest.rpartition(" ")
         tok = (tail if tail else word).rstrip(",")
-        if not _MNEM.match(tok):
+        if not _is_mnem(tok):
             break
         moved.insert(0, tok)
         rest = word if tail else ""
@@ -161,7 +235,7 @@ def _cont_toks(head: str) -> list[str]:
     # A wrapped mnemonic column can sit fully left of the cut column, leaving
     # only mnemonic tokens in head.
     toks = [t.rstrip(",") for t in head.split() if t.rstrip(",")]
-    if toks and all(_MNEM.match(t) and (len(t) > 1 or t == "B") for t in toks):
+    if toks and all(_is_mnem(t) and (len(t) > 1 or t == "B") for t in toks):
         return toks
     return []
 
@@ -173,17 +247,11 @@ def parse_groups(text: str) -> list[dict]:
     per cycle), pipeline letters, notes and the mnemonic list.
     """
     lines = text.split("\n")
-    start = next(
-        (i for i, l in enumerate(lines) if re.match(r"^\s*3\.1 Instruction tables\s*$", l)), None
-    )
+    start = next((i for i, l in enumerate(lines) if l.strip() == "3.1 Instruction tables"), None)
     if start is None:
         return []
     end = next(
-        (
-            i
-            for i in range(start + 1, len(lines))
-            if re.match(r"^\s*4\.1 Dispatch constraints\s*$", lines[i])
-        ),
+        (i for i in range(start + 1, len(lines)) if lines[i].strip() == "4.1 Dispatch constraints"),
         None,
     )
     if end is None:
@@ -191,7 +259,7 @@ def parse_groups(text: str) -> list[dict]:
             (
                 i
                 for i in range(start + 1, len(lines))
-                if re.match(r"^\s*4 Special considerations\s*$", lines[i])
+                if lines[i].strip() == "4 Special considerations"
             ),
             len(lines),
         )
@@ -201,28 +269,30 @@ def parse_groups(text: str) -> list[dict]:
     for i in range(start, end):
         line = lines[i]
         s = line.strip()
-        if re.match(r"^\s*Table \S+", line):
-            m = re.search(r"AArch(32|64)", line)
-            arch = ("AArch" + m.group(1)) if m else "AArch64"
+        if _is_table_title(line):
+            arch = "AArch64"
+            j = line.find("AArch")
+            if j >= 0 and line[j + 5 : j + 7] in ("32", "64"):
+                arch = "AArch" + line[j + 5 : j + 7]
             in_foot, cur, col_a, col_e = False, None, None, None
             continue
         # Column headers repeat at each page break; re-derive the cut columns
         # each time. They may drift by a few chars between pages. The mnemonic
         # column is the last word before "Exec" (AArch64, Instructions or
         # "SVE Instruction" depending on the guide and the table).
-        if "Exec" in line and re.search(r"AArch|Instruction", line):
+        if "Exec" in line and ("AArch" in line or "Instruction" in line):
             words = word_spans(line[: line.find("Exec")])
             if words:
                 col_a, col_e = words[-1][1], line.find("Exec")
             continue
         if "Latency" in line and "Throughput" in line:
             continue
-        if _SECT.match(line):
+        if _is_sect(line):
             in_foot = False
             continue
-        if _FOOT.match(line):
+        if _is_foot(line):
             in_foot = True
-        if in_foot or _NOISE.search(line) or not s:
+        if in_foot or _is_noise(line) or not s:
             continue
         m = row_tail(s)
         if m and col_a is not None and col_e is not None and col_a < col_e:
