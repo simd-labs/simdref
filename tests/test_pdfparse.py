@@ -272,6 +272,27 @@ def test_merge_pdf_enrichment_adds_sections_and_pdf_reference():
     assert item.metadata["intel-sdm-url"] == f"{INTEL_SDM_URL}#page=123"
 
 
+def test_merge_pdf_enrichment_derives_cc_suffixes_from_rows():
+    instructions = [
+        InstructionRecord(mnemonic=name, form=name, summary="")
+        for name in ("JZ", "SETZ", "CMOVZ", "JMP")
+    ]
+    family = PdfDescriptionPayload(
+        sections={"Description": "Condition-code family."},
+        source_url=INTEL_SDM_URL,
+        page_start=1,
+        page_end=1,
+    )
+    result = PdfEnrichmentResult(descriptions={"JCC": family, "SETCC": family, "CMOVCC": family})
+
+    merge_pdf_enrichment(instructions, "intel-sdm", result)
+
+    by_name = {item.mnemonic: item for item in instructions}
+    # Z is spelled by all three families; MP is not a cc spelling.
+    assert by_name["JZ"].description["Description"] == "Condition-code family."
+    assert by_name["JMP"].description == {}
+
+
 def test_load_or_parse_pdf_source_uses_cache(tmp_path, monkeypatch):
     pdf_path = tmp_path / "intel-sdm.pdf"
     cache_path = tmp_path / "intel-sdm-cache.msgpack"

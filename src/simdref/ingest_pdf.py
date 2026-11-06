@@ -202,41 +202,22 @@ def merge_pdf_enrichment(
 
     # SDM family keys (CMOVCC, JCC, SETCC, PREFETCHH) describe the whole
     # condition-code family; a concrete record falls back to its family.
-    _CC_SUFFIXES = {
-        "O",
-        "NO",
-        "B",
-        "C",
-        "NAE",
-        "AE",
-        "NB",
-        "NC",
-        "E",
-        "Z",
-        "NE",
-        "NZ",
-        "BE",
-        "NA",
-        "A",
-        "NBE",
-        "S",
-        "NS",
-        "P",
-        "PE",
-        "NP",
-        "PO",
-        "L",
-        "NGE",
-        "GE",
-        "NL",
-        "LE",
-        "NG",
-        "G",
-        "NLE",
-    }
+    # A cc spelling is what the Jcc, SETcc and CMOVcc rows spell: 1-3 letters
+    # of the x86 condition-code alphabet. That keeps lookalikes (JMP,
+    # SETSSBSY) out and cannot drift from the catalog.
+    _CC_LETTERS = frozenset("ABCELGNOPSZ")
+    _FAMILY_STEMS = (("CMOVCC", "CMOV"), ("SETCC", "SET"), ("JCC", "J"))
+    _NAMES = {record.mnemonic.upper() for record in instructions}
+    _CC_SUFFIXES = set()
+    for _, stem in _FAMILY_STEMS:
+        for name in _NAMES:
+            if name.startswith(stem):
+                suffix = name[len(stem) :]
+                if 0 < len(suffix) <= 3 and not set(suffix) - _CC_LETTERS:
+                    _CC_SUFFIXES.add(suffix)
 
     def _family_candidates(mnemonic: str) -> list[str]:
-        for family, stem in (("CMOVCC", "CMOV"), ("SETCC", "SET"), ("JCC", "J")):
+        for family, stem in _FAMILY_STEMS:
             if mnemonic.startswith(stem) and mnemonic[len(stem) :] in _CC_SUFFIXES:
                 return [family]
         if mnemonic in {
