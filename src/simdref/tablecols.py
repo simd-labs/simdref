@@ -11,29 +11,27 @@ from fractions import Fraction
 
 _VALUE_CHARS = frozenset("0123456789.,~<>()/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-")
 _PIPE_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-_PIPE_SEP = frozenset(" ,")
 _NOTES_CHARS = frozenset("-0123456789, ")
 
 
 def split_cells(line: str) -> list[str]:
     """Cut at runs of two or more whitespace; single spaces stay in the cell."""
     cells: list[str] = []
-    cur = ""
-    i, n = 0, len(line)
-    while i < n:
-        j = i
-        while j < n and line[j].isspace():
-            j += 1
-        if j == i:
-            while j < n and not line[j].isspace():
-                j += 1
-            cur += line[i:j]
-        elif j - i >= 2:
-            cells.append(cur)
-            cur = ""
+    cur, gap, prev_space = "", 0, ""
+    for ch in line:
+        if ch.isspace():
+            prev_space = ch
+            gap += 1
+            if gap == 2:
+                cells.append(cur)
+                cur = ""
         else:
-            cur += line[i:j]
-        i = j
+            if gap == 1:
+                cur += prev_space
+            cur += ch
+            gap = 0
+    if gap == 1:
+        cur += prev_space
     cells.append(cur)
     return cells
 
@@ -95,63 +93,34 @@ def _marker(s: str, i: int) -> int:
     return -1
 
 
-def _lat_forms(s: str, i: int) -> list[tuple[str, int]]:
-    # Latency shapes in the old alternation order: d(d), d, "d to d",
-    # "d d/d", "d/d". Each shape has one candidate at a position.
+# Value templates: each letter is one (separator, digits) step after the
+# leading digit run, in the old alternation order. "T"/"t" is " to ", a
+# lowercase or space step tolerates missing digits after the separator.
+_LAT_STEPS = ("T", " /", "/")  # d to d; d d/d; d/d
+_TP_STEPS = ("/", ".", " /", "/t/")  # d/d; d.d; d d/d; d/d to d/d
+
+
+def _value_forms(s: str, i: int, templates: tuple[str, ...]) -> list[tuple[str, int]]:
+    # Candidate values at position i, in the old alternation order: the
+    # footnote marker d(d), the plain digit run, then each template.
     d = _digit_run(s, i)
     out: list[tuple[str, int]] = []
     m = _marker(s, d)
     if m > 0:
         out.append((s[i:m], m))
     out.append((s[i:d], d))
-    if s[d : d + 4] == " to ":
-        d2 = _digit_run(s, d + 4)
-        if d2 > d + 4:
-            out.append((s[i:d2], d2))
-    if s[d : d + 1] == " ":
-        d2 = _digit_run(s, d + 1)
-        if s[d2 : d2 + 1] == "/":
-            d3 = _digit_run(s, d2 + 1)
-            if d3 > d2 + 1:
-                out.append((s[i:d3], d3))
-    if s[d : d + 1] == "/":
-        d2 = _digit_run(s, d + 1)
-        if d2 > d + 1:
-            out.append((s[i:d2], d2))
-    return out
-
-
-def _tp_forms(s: str, i: int) -> list[tuple[str, int]]:
-    # Throughput shapes in the old alternation order: d(d), d, "d/d", "d.d",
-    # "d d/d", "d/d to d/d".
-    d = _digit_run(s, i)
-    out: list[tuple[str, int]] = []
-    m = _marker(s, d)
-    if m > 0:
-        out.append((s[i:m], m))
-    out.append((s[i:d], d))
-    if s[d : d + 1] == "/":
-        d2 = _digit_run(s, d + 1)
-        if d2 > d + 1:
-            out.append((s[i:d2], d2))
-    if s[d : d + 1] == ".":
-        d2 = _digit_run(s, d + 1)
-        if d2 > d + 1:
-            out.append((s[i:d2], d2))
-    if s[d : d + 1] == " ":
-        d2 = _digit_run(s, d + 1)
-        if s[d2 : d2 + 1] == "/":
-            d3 = _digit_run(s, d2 + 1)
-            if d3 > d2 + 1:
-                out.append((s[i:d3], d3))
-    if s[d : d + 1] == "/":
-        d2 = _digit_run(s, d + 1)
-        if s[d2 : d2 + 4] == " to ":
-            d3 = _digit_run(s, d2 + 4)
-            if s[d3 : d3 + 1] == "/":
-                d4 = _digit_run(s, d3 + 1)
-                if d4 > d3 + 1:
-                    out.append((s[i:d4], d4))
+    for form in templates:
+        p = d
+        for step in form:
+            sep = " to " if step in "Tt" else step
+            if not s.startswith(sep, p):
+                break
+            q = _digit_run(s, p + len(sep))
+            if step not in " t" and q == p + len(sep):
+                break
+            p = q
+        else:
+            out.append((s[i:p], p))
     return out
 
 
@@ -165,7 +134,7 @@ def _pipe_end(s: str, i: int) -> int:
             j += 1
         end = j
         k = j
-        while k < n and s[k] in _PIPE_SEP:
+        while k < n and s[k] in " ,":
             k += 1
         if k == j or k >= n or s[k] not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
             break
@@ -179,6 +148,7 @@ def row_tail(s: str) -> tuple[str, str, str, str] | None:
     Returns (latency, throughput, pipelines, notes) or None. The tail is
     "latency throughput pipelines" with optional notes at the end; the scan
     starts at the leftmost digit whose tail parses to the line end.
+
     shortcut: assumes a stripped line (its only caller strips), upgrade if a
     caller passes trailing spaces.
     """
@@ -186,13 +156,13 @@ def row_tail(s: str) -> tuple[str, str, str, str] | None:
     for i, ch in enumerate(s):
         if not ch.isdecimal():
             continue
-        for lat, p in _lat_forms(s, i):
+        for lat, p in _value_forms(s, i, _LAT_STEPS):
             q = p
             while q < n and s[q].isspace():
                 q += 1
             if q == p:
                 continue
-            for tp, r in _tp_forms(s, q):
+            for tp, r in _value_forms(s, q, _TP_STEPS):
                 t = r
                 while t < n and s[t].isspace():
                     t += 1
