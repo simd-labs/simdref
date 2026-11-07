@@ -9,7 +9,6 @@ simdref catalog.
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import statistics
 import string
@@ -18,6 +17,7 @@ from enum import Enum
 from typing import Any, Iterable, Iterator
 
 from simdref import perf
+from simdref.arm_instructions import _CONDITION_CODES
 from simdref.asm_identity import isa_by_acceptance
 from simdref.catkey import ISA_FAMILY, isa_family as _isa_family
 from simdref.lsp import NO_CATALOG_ROW, _document_arch, identity_keys
@@ -507,9 +507,31 @@ def _lookup_variants(mnemonic: str) -> list[str]:
 
 
 # AArch64 condition-code branches: b.<cond>, no register table covers them.
-_A64_BCOND_RE = re.compile(
-    r"(?<![\w])b\.(?:eq|ne|lt|le|gt|ge|hs|lo|hi|ls|mi|pl|vs|vc|al|nv)(?![\w])"
+# The vocabulary is the first spelling of each cond value in the A64 row table
+# (cs/cc alias the hs/lo spellings the llvm-objdump printers print).
+_A64_BCOND_CODES = frozenset(
+    dict(reversed([(cond, code) for code, cond in _CONDITION_CODES])).values()
 )
+
+
+def _bcond_hits(text: str) -> int:
+    """Count b.<cond> branch mnemonics with word boundaries on both sides."""
+    count = 0
+    i = text.find("b.")
+    while i >= 0:
+        tail = text[i + 2 : i + 4]
+        before = text[i - 1 : i]
+        after = text[i + 4 : i + 5]
+        if (
+            tail in _A64_BCOND_CODES
+            and not (before and (before.isalnum() or before == "_"))
+            and not (after and (after.isalnum() or after == "_"))
+        ):
+            count += 1
+            i = text.find("b.", i + 4)
+        else:
+            i = text.find("b.", i + 2)
+    return count
 
 
 def _drop_symbol_annotations(text: str) -> str:
@@ -646,7 +668,7 @@ def detect_isa(lines: Iterable[str]) -> str | None:
         # a register (review finding 1).
         text = _drop_symbol_annotations(f"{parsed.mnemonic} {parsed.operands}")
         vote_arm, vote_riscv, vote_shared = _isa_votes(text)
-        excl_arm += vote_arm + len(_A64_BCOND_RE.findall(text))
+        excl_arm += vote_arm + _bcond_hits(text)
         excl_riscv += vote_riscv
         shared += vote_shared
     if excl_arm or excl_riscv:
@@ -682,10 +704,36 @@ def lookup(
     return []
 
 
-_SIZE_SPECIFIER_RE = re.compile(
-    r"\b(byte|word|dword|qword|xmmword|ymmword|zmmword)\s+ptr\b",
-    re.IGNORECASE,
-)
+_SIZE_WORDS = frozenset({"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword"})
+
+
+def _has_size_ptr(text: str) -> bool:
+    """True for a size keyword with a trailing "ptr" ("byte ptr [rdx]")."""
+    n = len(text)
+    i = 0
+    while i + 3 <= n:
+        if text[i : i + 3].lower() != "ptr":
+            i += 1
+            continue
+        if i + 3 < n and (text[i + 3].isalnum() or text[i + 3] == "_"):
+            i += 1
+            continue
+        j = i
+        while j > 0 and text[j - 1].isspace():
+            j -= 1
+        if j == i:
+            i += 1
+            continue
+        for word in _SIZE_WORDS:
+            k = j - len(word)
+            if (
+                k >= 0
+                and text[k:j].lower() == word
+                and not (k > 0 and (text[k - 1].isalnum() or text[k - 1] == "_"))
+            ):
+                return True
+        i += 1
+    return False
 
 
 def _x86_reg_class(name: str) -> str | None:
@@ -750,6 +798,26 @@ def _imm_kind(value: int) -> str:
     return "I64"
 
 
+def _is_number(text: str) -> bool:
+    """True for the literal ``-?0x<hex>`` or ``-?<digits>`` the scans matched."""
+    body = text[1:] if text[:1] == "-" else text
+    if body[:2] == "0x":
+        body = body[2:]
+        return bool(body) and all(char in string.hexdigits for char in body)
+    return bool(body) and body.isdecimal()
+
+
+def _is_symbol(text: str) -> bool:
+    """True for ``[A-Za-z_.$]`` heads with ``\\w.$@`` tails (a plain symbol)."""
+    head = text[:1]
+    return (
+        bool(head)
+        and head.isascii()
+        and (head.isalpha() or head in "_.$")
+        and all(char.isalnum() or char in "_.$@" for char in text[1:])
+    )
+
+
 def _classify_operand(op: str) -> tuple[str, str | None]:
     """Return ``(kind, reg_name_lower)`` for one operand.
 
@@ -763,17 +831,22 @@ def _classify_operand(op: str) -> tuple[str, str | None]:
     if not s:
         return "?", None
     # objdump branch target: an address followed by a <symbol> annotation.
-    if re.fullmatch(r"-?(?:0x[0-9a-fA-F]+|\d+)\s+<[^>]*>", s):
-        return "REL", None
+    lt = s.find("<")
+    if lt > 0 and s.endswith(">") and ">" not in s[lt + 1 : -1]:
+        k = lt
+        while k > 0 and s[k - 1].isspace():
+            k -= 1
+        if k < lt and _is_number(s[:k]):
+            return "REL", None
     # AT&T immediate: $... ; Intel immediate: bare number / 0x... / '$'-less literal
-    if s.startswith("$") or re.fullmatch(r"-?0x[0-9a-fA-F]+|-?\d+", s):
+    if s.startswith("$") or _is_number(s):
         try:
             return _imm_kind(int(s.lstrip("$"), 0)), None
         except ValueError:
             return "I", None
     # AT&T memory: ``(%reg)``, ``disp(%reg,%idx,scale)``, or plain symbol
     # with a ``(...)`` section; Intel memory: ``[...]`` or explicit size ptr.
-    if "(" in s or "[" in s or _SIZE_SPECIFIER_RE.search(s):
+    if "(" in s or "[" in s or _has_size_ptr(s):
         return "M", None
     # Pure register?
     name = (s[1:] if s[:1] == "%" else s).casefold()
@@ -781,7 +854,7 @@ def _classify_operand(op: str) -> tuple[str, str | None]:
     if tok is not None or _is_vec_shaped(name):
         return tok or "?", name
     # Plain symbol (branch target) or unknown.
-    if re.fullmatch(r"[A-Za-z_.$][\w.$@]*", s):
+    if _is_symbol(s):
         return "REL", None
     return "?", None
 
@@ -802,9 +875,6 @@ def _operand_shape(operands: str) -> tuple[list[tuple[str, str | None]], bool]:
     return slots, aliased
 
 
-_FORM_OPS_RE = re.compile(r"\(([^)]*)\)\s*$")
-
-
 def _form_operand_tokens(form_or_key: str) -> list[str]:
     """Extract the comma-separated operand tokens from a catalog form/key.
 
@@ -812,14 +882,25 @@ def _form_operand_tokens(form_or_key: str) -> list[str]:
     ``"RET_NEAR"`` returns ``[]``. Tokens are upper-cased.
     """
     s = str(form_or_key or "")
-    m = _FORM_OPS_RE.search(s)
-    if not m:
+    tail = s.rstrip()
+    if not tail or tail[-1] != ")":
         return []
-    inner = m.group(1)
+    close = len(tail) - 1
+    # The inner text starts at the first "(" after the last ")" before the
+    # closing one, so no ")" splits it (the old group matched the same span).
+    start = tail.find("(", tail.rfind(")", 0, close) + 1)
+    if start < 0:
+        return []
+    inner = tail[start + 1 : close]
     return [t.strip().upper() for t in inner.split(",") if t.strip()]
 
 
-_BROADCAST_TOK_RE = re.compile(r"_1TO\d+$")
+def _is_broadcast_token(token: str) -> bool:
+    """True for a form token with a ``_1toN`` tail (``M16_1to8``)."""
+    start = len(token)
+    while start > 0 and token[start - 1].isdecimal():
+        start -= 1
+    return start < len(token) and start >= 4 and token[start - 4 : start] == "_1TO"
 
 
 def _token_matches_slot(form_tok: str, slot_kind: str) -> bool:
@@ -867,7 +948,7 @@ def _slot_token_score(form_tok: str, slot_kind: str) -> int:
     if not _token_matches_slot(ft, sk):
         # Weak near-misses: a broadcast row wants a {1toN} annotation, and a
         # register can ride a memory row (mov r,r against MOV (M32, R32)).
-        if sk == "M" and _BROADCAST_TOK_RE.search(ft):
+        if sk == "M" and _is_broadcast_token(ft):
             return 2
         if sk.startswith("R") and ("M" + sk[1:]) == ft:
             return 2
@@ -1219,8 +1300,45 @@ def collect_ports(
     return ports or None
 
 
-_SUMMARY_BITS_RE = re.compile(r"(\d+)\s*-?\s*bit", re.IGNORECASE)
-_FORM_WIDTH_RE = re.compile(r"[MRI](\d+)")
+def _summary_bits(summary: str) -> str | None:
+    """The digits of the first "NNN - bit" phrase ("32-bit" -> "32"), else None.
+
+    shortcut: str.lower folds no Turkish dotted i in "bit", upgrade if an
+    SDM summary ever carries one
+    """
+    for j in range(len(summary) - 2):
+        if summary[j : j + 3].lower() != "bit":
+            continue
+        k = j
+        while k > 0 and summary[k - 1].isspace():
+            k -= 1
+        if k > 0 and summary[k - 1] == "-":
+            k -= 1
+            while k > 0 and summary[k - 1].isspace():
+                k -= 1
+        end = k
+        while k > 0 and summary[k - 1].isdecimal():
+            k -= 1
+        if k < end:
+            return summary[k:end]
+    return None
+
+
+def _form_widths(key: str) -> list[str]:
+    """The digit groups of the ``M64``-style width tokens of one key."""
+    out: list[str] = []
+    i = 0
+    n = len(key)
+    while i < n:
+        if key[i] in "MRI" and i + 1 < n and key[i + 1].isdecimal():
+            j = i + 1
+            while j < n and key[j].isdecimal():
+                j += 1
+            out.append(key[i + 1 : j])
+            i = j
+        else:
+            i += 1
+    return out
 
 
 def _summary_matches_form(summary: str, record: InstructionRecord) -> bool:
@@ -1229,10 +1347,9 @@ def _summary_matches_form(summary: str, record: InstructionRecord) -> bool:
 
     We only flag a summary as wrong when it declares an explicit bit-width
     that appears nowhere among the form's operand widths."""
-    m = _SUMMARY_BITS_RE.search(summary or "")
-    if not m:
+    declared = _summary_bits(summary or "")
+    if declared is None:
         return True
-    declared = m.group(1)
     widths: list[str] = []
     for op in record.operand_details or []:
         w = op.get("width")
@@ -1240,7 +1357,7 @@ def _summary_matches_form(summary: str, record: InstructionRecord) -> bool:
             widths.append(str(w))
     if not widths:
         key = str(getattr(record, "key", "") or "")
-        widths = _FORM_WIDTH_RE.findall(key)
+        widths = _form_widths(key)
     if not widths:
         return True
     return declared in widths
