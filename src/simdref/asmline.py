@@ -161,7 +161,7 @@ def c_asm_literals(text: str) -> list[tuple[int, str]]:
     while index < len(masked):
         hit = _asm_call_at(masked, index)
         if hit is not None:
-            block_end, literals = hit
+            block_end, literals, _zones = hit
             out.extend(literals)
             index = block_end
         else:
@@ -169,14 +169,44 @@ def c_asm_literals(text: str) -> list[tuple[int, str]]:
     return out
 
 
+def c_asm_zone_at(text: str, offset: int) -> str | None:
+    """Completion zone holding the text offset, or None.
+
+    'template' is an asm(...) template string, 'msvc' an MSVC __asm block
+    or line, 'operands' the operand and clobber lists after the first ':'
+    of an asm(...) call. None is plain code. Shares _asm_call_at with
+    c_asm_literals, so hover and completion parse the same calls.
+    """
+    masked = _mask_c_comments(text)
+    index = 0
+    while index < len(masked):
+        hit = _asm_call_at(masked, index)
+        if hit is not None:
+            block_end, literals, zones = hit
+            for kind, low, high in zones:
+                if low <= offset <= high:
+                    return kind
+            for start, _body in literals:
+                if start <= offset <= start + len(_body):
+                    return "template"
+            index = block_end
+        else:
+            index += 1
+    return None
+
+
 _QUALIFIERS = ("volatile", "__volatile__", "goto", "inline")
 
 
-def _asm_call_at(text: str, index: int) -> tuple[int, list[tuple[int, str]]] | None:
-    """(block end, literals) of the asm(...) call whose keyword starts at index.
+def _asm_call_at(
+    text: str, index: int
+) -> tuple[int, list[tuple[int, str]], list[tuple[str, int, int]]] | None:
+    """(block end, literals, zones) of the asm call at index.
 
-    The end is the last literal's closing quote: that is where the old
-    regex match ended and where the scan resumes.
+    end is where the scan resumes: the last literal's closing quote, where
+    the old regex match ended. zones are (kind, low, high) cursor regions,
+    'operands' after the first ':' at bracket depth 1, 'msvc' for an MSVC
+    __asm block or line.
     """
     if (
         index > 0
@@ -203,8 +233,18 @@ def _asm_call_at(text: str, index: int) -> tuple[int, list[tuple[int, str]]] | N
             cursor = saved
             break
     cursor = _skip_space(text, cursor)
+    if text[cursor : cursor + 1] == "{":
+        # MSVC __asm { ... } block: bare instructions, no template string.
+        close = _brace_end(text, cursor)
+        if close is None:
+            return None
+        return close + 1, [], [("msvc", cursor + 1, close)]
     if text[cursor : cursor + 1] != "(":
-        return None
+        # MSVC __asm <insn> line: the instruction runs to end of line.
+        end = index
+        while end < len(text) and text[end] != "\n":
+            end += 1
+        return end, [], [("msvc", cursor, end)]
     cursor = _skip_space(text, cursor + 1)
     literals: list[tuple[int, str]] = []
     block_end = cursor
@@ -223,7 +263,66 @@ def _asm_call_at(text: str, index: int) -> tuple[int, list[tuple[int, str]]] | N
     probe = _skip_space(text, block_end)
     if text[probe : probe + 1] not in (":", ")"):
         return None
-    return block_end, literals
+    zones: list[tuple[str, int, int]] = []
+    colon, close = _colon_and_close(text, block_end)
+    if close is None:
+        return None
+    if colon is not None:
+        zones.append(("operands", colon + 1, close))
+    return block_end, literals, zones
+
+
+def _colon_and_close(text: str, index: int) -> tuple[int | None, int | None]:
+    """(first ':' at depth 1, closing ')') of the asm(...) paren group.
+
+    index sits inside the group after the template strings. String
+    literals are skipped: a ':' or ')' inside one is literal text.
+    """
+    depth, colon, close = 1, None, None
+    cursor = index
+    while cursor < len(text):
+        char = text[cursor]
+        if char == '"':
+            end = _string_end(text, cursor, spans_lines=True)
+            if end is None:
+                return colon, None
+            cursor = end
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                close = cursor
+                break
+        elif char == ":" and depth == 1 and colon is None:
+            colon = cursor
+        cursor += 1
+    return colon, close
+
+
+def _brace_end(text: str, index: int) -> int | None:
+    """Index of the '}' matching the '{' at index, or None.
+
+    String literals are skipped: a brace inside one is data.
+    """
+    depth, cursor = 0, index
+    while cursor < len(text):
+        char = text[cursor]
+        if char == '"':
+            end = _string_end(text, cursor, spans_lines=True)
+            if end is None:
+                return None
+            cursor = end
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return cursor
+        cursor += 1
+    return None
 
 
 def _skip_space(text: str, index: int) -> int:

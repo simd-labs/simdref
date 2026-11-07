@@ -1319,7 +1319,18 @@ def _hover_markdown(
     return None
 
 
-def _completion_candidates(conn, prefix: str, limit: int = 50) -> list[dict]:
+_INTRINSIC_KINDS = frozenset({3})
+_MNEMONIC_KINDS = frozenset({14})
+
+
+def _completion_candidates(
+    conn, prefix: str, limit: int = 50, kinds: frozenset[int] | None = None
+) -> list[dict]:
+    """Completion items for a word prefix, deduped by (kind, label).
+
+    kinds restricts the emitted item kinds (3 intrinsic, 14 instruction);
+    None keeps every kind, the pre-0.0.16 pool.
+    """
     prefix_folded = prefix.casefold()
     emitted: set[tuple[str, str]] = set()
     items: list[dict] = []
@@ -1328,6 +1339,10 @@ def _completion_candidates(conn, prefix: str, limit: int = 50) -> list[dict]:
     instructions = search_instruction_candidates_from_db(
         conn, prefix or "_mm", limit=candidate_limit
     )
+    if kinds == _MNEMONIC_KINDS:
+        intrinsics = []
+    elif kinds == _INTRINSIC_KINDS:
+        instructions = []
     for result in search_records(intrinsics, instructions, prefix or "_mm", limit=candidate_limit):
         label = result.title
         if prefix_folded and not label.casefold().startswith(prefix_folded):
@@ -1341,6 +1356,25 @@ def _completion_candidates(conn, prefix: str, limit: int = 50) -> list[dict]:
         if len(items) >= limit:
             return items
     return items
+
+
+def _completion_items(
+    conn, text: str, language_id: str, uri: str, prefix: str, line: int, character: int
+) -> list[dict]:
+    """Completion items for one cursor position.
+
+    Assembly documents keep the full pool. In C and C++ the pool follows
+    the cursor: mnemonics only inside an asm template string, an MSVC
+    __asm block or an MSVC __asm line; no simdref items in the operand and
+    clobber lists; intrinsics only everywhere else.
+    """
+    if not _is_c_doc(language_id, uri):
+        return _completion_candidates(conn, prefix)
+    zone = asmline.c_asm_zone_at(text, _offset_at(text, line, character))
+    if zone == "operands":
+        return []
+    kinds = _MNEMONIC_KINDS if zone in ("template", "msvc") else _INTRINSIC_KINDS
+    return _completion_candidates(conn, prefix, kinds=kinds)
 
 
 def _is_c_doc(language_id: str, uri: str) -> bool:
@@ -1383,11 +1417,16 @@ def _asm_line_at(text: str, language_id: str, uri: str, offset: int) -> str | No
     return None
 
 
+def _offset_at(text: str, line: int, character: int) -> int:
+    """Text offset of an LSP position. Out-of-range positions give len(text)."""
+    lines = text.split("\n")
+    if line >= len(lines):
+        return len(text)
+    return sum(len(item) + 1 for item in lines[:line]) + _code_point_index(lines[line], character)
+
+
 def _in_asm_string(text: str, line: int, character: int) -> bool:
-    offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
-        text.split("\n")[line], character
-    )
-    return any(start <= offset <= start + len(body) for start, body in asmline.c_asm_literals(text))
+    return asmline.c_asm_zone_at(text, _offset_at(text, line, character)) == "template"
 
 
 def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
@@ -1609,9 +1648,7 @@ def main() -> int:
             operand_text = ""
             segment = None
             if word and allow_instruction:
-                offset = sum(len(item) + 1 for item in text.split("\n")[:line]) + _code_point_index(
-                    text.split("\n")[line], character
-                )
+                offset = _offset_at(text, line, character)
                 segment = _asm_line_at(text, language_id, uri, offset)
                 if segment:
                     # The C-escape pair "\t" starts a segment in asm("...\n\t...").
@@ -1670,8 +1707,14 @@ def main() -> int:
             params = message["params"]
             uri = params["textDocument"]["uri"]
             text = session.documents.get(uri, "")
-            prefix = _line_prefix(text, params["position"]["line"], params["position"]["character"])
-            items = _completion_candidates(conn, prefix) if conn else []
+            language_id = session.languages.get(uri, "")
+            line, character = params["position"]["line"], params["position"]["character"]
+            prefix = _line_prefix(text, line, character)
+            items = (
+                _completion_items(conn, text, language_id, uri, prefix, line, character)
+                if conn
+                else []
+            )
             _jsonrpc_write(
                 {
                     "jsonrpc": "2.0",

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from simdref import lsp
 from simdref.lsp import _mnemonic_from_asm_line
-from simdref.models import Catalog, InstructionRecord, SourceVersion
+from simdref.models import Catalog, IntrinsicRecord, InstructionRecord, SourceVersion
 from simdref.storage import (
     SQLITE_PATH,
     build_sqlite,
@@ -165,6 +165,10 @@ class _Server:
     def hover(self, uri, line, character):
         params = {"textDocument": {"uri": uri}, "position": {"line": line, "character": character}}
         return self.request("textDocument/hover", params)["result"]
+
+    def completion(self, uri, line, character):
+        params = {"textDocument": {"uri": uri}, "position": {"line": line, "character": character}}
+        return self.request("textDocument/completion", params)["result"]["items"]
 
     def stop(self):
         try:
@@ -974,6 +978,203 @@ class LspArmFixtureTests(unittest.TestCase):
         # The rendered summary stays the ACLE text of the vector row.
         hints = self.server.hints(uri)
         self.assertEqual([h["label"] for h in hints], ["Add (vector)."])
+
+
+C_COMPLETION_URI = "file:///tmp/simdref_lsp_c_completion.c"
+C_COMPLETION_CPP_URI = "file:///tmp/simdref_lsp_c_completion.cpp"
+C_COMPLETION_ASM_URI = "file:///tmp/simdref_lsp_c_completion.s"
+
+
+def _c_insn(mnemonic: str, form: str, summary: str) -> InstructionRecord:
+    return InstructionRecord(
+        mnemonic=mnemonic,
+        form=form,
+        summary=summary,
+        architecture="x86",
+        isa=["SSE"],
+    )
+
+
+def _c_intrinsic(name: str, signature: str, description: str, header: str, architecture: str):
+    return IntrinsicRecord(
+        name=name,
+        signature=signature,
+        description=description,
+        header=header,
+        architecture=architecture,
+        isa=["SSE"] if architecture == "x86" else ["NEON"],
+    )
+
+
+# The C/C++ completion pins run on a small fixture catalog, not the ambient
+# one. The v* prefix matches an intrinsic (vaddq_f32) and an instruction
+# (VADDPS) at once, so a zone that keeps both kinds shows its leak.
+C_COMPLETION_INTRINSICS = [
+    _c_intrinsic(
+        "_mm_add_ps",
+        "__m128 _mm_add_ps (__m128 a, __m128 b)",
+        "Add packed single precision values.",
+        "<immintrin.h>",
+        "x86",
+    ),
+    _c_intrinsic(
+        "vaddq_f32",
+        "float32x4_t vaddq_f32 (float32x4_t a, float32x4_t b)",
+        "Add four single precision values.",
+        "<arm_neon.h>",
+        "arm",
+    ),
+    _c_intrinsic(
+        "vmulq_f32",
+        "float32x4_t vmulq_f32 (float32x4_t a, float32x4_t b)",
+        "Multiply four single precision values.",
+        "<arm_neon.h>",
+        "arm",
+    ),
+]
+C_COMPLETION_INSTRUCTIONS = [
+    _c_insn("vaddps", "VADDPS (XMM, XMM, XMM)", "Add packed single precision values."),
+    _c_insn("vmulps", "VMULPS (XMM, XMM, XMM)", "Multiply packed single precision values."),
+    _c_insn("vmovaps", "VMOVAPS (XMM, XMM)", "Move aligned packed single precision values."),
+    _c_insn("mov", "MOV (R64, R64)", "Move."),
+]
+
+# One document per zone. Lines: 3-4 multi-line asm template, 5 asm with the
+# \n\t escape and the operand/clobber lists, 6-9 an MSVC __asm block, 10 an
+# MSVC __asm line, 11 a plain string, 12 a comment, 13 plain C code.
+C_COMPLETION_TEXT = (
+    "#include <immintrin.h>\n"
+    "void f(void) {\n"
+    "    int x = 0;\n"
+    '    __asm__ volatile ("vaddps %%xmm0, %%xmm1\\n\\t"\n'
+    '                      "vmulps %%xmm2, %%xmm0");\n'
+    '    asm volatile("\\tmov %%1, %%%%eax\\n\\tvaddps %%xmm0, %%xmm1" : "=r"(x) : "r"(vvec) : "memory");\n'
+    "    __asm {\n"
+    "        mov eax, 1\n"
+    "        vaddps xmm0, xmm1\n"
+    "    }\n"
+    "    __asm vaddps xmm0, xmm1\n"
+    '    char *s = "mov %%eax, %%ebx";\n'
+    "    // vaddps in a comment\n"
+    "    vaddq_f32(a, b);\n"
+    "    _mm_add_ps(a, b);\n"
+    "}\n"
+)
+
+C_COMPLETION_FIXTURE_CATALOG: Path | None = None
+
+
+def _c_completion_catalog() -> Path:
+    global C_COMPLETION_FIXTURE_CATALOG
+    if C_COMPLETION_FIXTURE_CATALOG is None:
+        tmp = tempfile.TemporaryDirectory(prefix="simdref-c-completion-lsp-")
+        atexit.register(tmp.cleanup)
+        db = Path(tmp.name) / "catalog.db"
+        build_sqlite(
+            Catalog(
+                intrinsics=C_COMPLETION_INTRINSICS,
+                instructions=C_COMPLETION_INSTRUCTIONS,
+                sources=[
+                    SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")
+                ],
+                generated_at="2025-01-01",
+            ),
+            db,
+        )
+        C_COMPLETION_FIXTURE_CATALOG = db
+    return C_COMPLETION_FIXTURE_CATALOG
+
+
+class LspCCompletionTests(unittest.TestCase):
+    """The C/C++ completion zone pins: intrinsics only in plain code,
+    mnemonics only inside an asm template string or an MSVC __asm block or
+    line, nothing in the operand and clobber lists, assembly documents
+    unchanged. On the fixture catalog, not the ambient one."""
+
+    def setUp(self):
+        self.server = _Server(_c_completion_catalog())
+        self.addCleanup(self.server.stop)
+        self.server.start()
+        self.server.open(C_COMPLETION_URI, "c", C_COMPLETION_TEXT)
+        self.lines = C_COMPLETION_TEXT.split("\n")
+
+    def _col(self, line: int, marker: str, typed: int) -> int:
+        return self.lines[line].index(marker) + typed
+
+    def _kinds(self, items):
+        return {item["kind"] for item in items}
+
+    def _labels(self, items):
+        return [item["label"] for item in items]
+
+    def test_template_string_gives_mnemonics_only(self):
+        items = self.server.completion(C_COMPLETION_URI, 3, self._col(3, "vaddps", 2))
+        self.assertEqual(self._kinds(items), {14})
+        self.assertEqual(self._labels(items), ["VADDPS (XMM, XMM, XMM)"])
+
+    def test_template_string_piece_on_later_line_gives_mnemonics_only(self):
+        items = self.server.completion(C_COMPLETION_URI, 4, self._col(4, "vmulps", 2))
+        self.assertEqual(self._kinds(items), {14})
+        self.assertEqual(
+            sorted(self._labels(items)), ["VMOVAPS (XMM, XMM)", "VMULPS (XMM, XMM, XMM)"]
+        )
+
+    def test_template_text_after_escape_gives_no_intrinsics(self):
+        # After the \n\t escape the raw word swallows the "t", so the prefix
+        # matches nothing; the zone must still be the template's, not the
+        # operand lists' or plain code's.
+        items = self.server.completion(C_COMPLETION_URI, 5, self._col(5, "vaddps", 2))
+        self.assertEqual(self._kinds(items), set())
+
+    def test_operand_list_gives_no_items(self):
+        items = self.server.completion(C_COMPLETION_URI, 5, self._col(5, "vvec", 1))
+        self.assertEqual(items, [])
+
+    def test_clobber_list_gives_no_items(self):
+        items = self.server.completion(C_COMPLETION_URI, 5, self._col(5, "memory", 1))
+        self.assertEqual(items, [])
+
+    def test_msvc_block_gives_mnemonics_only(self):
+        items = self.server.completion(C_COMPLETION_URI, 8, self._col(8, "vaddps", 2))
+        self.assertEqual(self._kinds(items), {14})
+        self.assertEqual(self._labels(items), ["VADDPS (XMM, XMM, XMM)"])
+        items = self.server.completion(C_COMPLETION_URI, 7, self._col(7, "mov", 1))
+        self.assertEqual(self._kinds(items), {14})
+        self.assertEqual(self._labels(items), ["MOV (R64, R64)"])
+
+    def test_msvc_line_gives_mnemonics_only(self):
+        items = self.server.completion(C_COMPLETION_URI, 10, self._col(10, "vaddps", 2))
+        self.assertEqual(self._kinds(items), {14})
+        self.assertEqual(self._labels(items), ["VADDPS (XMM, XMM, XMM)"])
+
+    def test_plain_code_gives_intrinsics_only(self):
+        items = self.server.completion(C_COMPLETION_URI, 13, self._col(13, "vaddq_f32", 2))
+        self.assertEqual(self._kinds(items), {3})
+        self.assertEqual(self._labels(items), ["vaddq_f32"])
+
+    def test_comment_gives_intrinsics_only(self):
+        items = self.server.completion(C_COMPLETION_URI, 12, self._col(12, "vaddps", 2))
+        self.assertEqual(self._kinds(items), {3})
+        self.assertEqual(self._labels(items), ["vaddq_f32"])
+
+    def test_plain_string_gives_no_mnemonics(self):
+        items = self.server.completion(C_COMPLETION_URI, 11, self._col(11, "mov", 1))
+        self.assertEqual(self._kinds(items), set())
+
+    def test_cpp_document_follows_the_same_zones(self):
+        self.server.open(C_COMPLETION_CPP_URI, "cpp", C_COMPLETION_TEXT)
+        items = self.server.completion(C_COMPLETION_CPP_URI, 3, self._col(3, "vaddps", 2))
+        self.assertEqual(self._kinds(items), {14})
+        items = self.server.completion(C_COMPLETION_CPP_URI, 13, self._col(13, "vaddq_f32", 2))
+        self.assertEqual(self._kinds(items), {3})
+
+    def test_assembly_document_keeps_the_full_pool(self):
+        self.server.open(C_COMPLETION_ASM_URI, "asm", "vaddps ymm0, ymm1, ymm2\n")
+        items = self.server.completion(C_COMPLETION_ASM_URI, 0, 2)
+        self.assertEqual(
+            sorted(zip(self._labels(items), [i["kind"] for i in items])),
+            [("VADDPS (XMM, XMM, XMM)", 14), ("vaddq_f32", 3)],
+        )
 
 
 class MissingCatalogTests(unittest.TestCase):

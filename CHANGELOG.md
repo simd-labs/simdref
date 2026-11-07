@@ -5,6 +5,12 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- LSP C and C++ completion offers intrinsics in plain code and mnemonics inside inline `asm` strings and `__asm` blocks or lines; the operand and clobber lists get no suggestions.
+
 ## [0.0.16], 2026-11-06
 
 ### Added
