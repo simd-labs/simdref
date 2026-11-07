@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import json
-import re
 from collections.abc import Iterator
 from typing import Any
 

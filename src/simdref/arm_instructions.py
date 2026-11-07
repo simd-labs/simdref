@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import json
-import re
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
