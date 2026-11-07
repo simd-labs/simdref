@@ -134,19 +134,19 @@ Dev commands
 
 ## Data sources
 
-| Source                  | What                                                    | Entries¹           |
-| ----------------------- | ------------------------------------------------------- | ------------------ |
-| Intel Intrinsics Guide  | Signatures, descriptions, ISA, categories               | 7,381 intrinsics   |
-| uops.info               | Instructions, operands, latency, throughput, ports      | 2,558 instructions |
-| Arm ACLE (NEON, SVE)    | Intrinsic signatures and descriptions                   | 10,791 intrinsics  |
-| Arm AARCHMRS (A64)      | Base instruction forms and operand tables               | live-only²         |
-| riscv-rvv-intrinsic-doc | RVV intrinsics with deterministic instruction refs      | 74,289 intrinsics  |
-| RISC-V unified-db       | RVV instruction forms, ISA tags, description, operation | 672 instructions   |
-| Intel Guide perf tables | Per-core latency and throughput                         | 9,134 rows         |
-| Intel Optimization Ref. | Latency and throughput tables (volume 2)                | 3,155 rows         |
-| InstLatX64              | Measured latency and throughput dumps                   | 16,235 rows        |
-| AMD Software Opt. Guide | Latency workbooks, Zen 1 to Zen 5                       | 8,386 rows         |
-| Arm Neoverse SWOPT      | Instruction tables for 8 CPUs                           | 10,213 rows        |
+| Source                  | What                                                    | Entries¹            |
+| ----------------------- | ------------------------------------------------------- | ------------------- |
+| Intel Intrinsics Guide  | Signatures, descriptions, ISA, categories               | 7,757 intrinsics    |
+| uops.info               | Instructions, operands, latency, throughput, ports      | 22,113 instructions |
+| Arm ACLE (NEON, SVE)    | Intrinsic signatures and descriptions                   | 13,493 intrinsics   |
+| Arm AARCHMRS (A64)      | Base instruction forms and operand tables               | live-only²          |
+| riscv-rvv-intrinsic-doc | RVV intrinsics with deterministic instruction refs      | 77,285 intrinsics   |
+| RISC-V unified-db       | RVV instruction forms, ISA tags, description, operation | 3,666 instructions  |
+| Intel Guide perf tables | Per-core latency and throughput                         | 9,134 rows          |
+| Intel Optimization Ref. | Latency and throughput tables (volume 2)                | 3,155 rows          |
+| InstLatX64              | Measured latency and throughput dumps                   | 16,235 rows         |
+| AMD Software Opt. Guide | Latency workbooks, Zen 1 to Zen 5                       | 8,386 rows          |
+| Arm Neoverse SWOPT      | Instruction tables for 8 CPUs                           | 10,213 rows         |
 
 ¹ Counts from the vendored snapshot. See
 [`docs/coverage/summary.json`](docs/coverage/summary.json) for parity
