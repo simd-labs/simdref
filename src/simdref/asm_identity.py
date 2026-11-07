@@ -26,38 +26,139 @@ the platforms it has wheels for; everywhere else point the env vars at a
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from simdref.catkey import ISA_FAMILY
 
 # Measured invocation of the 144/401/703 corpora probes (asm-pip/probe).
+# The riscv entries carry no "mattr": _mattr_for derives it from the tool.
 _ARCH_CFG: dict[str, dict] = {
-    "x86": {
-        "triple": "x86_64-unknown-linux-gnu",
-        "mattr": "+avx512f,+avx512bw,+avx512dq,+avx512vl,+avx512vbmi,+avx512vbmi2,"
-        "+avx512vnni,+avx512bitalg,+avx512vpopcntdq,+avx512ifma,+vaes,+vpclmulqdq,"
-        "+avx,+avx2,+fma,+f16c,+bmi,+bmi2,+lzcnt,+movbe",
-    },
-    "aarch64": {
-        "triple": "aarch64-unknown-linux-gnu",
-        "mattr": "+sve,+sve2,+sve2p1,+sme,+sme2,+sme2p1,+lse,+gcs,+aes",
-    },
+    "x86": {"triple": "x86_64-unknown-linux-gnu", "mattr": ""},
+    "aarch64": {"triple": "aarch64-unknown-linux-gnu", "mattr": "+all"},
     "arm": {"triple": "armv7-unknown-linux-gnueabihf", "mattr": "+neon"},
-    "riscv32": {
-        "triple": "riscv32-unknown-linux-gnu",
-        "mattr": "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs",
-    },
-    "riscv64": {
-        "triple": "riscv64-unknown-linux-gnu",
-        "mattr": "+m,+a,+f,+d,+c,+v,+zba,+zbb,+zbs,+zvbb,+zvkb,+zvkned,+zfh",
-    },
+    "riscv32": {"triple": "riscv32-unknown-linux-gnu"},
+    "riscv64": {"triple": "riscv64-unknown-linux-gnu"},
 }
+# The ratified profile each riscv derivation anchors on (spike feat H2).
+_RV_ANCHOR = {"riscv32": "+m,+a,+f,+d,+c,+v", "riscv64": "+rva23u64"}
+_RV_MATTR_CACHE: dict[tuple[str, str], str] = {}
+
+
+def _rv_help_names(llvm_mc: str, arch: str) -> list[str]:
+    """Extension names of ``llvm-mc -mattr=help``, in help order.
+
+    An extension line has the shape ``name - 'Name' (...)``. A tuning flag
+    (fusion-*, reserve-x*) has no quoted name, so the quote check keeps only
+    extensions. Vendor (x*) and experimental names drop out: the vendor ones
+    reuse the custom opcode spaces."""
+    # stdin=DEVNULL: -mattr=help keeps reading stdin, and in the LSP server
+    # stdin is the JSON-RPC stream (the derive would eat requests and block).
+    run = subprocess.run(
+        [llvm_mc, f"--triple={_ARCH_CFG[arch]['triple']}", "-mattr=help"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+    )
+    _head, sep, tail = (run.stdout + run.stderr).partition("Available features for this target:")
+    names = []
+    for line in tail.splitlines() if sep else []:
+        left, sep2, _desc = line.strip().partition(" - '")
+        name = left.strip()
+        if sep2 and name and not any(ch.isspace() for ch in name):
+            if not name.startswith(("x", "experimental-")):
+                names.append(name)
+    return names
+
+
+def _rv_accepts(llvm_mc: str, arch: str, mattr: str) -> bool:
+    """True when llvm-mc assembles one x31 instruction under ``mattr``."""
+    run = subprocess.run(
+        [llvm_mc, f"--triple={_ARCH_CFG[arch]['triple']}", f"-mattr={mattr}", "-show-encoding"],
+        # x31: a base-shrinking entry (e) fails here.
+        input="add t6, t6, t6\n",
+        capture_output=True,
+        text=True,
+    )
+    return run.returncode == 0 and "encoding" in run.stdout
+
+
+def _rv_mattr(llvm_mc: str, arch: str) -> str:
+    """The riscv ``-mattr``, derived from llvm-mc and cached per tool path.
+
+    Never a hand list (spike feat H2): probe each non-vendor extension next
+    to the ratified anchor and keep what assembles, then keep a name only
+    when it also joins the union so far. The anchor decides each
+    incompatible pair (F over Zfinx, Zcd over Zcmp), and an extension that
+    conflicts with it drops out; a pair conflict can need a third
+    extension's implication, so the union test covers that.
+
+    The cache outlives the process (the derive costs about a second and the
+    CLI is one-shot): one file per tool path, size and mtime, so a rebuilt
+    tool re-derives."""
+    cached = _RV_MATTR_CACHE.get((llvm_mc, arch))
+    if cached is not None:
+        return cached
+    cache_file = _rv_mattr_cache_file(llvm_mc, arch)
+    try:
+        cached = cache_file.read_text().strip()
+    except OSError:
+        cached = ""
+    if not cached:
+        names = _rv_help_names(llvm_mc, arch)
+        # Ratified extensions first: on a conflict the earlier one stays.
+        names.sort(key=lambda name: name.startswith("experimental-"))
+        anchor = _RV_ANCHOR[arch]
+        with ThreadPoolExecutor(16) as pool:
+            verdict = list(
+                pool.map(lambda name: _rv_accepts(llvm_mc, arch, f"{anchor},+{name}"), names)
+            )
+        kept: list[str] = []
+        for name, ok in zip(names, verdict):
+            union = ",".join([anchor] + [f"+{k}" for k in kept + [name]])
+            if ok and _rv_accepts(llvm_mc, arch, union):
+                kept.append(name)
+        cached = ",".join([anchor] + [f"+{k}" for k in kept])
+        try:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cache_file.with_name(f"{cache_file.name}.tmp{os.getpid()}")
+            tmp.write_text(cached)
+            os.replace(tmp, cache_file)
+        except OSError:
+            pass  # a read-only cache dir costs one re-derive per process
+    _RV_MATTR_CACHE[(llvm_mc, arch)] = cached
+    return cached
+
+
+def _rv_mattr_cache_file(llvm_mc: str, arch: str) -> Path:
+    """The cache file for one tool path: keyed by path, size and mtime."""
+    try:
+        stat = os.stat(llvm_mc)
+        stamp = f"{llvm_mc}:{stat.st_size}:{stat.st_mtime_ns}:{arch}"
+    except OSError:
+        stamp = f"{llvm_mc}:{arch}"
+    name = hashlib.sha256(stamp.encode()).hexdigest()[:16]
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(Path.home(), ".cache")
+    return Path(base) / "simdref" / f"rv-mattr-{name}"
+
+
+def _mattr_for(arch: str, llvm_mc: str) -> str:
+    """The ``-mattr`` string for one arch.
+
+    x86 needs none (its assembler accepts every extension by default) and
+    arm keeps its one flag. The riscv string comes from _rv_mattr."""
+    if arch.startswith("riscv"):
+        return _rv_mattr(llvm_mc, arch)
+    return _ARCH_CFG[arch]["mattr"]
+
+
 _X86_SYNTAX_FLAG = {"att": "-x86-asm-syntax=att", "intel": "-x86-asm-syntax=intel"}
 # uops.info eosz attribute values per effective operand size.
 _EOSZ_ATTR = {16: "1", 32: "2", 64: "3"}
@@ -303,8 +404,9 @@ def _probe_lines_uncached(
     every other instruction line reports no row (review E1/E2)."""
     cfg = _ARCH_CFG[arch]
     cmd = [llvm_mc, f"--triple={cfg['triple']}", "-show-encoding", "-show-inst"]
-    if mattr or cfg["mattr"]:
-        cmd.append(f"-mattr={mattr or cfg['mattr']}")
+    use = mattr or _mattr_for(arch, llvm_mc)
+    if use:
+        cmd.append(f"-mattr={use}")
     if arch == "x86":
         cmd.append(_X86_SYNTAX_FLAG[syntax])
 
@@ -441,7 +543,9 @@ def _probe_lines_split(lines: list[str], arch: str, syntax: str, llvm_mc: str) -
             continue
         mattr = None
         if not is_compressed:
-            mattr = ",".join(t for t in _ARCH_CFG[arch]["mattr"].split(",") if t != "+c")
+            # -c,-zca drops every Zc* family (zcb, zcmop, zcd), which the
+            # derived set names and a "+c" strip would leave on.
+            mattr = _mattr_for(arch, llvm_mc) + ",-c,-zca"
         sub = _probe_lines([lines[i] for i in indexes], arch, syntax, llvm_mc, mattr=mattr)
         for index, entry in zip(indexes, sub):
             merged = dict(entry)
@@ -808,8 +912,9 @@ def _string_spans_lines(lines: list[str], arch: str, syntax: str, llvm_mc: str |
         raise ToolUnavailableError("llvm-mc not found (set SIMDREF_LLVM_MC)")
     cfg = _ARCH_CFG[arch]
     cmd = [llvm_mc, f"--triple={cfg['triple']}"]
-    if cfg["mattr"]:
-        cmd.append(f"-mattr={cfg['mattr']}")
+    use = _mattr_for(arch, llvm_mc)
+    if use:
+        cmd.append(f"-mattr={use}")
     if arch == "x86":
         cmd.append(_X86_SYNTAX_FLAG[syntax])
     pending = []
@@ -963,62 +1068,6 @@ def identify(
 # whose printed mnemonic equals the line's own text mnemonic (objdump prints
 # the expanded or alias name too: jal, flw, sext.w). Both or neither match
 # keeps the rv64 result (the current default).
-def _rv64_only_ext(line: str) -> str | None:
-    """The extension name in an "'X' is only supported for 'rv64'" error line.
-
-    Returns None for any other line. The name sits after the last single quote
-    before the fixed tail, so a prefix like "error: ..." is ignored.
-    """
-    head, sep, _tail = line.partition("' is only supported for 'rv64'")
-    if not sep:
-        return None
-    return head.rpartition("'")[2] or None
-
-
-_RV32_MATTR_CACHE: dict[tuple[str, str], str] = {}
-
-
-def _rv32_decode_mattr(llvm_mc: str) -> str:
-    """The riscv32 decode -mattr: the riscv64 one minus rv64-only extensions.
-
-    Derived from llvm-mc's own errors (never hand-listed): the tool rejects
-    an rv64-only extension on the rv32 triple by name. shortcut: an extension
-    named differently in the error keeps its token, upgrade if a tool build
-    rejects it silently."""
-    base = _ARCH_CFG["riscv64"]["mattr"]
-    cached = _RV32_MATTR_CACHE.get((llvm_mc, base))
-    if cached is None:
-        tokens = base.split(",")
-        while True:
-            run = subprocess.run(
-                [
-                    llvm_mc,
-                    f"--triple={_ARCH_CFG['riscv32']['triple']}",
-                    f"-mattr={','.join(tokens)}",
-                    "-show-encoding",
-                ],
-                input="",
-                capture_output=True,
-                text=True,
-            )
-            drop = {
-                name.casefold()
-                for line in run.stderr.splitlines()
-                for name in [_rv64_only_ext(line)]
-                if name
-            }
-            if not drop:
-                break
-            remaining = [token for token in tokens if token.lstrip("+").casefold() not in drop]
-            # guard: the tool names an extension absent from the token list,
-            # so nothing shrank; break here or the loop spins forever
-            if len(remaining) == len(tokens):
-                break
-            tokens = remaining
-        cached = _RV32_MATTR_CACHE[(llvm_mc, base)] = ",".join(tokens)
-    return cached
-
-
 def _parse_disasm(listing: str) -> dict[bytes, tuple[str, str]]:
     """One (printed mnemonic, MCInst opcode) per decoded word.
 
@@ -1052,7 +1101,7 @@ def _rv_xlen_decodes(
     gate: only an undecided RVC line pays the decode)."""
     missing = [raw for raw in dict.fromkeys(raws) if (llvm_mc, xlen, raw) not in _RV_DECODE_CACHE]
     if missing:
-        mattr = _ARCH_CFG["riscv64"]["mattr"] if xlen == 64 else _rv32_decode_mattr(llvm_mc)
+        mattr = _mattr_for(f"riscv{xlen}", llvm_mc)
         hexed = [" ".join(f"0x{byte:02x}" for byte in raw) for raw in missing]
         run = subprocess.run(
             [
@@ -1282,9 +1331,6 @@ def _identify_words(probed, results, catalog: _Catalog, arch: str) -> None:
         _rv_xlen_resolve(probed, results, catalog)
 
 
-_ENDBR_BYTES = {"f30f1efa": "ENDBR64", "f30f1efb": "ENDBR32"}
-
-
 def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
     pending = []
     for entry, result in zip(probed, results):
@@ -1300,7 +1346,7 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
     if not pending:
         return
     hexes = [_bytes_to_words(entry.get("bytes")).hex() for entry, _result in pending]
-    for (entry, result), facts, hexed in zip(pending, _xed_facts(hexes, xed), hexes):
+    for (entry, result), facts in zip(pending, _xed_facts(hexes, xed)):
         # A fixup placeholder covers the immediate value (audit A1): the
         # pick must not read it, and a row carrying an immzero claim about
         # it would be a guess either way.
@@ -1308,8 +1354,7 @@ def _identify_x86(probed, results, catalog: _Catalog, xed: str) -> None:
         if "error" in facts:
             result.reason = f"no catalog row (XED {facts['error']})"
             continue
-        # XED decodes ENDBR32/64 as the NOP iform NOP_GPRv_GPRv_0F1E, which no uops.info row carries
-        pool = catalog.iform_pools.get(_ENDBR_BYTES.get(hexed, facts["iform"]), [])
+        pool = catalog.iform_pools.get(facts["iform"], [])
         if not pool:
             result.reason = f"no catalog row (iform {facts['iform']} absent)"
             continue

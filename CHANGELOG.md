@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - LSP C and C++ completion offers intrinsics in plain code and mnemonics inside inline `asm` strings and `__asm` blocks or lines; the operand and clobber lists get no suggestions.
+- Asm identity derives the riscv feature set and aarch64 `+all` from llvm-mc, and resolves `endbr64`/`endbr32` by bytes (simdref-llvm-mc 23.1.4.post1).
 
 ## [0.0.16], 2026-11-06
 

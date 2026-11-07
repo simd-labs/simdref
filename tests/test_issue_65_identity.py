@@ -225,7 +225,8 @@ def test_m3_vpcmp_broadcast_spelling_picks_the_broadcast_row(tmp_path):
     [("endbr64", None), ("endbr32", None), ("endbr64", "f3 0f 1e fa"), ("endbr32", "f3 0f 1e fb")],
 )
 def test_m4_endbr_maps_to_its_row(line, byte_column, tmp_path):
-    iform = _iform("f30f1efa")  # XED gives both ENDBR forms this one iform
+    # XED_CHIP_ALL gives each endbr its own iform. The NOP rows keep the NOP
+    # iform and never join the endbr pool.
     db = _db(
         [
             InstructionRecord(
@@ -234,8 +235,8 @@ def test_m4_endbr_maps_to_its_row(line, byte_column, tmp_path):
             InstructionRecord(
                 mnemonic="ENDBR32", form="ENDBR32", summary="e32", metadata={"iform": "ENDBR32"}
             ),
-            _x86_row("NOP (R32, R32)", iform),
-            _x86_row("NOP (R16, R16)", iform),
+            _x86_row("NOP (R32, R32)", "NOP_GPRv_GPRv_0F1E"),
+            _x86_row("NOP (R16, R16)", "NOP_GPRv_GPRv_0F1E"),
         ],
         tmp_path,
     )
@@ -268,21 +269,45 @@ def test_b6_identify_lines_gives_the_foreign_line_no_x86_row(tmp_path):
     assert not _got(identify_lines(items, catalog_path=db))[-1].startswith("x86:")
 
 
-def test_rv32_decode_mattr_guard_terminates(tmp_path):
-    # A tool error that names an extension absent from the -mattr list must
-    # not spin the shrink loop: the guard breaks when no token drops.
-    import time
-
+def test_rv_mattr_derives_and_caches(tmp_path):
+    # The riscv -mattr comes from the tool: -mattr=help names the
+    # extensions, a probe keeps what joins the union, and the derive runs
+    # once per tool path. The fake rejects the +zba,+zfinx pair only in the
+    # union, so the greedy union test (not the pair probe) drops zfinx.
     import simdref.asm_identity as ai
 
+    log = tmp_path / "calls.log"
     fake = tmp_path / "fake-llvm-mc"
     fake.write_text(
-        "#!/bin/sh\necho \"error: 'Znotanext' is only supported for 'rv64'\" >&2\nexit 0\n"
+        "#!/bin/sh\n"
+        f'echo "$@" >> {log}\n'
+        'case "$*" in\n'
+        "*mattr=help*)\n"
+        'echo "Available features for this target:"\n'
+        "echo \"  zba                                 - 'Zba' (address generation).\"\n"
+        "echo \"  zfinx                               - 'Zfinx' (F in GPRs).\"\n"
+        "echo \"  xtheadba                            - 'xtheadba' (vendor).\"\n"
+        "echo \"  experimental-zfoo                   - 'Zfoo' (draft).\"\n"
+        'echo "  fusion                              - Enable fusions."\n'
+        "exit 0\n"
+        ";;\n"
+        "esac\n"
+        'case "$*" in\n'
+        "*+zba*+zfinx*|*+zfinx*+zba*)\n"
+        "echo \"error: 'zfinx' and 'zba' extensions are incompatible\" >&2\n"
+        "exit 1\n"
+        ";;\n"
+        "esac\n"
+        'echo "  add t6, t6, t6 # encoding: [0x33,0x03,0xf3,0x03]"\n'
     )
     fake.chmod(0o755)
-    ai._RV32_MATTR_CACHE.clear()
-    start = time.monotonic()
-    result = ai._rv32_decode_mattr(str(fake))
-    elapsed = time.monotonic() - start
-    assert elapsed < 1.0, f"shrink loop spun for {elapsed:.2f}s"
-    assert result == ai._ARCH_CFG["riscv64"]["mattr"]
+    ai._RV_MATTR_CACHE.clear()
+    got = ai._rv_mattr(str(fake), "riscv64")
+    assert got == "+rva23u64,+zba"
+    assert ai._rv_mattr(str(fake), "riscv64") == got
+    # the derive runs once per tool path: the second call hits the process
+    # cache and a cleared cache hits the on-disk one (a fresh CLI process).
+    ai._RV_MATTR_CACHE.clear()
+    assert ai._rv_mattr(str(fake), "riscv64") == got
+    # one help run, one probe per name, one union probe per kept name
+    assert len(log.read_text().splitlines()) == 5
