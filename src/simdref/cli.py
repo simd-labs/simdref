@@ -243,85 +243,125 @@ def _download_from_release() -> None:
 
     is_tty = err_console.is_terminal and os.environ.get("GITHUB_ACTIONS") != "true"
 
+    def _retry_delay(attempt: int, retry_after: str | None, backoff: tuple[float, ...]) -> float:
+        # Retry-After is a delta in seconds. An HTTP-date value uses the fixed delays.
+        if retry_after:
+            try:
+                return max(0.0, float(retry_after))
+            except ValueError:
+                pass
+        return backoff[min(attempt, len(backoff) - 1)]
+
     def _fetch_into(asset: str, fh) -> bool:
+        # The release CDN bursts on 5xx/429. Retry transient failures before giving up.
+        backoff = (2.0, 4.0, 8.0)
         for tag in _release_tag_candidates():
             url = _release_asset_url(tag, asset)
-            try:
-                with httpx.stream("GET", url, follow_redirects=True, timeout=120) as resp:
-                    if resp.status_code == 404:
-                        continue
-                    resp.raise_for_status()
-                    total_header = resp.headers.get("content-length")
-                    total = int(total_header) if total_header and total_header.isdigit() else None
-
-                    if is_tty:
-                        progress = Progress(
-                            SpinnerColumn(),
-                            TextColumn("[progress.description]{task.description}"),
-                            BarColumn(),
-                            DownloadColumn(),
-                            TransferSpeedColumn(),
-                            TimeRemainingColumn(),
-                            console=err_console,
-                            transient=True,
+            delay = backoff[0]
+            last_status: int | None = None
+            last_error: Exception | None = None
+            for attempt in range(4):
+                if attempt:
+                    err_console.print(
+                        f"retrying {asset} from {tag} in {delay:g}s (attempt {attempt + 1} of 4)",
+                        style="yellow",
+                    )
+                    time.sleep(delay)
+                fh.truncate(0)
+                try:
+                    with httpx.stream("GET", url, follow_redirects=True, timeout=120) as resp:
+                        if resp.status_code == 404:
+                            last_status = None
+                            last_error = None
+                            break
+                        if resp.status_code == 429 or resp.status_code >= 500:
+                            last_status = resp.status_code
+                            delay = _retry_delay(attempt, resp.headers.get("retry-after"), backoff)
+                            continue
+                        resp.raise_for_status()
+                        total_header = resp.headers.get("content-length")
+                        total = (
+                            int(total_header) if total_header and total_header.isdigit() else None
                         )
-                        with progress:
-                            task = progress.add_task(f"downloading {asset} ({tag})", total=total)
+
+                        if is_tty:
+                            progress = Progress(
+                                SpinnerColumn(),
+                                TextColumn("[progress.description]{task.description}"),
+                                BarColumn(),
+                                DownloadColumn(),
+                                TransferSpeedColumn(),
+                                TimeRemainingColumn(),
+                                console=err_console,
+                                transient=True,
+                            )
+                            with progress:
+                                task = progress.add_task(
+                                    f"downloading {asset} ({tag})", total=total
+                                )
+                                for chunk in resp.iter_bytes(chunk_size=1024 * 64):
+                                    fh.write(chunk)
+                                    progress.update(task, advance=len(chunk))
+                        else:
+                            err_console.print(f"downloading {asset} from {tag}...", style="dim")
+                            written = 0
+                            last_progress = time.monotonic()
                             for chunk in resp.iter_bytes(chunk_size=1024 * 64):
                                 fh.write(chunk)
-                                progress.update(task, advance=len(chunk))
-                    else:
-                        err_console.print(f"downloading {asset} from {tag}...", style="dim")
-                        written = 0
-                        last_progress = time.monotonic()
-                        for chunk in resp.iter_bytes(chunk_size=1024 * 64):
-                            fh.write(chunk)
-                            written += len(chunk)
-                            now = time.monotonic()
-                            if now - last_progress >= 5.0:
-                                last_progress = now
-                                mb = written / 1_048_576
-                                if total:
-                                    pct = 100 * written / total
-                                    err_console.print(
-                                        f"downloading {asset}: {mb:.1f} / "
-                                        f"{total / 1_048_576:.1f} MB ({pct:.0f}%)",
-                                        style="dim",
-                                    )
-                                else:
-                                    err_console.print(
-                                        f"downloading {asset}: {mb:.1f} MB", style="dim"
-                                    )
-                        if total:
-                            err_console.print(
-                                f"downloaded {asset}: {written / 1_048_576:.1f} MB "
-                                f"({written}/{total} bytes)",
-                                style="dim",
-                            )
-                        else:
-                            err_console.print(
-                                f"downloaded {asset}: {written / 1_048_576:.1f} MB", style="dim"
-                            )
-                    return True
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 404:
-                    continue
+                                written += len(chunk)
+                                now = time.monotonic()
+                                if now - last_progress >= 5.0:
+                                    last_progress = now
+                                    mb = written / 1_048_576
+                                    if total:
+                                        pct = 100 * written / total
+                                        err_console.print(
+                                            f"downloading {asset}: {mb:.1f} / "
+                                            f"{total / 1_048_576:.1f} MB ({pct:.0f}%)",
+                                            style="dim",
+                                        )
+                                    else:
+                                        err_console.print(
+                                            f"downloading {asset}: {mb:.1f} MB", style="dim"
+                                        )
+                            if total:
+                                err_console.print(
+                                    f"downloaded {asset}: {written / 1_048_576:.1f} MB "
+                                    f"({written}/{total} bytes)",
+                                    style="dim",
+                                )
+                            else:
+                                err_console.print(
+                                    f"downloaded {asset}: {written / 1_048_576:.1f} MB",
+                                    style="dim",
+                                )
+                        return True
+                except httpx.HTTPStatusError as exc:
+                    err_console.print(
+                        f"failed to download {asset}: {exc.response.status_code}", style="red"
+                    )
+                    raise typer.Exit(code=1) from exc
+                except (
+                    httpx.ConnectError,
+                    httpx.ConnectTimeout,
+                    httpx.ReadTimeout,
+                    httpx.NetworkError,
+                ) as exc:
+                    last_error = exc
+                    delay = backoff[min(attempt, len(backoff) - 1)]
+            if last_status is not None:
                 err_console.print(
-                    f"failed to download {asset}: {exc.response.status_code}", style="red"
+                    f"failed to download {asset} from {tag} after 4 attempts: {last_status}",
+                    style="red",
                 )
-                raise typer.Exit(code=1) from exc
-            except (
-                httpx.ConnectError,
-                httpx.ConnectTimeout,
-                httpx.ReadTimeout,
-                httpx.NetworkError,
-            ) as exc:
+                raise typer.Exit(code=1) from None
+            if last_error is not None:
                 err_console.print(
                     "[bold yellow]warning:[/bold yellow] no internet connectivity — "
-                    f"could not reach the release server ({exc.__class__.__name__}). "
+                    f"could not reach the release server ({last_error.__class__.__name__}). "
                     "Some features may not work correctly until the catalog is refreshed.",
                 )
-                raise typer.Exit(code=1) from exc
+                raise typer.Exit(code=1) from last_error
         return False
 
     for asset in ("catalog.msgpack", "catalog.db"):

@@ -168,6 +168,7 @@ class OfflineWarningTests(unittest.TestCase):
         fake_console = Console(file=buf, force_terminal=False, width=200)
         with (
             mock.patch("httpx.stream", fake_stream),
+            mock.patch("time.sleep"),
             mock.patch.object(cli, "err_console", fake_console),
         ):
             with self.assertRaises(typer.Exit):
