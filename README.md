@@ -142,6 +142,7 @@ Dev commands
 | Arm AARCHMRS (A64)      | Base instruction forms and operand tables               | live-only²          |
 | riscv-rvv-intrinsic-doc | RVV intrinsics with deterministic instruction refs      | 77,285 intrinsics   |
 | RISC-V unified-db       | RVV instruction forms, ISA tags, description, operation | 3,666 instructions  |
+| NVIDIA PTX ISA          | Instruction ops, syntax, qualifiers, versions, sm_XX    | 1,088 instructions  |
 | Intel Guide perf tables | Per-core latency and throughput                         | 9,134 rows          |
 | Intel Optimization Ref. | Latency and throughput tables (volume 2)                | 3,155 rows          |
 | InstLatX64              | Measured latency and throughput dumps                   | 16,235 rows         |

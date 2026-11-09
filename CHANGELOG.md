@@ -5,18 +5,25 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.17], 2026-11-09
 
 ### Added
 
-- The catalog includes PTX ISA rows, derived at build time from the NVIDIA PTX ISA reference. They appear in the next release and then after `isa update`.
+- The catalog includes PTX ISA rows, derived at build time from the NVIDIA PTX ISA reference. They appear with this release and then after `isa update`.
 - `isa ld.global`-style dotted lookup resolves a PTX line to its documented op chain.
 - The LSP gives hover, inlay hints, and completion for `.ptx` files and for PTX in CUDA inline asm.
+
+### Changed
+
+- `annotate.py` replaces its pattern regexes with character scans and table lookups.
 
 ### Fixed
 
 - LSP C and C++ completion offers intrinsics in plain code and mnemonics inside inline `asm` strings and `__asm` blocks or lines; the operand and clobber lists get no suggestions.
 - Asm identity derives the riscv feature set and aarch64 `+all` from llvm-mc, and resolves `endbr64`/`endbr32` by bytes (simdref-llvm-mc 23.1.4.post1).
+- Catalog downloads retry 5xx, 429 and connection errors up to 4 attempts with 2/4/8 s backoff, honouring Retry-After when present.
+
+## [Unreleased]
 
 ## [0.0.16], 2026-11-06
 
