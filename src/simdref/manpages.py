@@ -7,6 +7,7 @@ plain ``man <name>`` works.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -158,15 +159,12 @@ def write_manpages(
             on_progress(done, total)
     for instruction in catalog.instructions:
         page = instruction_page(instruction)
-        filename = (
-            f"instruction-{record_slug(instruction.architecture)}-{record_slug(instruction.key)}.7"
-        )
-        (section_dir / filename).write_text(page)
+        stem = f"instruction-{record_slug(instruction.architecture)}-{record_slug(instruction.key)}"
+        (section_dir / f"{_safe_page_name(stem)}.7").write_text(page)
         if instruction.architecture == "x86":
-            (section_dir / f"{instruction.mnemonic}.7").write_text(page)
-        (
-            section_dir / f"{record_slug(instruction.architecture)}-{instruction.mnemonic}.7"
-        ).write_text(page)
+            (section_dir / f"{_safe_page_name(instruction.mnemonic)}.7").write_text(page)
+        stem = f"{record_slug(instruction.architecture)}-{instruction.mnemonic}"
+        (section_dir / f"{_safe_page_name(stem)}.7").write_text(page)
         done += 1
         if on_progress is not None:
             on_progress(done, total)
@@ -174,3 +172,17 @@ def write_manpages(
 
 def record_slug(value: str) -> str:
     return "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
+
+
+def _safe_page_name(value: str) -> str:
+    """File name with unsafe characters mapped to "-" and a length cap.
+
+    PTX keys can carry "::" and run past the 255-byte file-name limit; the
+    digest suffix keeps long names unique. Short safe names pass through
+    unchanged.
+    """
+    safe = "".join(char if char.isalnum() or char in "._-" else "-" for char in value)
+    if len(safe) <= 200:
+        return safe
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
+    return f"{safe[:200]}-{digest}"

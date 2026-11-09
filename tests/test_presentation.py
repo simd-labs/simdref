@@ -97,6 +97,31 @@ def test_write_manpages_covers_every_intrinsic(catalog: Catalog, tmp_path: Path)
     assert "VADDPS.7" in written
 
 
+def test_write_manpages_bounds_long_unsafe_names(catalog: Catalog, tmp_path: Path):
+    # A PTX key can carry "::" and run past the file-name limit: the page
+    # names stay unique and inside the limit.
+    catalog.instructions.append(
+        InstructionRecord(
+            mnemonic="fabric.try_put." + ".".join(f"seg{i}" for i in range(40)) + "::reads",
+            form="d, a, b",
+            summary="generated",
+            architecture="ptx",
+            isa=["PTX"],
+            metadata={},
+            description={},
+            source="ptx-isa",
+        )
+    )
+    write_manpages(catalog, tmp_path)
+    written = {p.name for p in (tmp_path / "man7").iterdir()}
+    ptx_pages = [name for name in written if name.startswith(("instruction-ptx-", "ptx-"))]
+    assert len(ptx_pages) == 2
+    for name in written:
+        assert name.endswith(".7")
+        assert len(name.encode("utf-8")) <= 255
+        assert ":" not in name
+
+
 # ---------------------------------------------------------------------------
 # F3 — web export structure
 # ---------------------------------------------------------------------------

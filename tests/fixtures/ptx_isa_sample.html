@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>1. Introduction — Sample ISA 9.9 documentation</title>
+</head>
+<body>
+<div class="wy-nav-content">
+<div role="main" class="section">
+
+<section id="introduction">
+<h1>
+<span class="section-number">1. </span><a class="reference internal" href="#introduction">Introduction</a><a class="headerlink" href="#introduction" title="Permalink to this headline">&#182;</a>
+</h1>
+<p>This page documents the Sample Instruction Set Architecture.</p>
+</section>
+
+<section id="instruction-set">
+<h2>
+<span class="section-number">9. </span><a class="reference internal" href="#instruction-set">Instruction Set</a>
+</h2>
+
+<section id="widget-instructions">
+<h3>
+<span class="section-number">9.1. </span><a class="reference internal" href="#widget-instructions">Widget Instructions</a>
+</h3>
+
+<section id="widget-instructions-frob">
+<span id="id101"></span><h3>
+<span class="section-number">9.1.1. </span><a class="reference internal" href="#widget-instructions-frob">Widget Instructions: <code class="docutils literal notranslate"><span class="pre">frob</span></code></a><a class="headerlink" href="#widget-instructions-frob" title="Permalink to this headline">&#182;</a>
+</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">frob</span></code></p>
+<p>Copy a widget from one register file to another.</p>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>frob{.fast}.vec.type d, [a];
+frob.relaxed.scope.type d, [a];
+
+.vec =    { .v2, .v4 };
+.type =   { .u8, .f32 };
+.scope =  { .cta, .cluster };
+</pre></div>
+</div>
+<p class="rubric">Description</p>
+<p>Read the widget operand and write the destination register.</p>
+<p class="rubric">PTX ISA Notes</p>
+<p>frob introduced in PTX ISA version 2.0.</p>
+<p>frob.relaxed introduced in PTX ISA version 3.1.</p>
+<p class="rubric">Target ISA Notes</p>
+<p>frob requires sm_75 or higher.</p>
+<p>frob.relaxed requires sm_80 or higher.</p>
+<p class="rubric">Examples</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>frob.v4.f32 d, [a];
+</pre></div>
+</div>
+</section>
+
+<section id="widget-instructions-frob-nc">
+<span id="id102"></span><h4>
+<span class="section-number">9.1.2. </span><a class="reference internal" href="#widget-instructions-frob-nc">Widget Instructions: <code class="docutils literal notranslate"><span class="pre">frob.nc</span></code></a><a class="headerlink" href="#widget-instructions-frob-nc" title="Permalink to this headline">&#182;</a>
+</h4>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">frob.nc</span></code></p>
+<p>Copy a widget without caching the source line.</p>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>frob.nc{.fast}.type d, [a];
+
+.type = { .u8 };
+.scope = { .cta, .relaxed };
+</pre></div>
+</div>
+<p class="rubric">PTX ISA Notes</p>
+<p>frob.nc introduced in PTX ISA version 8.0.</p>
+<p class="rubric">Target ISA Notes</p>
+<p>frob.nc requires sm_90 or higher.</p>
+</section>
+
+<section id="widget-instructions-zzz">
+<span id="id103"></span><h3>
+<span class="section-number">9.1.3. </span><a class="reference internal" href="#widget-instructions-zzz">Widget Instructions: <code class="docutils literal notranslate"><span class="pre">zzz</span></code></a>
+</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">zzz</span></code></p>
+<p>Reserved for a future revision. No syntax is defined.</p>
+</section>
+
+</section>
+
+<section id="matrix-instructions">
+<h3>
+<span class="section-number">9.2. </span><a class="reference internal" href="#matrix-instructions">Matrix Instructions</a>
+</h3>
+
+<section id="matrix-instructions-twiddle">
+<span id="id104"></span><h3>
+<span class="section-number">9.2.1. </span><a class="reference internal" href="#matrix-instructions-twiddle">Matrix Instructions: <code class="docutils literal notranslate"><span class="pre">twiddle</span></code></a>
+</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">twiddle</span></code></p>
+<p>Twiddle one matrix fragment against another.</p>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>twiddle.sync.aligned.shape.row.col.dtype b, c, d;
+twiddle.sync.aligned.shape.row.col.kind b, c, d, e;
+
+.shape = { .m8n8, .m16n8 };
+.dtype = { .f16, .f32 };
+.kind =   { .a, .b };
+</pre></div>
+</div>
+<p class="rubric">PTX ISA Notes</p>
+<p>twiddle introduced in PTX ISA version 8.0.</p>
+<p class="rubric">Target ISA Notes</p>
+<p>twiddle requires sm_90 or higher.</p>
+</section>
+</section>
+
+<section id="cache-instructions">
+<h3>
+<span class="section-number">9.3. </span><a class="reference internal" href="#cache-instructions">Cache Instructions</a>
+</h3>
+
+<section id="cache-instructions-flop-floop">
+<span id="id105"></span><h3>
+<span class="section-number">9.3.1. </span><a class="reference internal" href="#cache-instructions-flop-floop">Cache Instructions: <code class="docutils literal notranslate"><span class="pre">flop</span></code>, <code class="docutils literal notranslate"><span class="pre">floop</span></code></a>
+</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">flop</span></code>, <code class="docutils literal notranslate"><span class="pre">floop</span></code></p>
+<p>Pull a cache line ahead of use.</p>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>flop{.level} [a];
+floop.L1 [a];
+
+.level = { .L1, .L2 };
+</pre></div>
+</div>
+</section>
+</section>
+
+</section>
+</div>
+</div>
+</body>
+</html>

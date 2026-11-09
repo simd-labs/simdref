@@ -88,10 +88,12 @@ def test_isa_family_maps_every_catalog_family():
         "arm": "arm",
         "riscv32": "riscv",
         "riscv64": "riscv",
+        "ptx": "ptx",
     }
     assert isa_family("AArch64") == "arm"
     assert isa_family("armv8-a") == "arm"
     assert isa_family("riscv64") == "riscv"
+    assert isa_family("ptx") == "ptx"
     assert isa_family("skylake") == "x86"
     assert isa_family("auto") is None
     assert isa_family(None) is None

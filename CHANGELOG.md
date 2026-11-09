@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The catalog includes PTX ISA rows, derived at build time from the NVIDIA PTX ISA reference. They appear in the next release and then after `isa update`.
+- `isa ld.global`-style dotted lookup resolves a PTX line to its documented op chain.
+- The LSP gives hover, inlay hints, and completion for `.ptx` files and for PTX in CUDA inline asm.
+
 ### Fixed
 
 - LSP C and C++ completion offers intrinsics in plain code and mnemonics inside inline `asm` strings and `__asm` blocks or lines; the operand and clobber lists get no suggestions.

@@ -28,12 +28,14 @@ from simdref.ingest_sources import (
     fetch_arm_a64_data,
     fetch_arm_acle_data,
     fetch_intel_data,
+    fetch_ptx_isa_data,
     fetch_riscv_rvv_intrinsics_data,
     fetch_riscv_unified_db_data,
     fetch_uops_xml,
     now_iso,
 )
 from simdref.models import Catalog, InstructionRecord, IntrinsicRecord, SourceVersion
+from simdref.ptx import parse_ptx_instructions_payload
 from simdref.riscv import parse_riscv_instruction_payload, parse_riscv_intrinsics_payload
 
 _UOPS_METADATA_KEYS = frozenset(
@@ -1617,6 +1619,9 @@ def build_catalog(
     emit("Fetching RISC-V unified-db instruction data")
     riscv_instructions_text, riscv_instructions_source = fetch_riscv_unified_db_data()
     emit(f"Fetched RISC-V unified-db instruction data from {riscv_instructions_source.url}")
+    emit("Fetching PTX ISA reference")
+    ptx_text, ptx_source = fetch_ptx_isa_data()
+    emit(f"Fetched PTX ISA reference from {ptx_source.url}")
     emit("Parsing intrinsic catalog")
     intrinsics = parse_intel_payload(intel_text)
     arm_intrinsics = parse_arm_intrinsics_payload(arm_acle_text)
@@ -1627,6 +1632,7 @@ def build_catalog(
     instructions = parse_uops_xml(uops_text)
     instructions.extend(parse_arm_instruction_payload(arm_a64_text))
     instructions.extend(parse_riscv_instruction_payload(riscv_instructions_text))
+    instructions.extend(parse_ptx_instructions_payload(ptx_text))
     emit(f"Parsed {len(instructions)} instructions")
     emit("Linking intrinsics to instructions")
     link_records(intrinsics, instructions)
@@ -1661,6 +1667,7 @@ def build_catalog(
             riscv_intrinsics_source,
             riscv_instructions_source,
             *perf_sources_version,
+            ptx_source,
         ],
         generated_at=now_iso(),
     )

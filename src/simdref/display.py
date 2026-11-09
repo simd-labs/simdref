@@ -388,6 +388,8 @@ def isa_family(isa: str) -> str:
         return "Arm"
     if d == "V" or d.startswith("RV") or d.startswith("ZV") or d.startswith("ZVE"):
         return "RISC-V"
+    if d == "PTX":
+        return "PTX"
     if d.startswith("APX"):
         return "APX"
     if d.startswith("AMX"):

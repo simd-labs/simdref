@@ -22,6 +22,7 @@ from simdref.ingest_catalog import (
 )
 from simdref.arm_instructions import parse_arm_instruction_payload
 from simdref.models import Catalog, SourceVersion
+from simdref.ptx import parse_ptx_instructions_payload
 from simdref.riscv import (
     parse_riscv_instruction_payload,
     parse_riscv_intrinsics_payload,
@@ -80,6 +81,8 @@ def build_fixture_catalog(*, status: Callable[[str], None] | None = None) -> Cat
     instructions.extend(
         parse_riscv_instruction_payload(_fixture_text("riscv_unified_db_sample.json"))
     )
+    emit("Loading PTX ISA fixture")
+    instructions.extend(parse_ptx_instructions_payload(_fixture_text("ptx_isa_sample.html")))
 
     emit("Linking intrinsics to instructions")
     link_records(intrinsics, instructions)
@@ -97,8 +100,27 @@ def build_fixture_catalog(*, status: Callable[[str], None] | None = None) -> Cat
             _fixture_source("arm-a64", "arm_a64_instructions_sample.json"),
             _fixture_source("rvv-intrinsic-doc", "riscv_rvv_intrinsics_sample.json"),
             _fixture_source("riscv-unified-db", "riscv_unified_db_sample.json"),
+            _fixture_source("ptx-isa", "ptx_isa_sample.html"),
         ],
         generated_at=_iso_now(),
+    )
+
+
+def build_match_catalog() -> Catalog:
+    """The fixture catalog plus the PTX match-sample rows.
+
+    The match sample keeps the real doc's colliding ``add`` sections and
+    the ``ld`` / ``ld.global.nc`` / ``vop`` rows that a concrete spelling
+    must resolve to the section documenting it.
+    """
+    catalog = build_fixture_catalog()
+    extra = parse_ptx_instructions_payload(_fixture_text("ptx_isa_match_sample.html"))
+    return replace(
+        catalog,
+        instructions=sorted(
+            list(catalog.instructions) + extra,
+            key=lambda item: (item.architecture, item.mnemonic, item.form),
+        ),
     )
 
 
@@ -113,7 +135,7 @@ def load_any_catalog() -> Catalog:
     return load_catalog_from_db()
 
 
-__all__ = ["FIXTURES_DIR", "build_fixture_catalog", "load_any_catalog"]
+__all__ = ["FIXTURES_DIR", "build_fixture_catalog", "build_match_catalog", "load_any_catalog"]
 
 # Keep dataclass 'replace' importable by tests that want to tweak catalogs.
 _ = replace

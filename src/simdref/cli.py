@@ -72,6 +72,7 @@ from simdref.ingest_sources import (
 from simdref.manpages import write_manpages
 from simdref import perf
 from simdref.perf import variant_perf_summary
+from simdref.ptx import pick_spelling as _ptx_pick_spelling
 from simdref.queries import (
     intrinsic_perf_summary_runtime,
     linked_instruction_records,
@@ -93,6 +94,7 @@ from simdref.storage import (
     load_catalog_from_db,
     load_instruction_from_db,
     load_intrinsic_from_db,
+    load_instructions_by_arch_from_db,
     load_instructions_by_mnemonic_from_db,
     open_db,
     read_installed_version_stamp,
@@ -666,6 +668,16 @@ def _find_instructions_fast(query: str):
             return [exact]
         parts = query.split()
         mnemonic = parts[0] if parts else query
+        if "." in mnemonic:
+            # A concrete PTX spelling resolves through the shared matcher
+            # first: the row and the section that documents it.
+            hit = _ptx_pick_spelling(
+                load_instructions_by_arch_from_db(conn, "ptx"),
+                mnemonic,
+                parts[1] if len(parts) > 1 else "",
+            )
+            if hit is not None:
+                return [hit]
         candidates = load_instructions_by_mnemonic_from_db(conn, mnemonic)
         if not candidates:
             return []

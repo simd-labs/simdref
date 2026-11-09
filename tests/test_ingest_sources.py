@@ -232,6 +232,15 @@ def test_uops_all_sources_unreachable_raises(monkeypatch):
         src.fetch_uops_xml()
 
 
+def test_ptx_all_sources_unreachable_raises(monkeypatch):
+    _isolate_network(monkeypatch, raise_on_urls=(src.PTX_ISA_DOC_URL,))
+    monkeypatch.setattr(src, "LOCAL_PTX_BUNDLES", [])
+    monkeypatch.setattr(src, "LOCAL_PTX_DOC_HTMLS", [])
+    with pytest.raises(src.SourceUnavailableError) as err:
+        src.fetch_ptx_isa_data()
+    assert src.PTX_ISA_DOC_URL in str(err.value)
+
+
 # ---------------------------------------------------------------------------
 # Malformed input handling
 # ---------------------------------------------------------------------------
@@ -463,6 +472,17 @@ def test_fetch_uops_xml_uses_local_file(tmp_path, monkeypatch):
     assert path_or_text == xml_path
     assert version.source == "uops.info"
     assert version.version.startswith("local-xml:")
+
+
+def test_fetch_ptx_isa_data_uses_local_bundle(tmp_path, monkeypatch):
+    bundle = tmp_path / "ptx_instructions.json"
+    bundle.write_text('{"instructions": []}')
+    monkeypatch.setattr(src, "LOCAL_PTX_BUNDLES", [bundle])
+    text, version = src.fetch_ptx_isa_data()
+    assert text == '{"instructions": []}'
+    assert version.source == "ptx-isa"
+    assert version.version == "local-bundle:ptx_instructions.json"
+    assert version.url == str(bundle)
 
 
 def test_read_local_arm_intrinsics_bundle_missing(monkeypatch, tmp_path):

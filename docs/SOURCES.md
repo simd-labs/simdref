@@ -67,6 +67,17 @@ Run `python tools/audit_coverage.py report` for live coverage. Snapshot at `docs
 - Refresh: continuous.
 - Gaps: none against the vendored snapshot.
 
+## PTX
+
+### NVIDIA PTX ISA reference
+
+- URL: <https://docs.nvidia.com/cuda/parallel-thread-execution/> (HTML page, PTX ISA 9.5), <https://docs.nvidia.com/cuda/pdf/ptx_isa_9.5.pdf> (PDF).
+- Format: one Sphinx HTML page. `tools/vendor_ptx_sources.py` downloads the page to `vendor/ptx/` and derives a JSON bundle from it. simdref reads the bundle, and then the HTML cache, and then the live page.
+- License: no license grant. NVIDIA grants no license under its IP rights. Notice text (PDF chapter 14 Notices, and the page footer): "Reproduction of information in this document is permissible only if approved in advance by NVIDIA in writing, reproduced without alteration...".
+- Refresh: follows PTX ISA releases. The fetch recipe lives in `src/simdref/ingest_sources.py`.
+- Stored data: a fetch recipe and derived fields only. The derived fields are instruction op names, syntax template grammar, qualifier tokens, PTX ISA versions, `sm_XX` floors, and simdref-generated summaries. The repo stores no document prose. The `.gitignore` rule `vendor/*` keeps the `vendor/ptx/` download cache out of the repo.
+- Perf data: none. llvm-mca holds no scheduling model for the PTX target, and the document publishes no latency or throughput numbers.
+
 ## Microarchitectural perf data
 
 Each perf row has a `source_kind` so users do not confuse modeled numbers with measurements.

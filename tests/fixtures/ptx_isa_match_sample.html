@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head><title>PTX ISA match sample</title></head>
+<body>
+<div class="wy-nav-content">
+<div role="main" class="section">
+
+<section id="data-movement-and-conversion-instructions-ld">
+<h3>Data Movement and Conversion Instructions: ld</h3>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>ld{.weak}{.ss}{.cop}{.level::cache_hint}{.level::prefetch_size}{.vec}.type  d, [a]{.unified}{, cache_policy};
+
+.ss =  { .const, .global, .local };
+.cop =  { .ca, .cg, .cs, .lu, .cv };
+.level::cache_hint = { .L2::cache_hint };
+.level::prefetch_size = { .L2::64B };
+.vec =  { .v2, .v4 };
+.type = { .u8, .f32 };
+</pre></div>
+</div>
+</section>
+
+<section id="data-movement-and-conversion-instructions-ld-global-nc">
+<h3>Data Movement and Conversion Instructions: ld.global.nc</h3>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>ld.global{.cop}.nc{.level::cache_hint}{.level::prefetch_size}.type  d, [a]{, cache_policy};
+ld.global.nc{.vec}.type                                          d, [a]{, cache_policy};
+
+.cop =  { .ca, .cg, .cs };
+.level::cache_hint = { .L2::cache_hint };
+.level::prefetch_size = { .L2::64B };
+.vec =  { .v2, .v4 };
+.type = { .u8, .f32 };
+</pre></div>
+</div>
+</section>
+
+<section id="integer-arithmetic-instructions-add">
+<h3>Integer Arithmetic Instructions: add</h3>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>add.type1        d, a, b;
+add{.sat}.type2  d, a, b;
+
+.type1 = { .u16, .u64, .s16, .s64 };
+.type2 = { .u32, .u16x2, .u8x4, .s32, .s16x2, .s8x4 };
+</pre></div>
+</div>
+</section>
+
+<section id="floating-point-instructions-add">
+<h3>Floating Point Instructions: add</h3>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>add{.rnd}{.ftz}{.sat}.f32  d, a, b;
+add{.rnd}{.ftz}.f32x2      d, a, b;
+
+.rnd = { .rn, .rz };
+</pre></div>
+</div>
+</section>
+
+<section id="mixed-precision-floating-point-instructions-add">
+<h3>Mixed Precision Floating Point Instructions: add</h3>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>add{.rnd}{.sat}.cdtype.atype  d, a, c;
+
+.rnd =   { .rn, .rz };
+.cdtype = { .f32, .e5m2x2, .e5m2x4, .e4m3x2, .e4m3x4 };
+.atype =  { .f16, .bf16 };
+</pre></div>
+</div>
+</section>
+
+<section id="scalar-video-instructions-vadd-vsub-vabsdiff-vmin-vmax">
+<h3>Scalar Video Instructions: vadd, vsub, vabsdiff, vmin, vmax</h3>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>vop.dtype.atype.btype{.sat}  d, a{.asel}, b{.bsel};
+
+.vop =   { vadd, vsub, vabsdiff, vmin, vmax };
+.dtype = { .u32, .s32 };
+.atype = { .u32, .s32 };
+.btype = { .u32, .s32 };
+</pre></div>
+</div>
+</section>
+
+</div>
+</div>
+</body>
+</html>

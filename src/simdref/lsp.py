@@ -20,6 +20,8 @@ from simdref.operands import (
     strip_braces,
 )
 from simdref.perf import best_cpi, best_latency, record_iclass
+from simdref.ptx import pick_form as _ptx_pick_form
+from simdref.ptx import pick_spelling as _ptx_pick_spelling
 from simdref.queries import linked_instruction_records
 from simdref.regtable import reg_has, reg_rows, reg_width
 from simdref.search import search_records
@@ -27,6 +29,7 @@ from simdref.storage import (
     SQLITE_PATH,
     load_intrinsic_from_db,
     load_instruction_from_db,
+    load_instructions_by_arch_from_db,
     load_instructions_by_mnemonic_from_db,
     open_db,
     search_intrinsic_candidates_from_db,
@@ -36,6 +39,7 @@ from simdref.storage import (
 
 
 C_EXTENSIONS = (".c", ".cc", ".cpp", ".cxx", ".c++", ".h", ".hpp", ".hh", ".hxx", ".cu", ".cuh")
+PTX_ARCH = frozenset({"ptx"})
 CATALOG_MISSING = "simdref catalog not found. Run: isa update, then restart the editor."
 
 
@@ -461,6 +465,9 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
     carries a RISC-V "addw" row. On an undecided line the exact key wins as it
     always did: "mulw sym" keeps its RISC-V row, never x86 MUL.
 
+    PTX line only: a dotted mnemonic with no catalog row uses the longest
+    chain prefix that holds ptx rows.
+
     The alias and the suffix strip run on an x86 or undecided line only: "addw"
     on a RISC-V or ARM32 line must not land on x86 "add". When the strip names
     no x86 rows, the exact rows stay, so "bl target" keeps its ARM row. Rows of
@@ -477,6 +484,20 @@ def _lookup_mnemonic(conn, mnemonic: str, arch: frozenset = frozenset()):
             return forms, None
     elif any(form.architecture in arch for form in forms):
         return forms, None
+    if "ptx" in arch and "." in mnemonic:
+        token = mnemonic
+        while True:
+            ptx_rows = [
+                form
+                for form in load_instructions_by_mnemonic_from_db(conn, token)
+                if form.architecture == "ptx"
+            ]
+            if ptx_rows:
+                return ptx_rows, None
+            dot = token.rfind(".")
+            if dot <= 0:
+                break
+            token = token[:dot]
     if arch and "x86" not in arch:
         return [], None
     alias = _ATT_EXTEND_ALIAS.get(mnemonic.casefold())
@@ -1190,13 +1211,28 @@ def identity_keys(
     return out
 
 
-def _resolve_line_form(db, mnemonic, count, operands, intel, exact=None):
+def _resolve_line_form(
+    db, mnemonic, count, operands, intel, exact=None, arch: frozenset | None = None
+):
     """The form one asm line names: classify, alias, weak gate, match.
 
     db is a connection (hover) or a catalog path (hints, cached lookup).
     EXACT is the line's own exact-name row for hover's exact-name path; a
     hint passes None and only matches the form on the source line.
     """
+    if arch is PTX_ARCH:
+        # PTX line: skip classify, alias, weak gate and match. The exact key
+        # can name a bare row from another architecture, so the code drops
+        # it and picks the row by chain prefix and operand shape.
+        lookup = _mnemonic_matches if isinstance(db, str) else _lookup_mnemonic
+        if "." in mnemonic:
+            # A concrete spelling resolves through the shared matcher first:
+            # it picks the template line and the section that documents it.
+            hit = _ptx_pick_spelling(_ptx_rows(db), mnemonic, operands)
+            if hit is not None:
+                return hit
+        rows, _ = lookup(db, mnemonic, PTX_ARCH)
+        return _ptx_pick_form(rows, mnemonic, operands)
     line = _classify_line(operands, intel)
     # The folded shift/extend suffix makes the classified parts shorter than
     # the parsed comma count; the parts are authoritative for the count
@@ -1250,6 +1286,7 @@ def _hover_markdown(
     operand_text: str = "",
     intel: bool = False,
     identity_key: str | None = None,
+    arch: frozenset | None = None,
 ) -> str | None:
     intrinsic = load_intrinsic_from_db(conn, word)
     if intrinsic is not None:
@@ -1310,7 +1347,7 @@ def _hover_markdown(
     if instruction is None:
         exact = load_instruction_from_db(conn, word)
         instruction = _resolve_line_form(
-            conn, word, operand_count, operand_text, intel, exact=exact
+            conn, word, operand_count, operand_text, intel, exact=exact, arch=arch
         )
     if instruction is not None:
         # The url and reference rows of the body already carry the source links.
@@ -1324,12 +1361,13 @@ _MNEMONIC_KINDS = frozenset({14})
 
 
 def _completion_candidates(
-    conn, prefix: str, limit: int = 50, kinds: frozenset[int] | None = None
+    conn, prefix: str, limit: int = 50, kinds: frozenset[int] | None = None, ptx: bool = False
 ) -> list[dict]:
     """Completion items for a word prefix, deduped by (kind, label).
 
     kinds restricts the emitted item kinds (3 intrinsic, 14 instruction);
-    None keeps every kind, the pre-0.0.16 pool.
+    None keeps every kind, the pre-0.0.16 pool. ptx widens a dotted prefix
+    (\"ld.\") to the bare op's rows; other documents keep the exact filter.
     """
     prefix_folded = prefix.casefold()
     emitted: set[tuple[str, str]] = set()
@@ -1345,8 +1383,15 @@ def _completion_candidates(
         instructions = []
     for result in search_records(intrinsics, instructions, prefix or "_mm", limit=candidate_limit):
         label = result.title
-        if prefix_folded and not label.casefold().startswith(prefix_folded):
-            continue
+        folded = label.casefold()
+        if prefix_folded and not folded.startswith(prefix_folded):
+            # A dotted prefix ("ld.") also names the bare op's rows: the
+            # prefix's first dot segment followed by a space or open paren.
+            if not (ptx and "." in prefix_folded):
+                continue
+            head = prefix_folded.partition(".")[0]
+            if not (folded.startswith(head + " ") or folded.startswith(head + "(")):
+                continue
         key = (result.kind, label)
         if key in emitted:
             continue
@@ -1368,17 +1413,28 @@ def _completion_items(
     __asm block or an MSVC __asm line; no simdref items in the operand and
     clobber lists; intrinsics only everywhere else.
     """
+    ptx = _is_ptx_doc(language_id, uri) or _is_cuda_doc(language_id, uri)
+    if _is_ptx_doc(language_id, uri):
+        return _completion_candidates(conn, prefix, kinds=_MNEMONIC_KINDS, ptx=True)
     if not _is_c_doc(language_id, uri):
-        return _completion_candidates(conn, prefix)
+        return _completion_candidates(conn, prefix, ptx=ptx)
     zone = asmline.c_asm_zone_at(text, _offset_at(text, line, character))
     if zone == "operands":
         return []
     kinds = _MNEMONIC_KINDS if zone in ("template", "msvc") else _INTRINSIC_KINDS
-    return _completion_candidates(conn, prefix, kinds=kinds)
+    return _completion_candidates(conn, prefix, kinds=kinds, ptx=ptx)
 
 
 def _is_c_doc(language_id: str, uri: str) -> bool:
     return language_id in ("c", "cpp") or uri.lower().endswith(C_EXTENSIONS)
+
+
+def _is_ptx_doc(language_id: str, uri: str) -> bool:
+    return language_id == "ptx" or uri.lower().endswith(".ptx")
+
+
+def _is_cuda_doc(language_id: str, uri: str) -> bool:
+    return language_id == "cuda" or uri.lower().endswith((".cu", ".cuh"))
 
 
 def _semicolon_is_comment(language_id: str, uri: str) -> bool:
@@ -1429,14 +1485,20 @@ def _in_asm_string(text: str, line: int, character: int) -> bool:
     return asmline.c_asm_zone_at(text, _offset_at(text, line, character)) == "template"
 
 
-def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False):
+def _mnemonic_from_asm_line(line: str, semicolon_is_comment: bool = False, ptx: bool = False):
     """Return (mnemonic, operand_count, operands) for an asm line, or None."""
     line = asmline.cut_asm_comment(line, _hash_opens_operand)
-    if semicolon_is_comment:
+    if ptx or semicolon_is_comment:
         line = asmline.cut_semicolon(line)
     line = line.strip()
     if not line or line.startswith("."):
         return None
+    if ptx:
+        tokens = line.split(None, 1)
+        if tokens and tokens[0].startswith("@"):
+            line = tokens[1].strip() if len(tokens) > 1 else ""
+            if not line or line.startswith("."):
+                return None
     parts = line.split(None, 1)
     if parts[0].endswith(":"):
         line = parts[1].strip() if len(parts) > 1 else ""
@@ -1483,14 +1545,51 @@ def _mnemonic_matches(db_path: str, mnemonic: str, arch: frozenset = frozenset()
         conn.close()
 
 
+@functools.lru_cache(maxsize=32)
+def _ptx_rows_by_path(db_path: str) -> tuple:
+    # The inlay-hint loop resolves every PTX spelling through these rows, so
+    # query the PTX rows once per catalog path and reuse, as for mnemonics.
+    conn = open_db(path=Path(db_path))
+    try:
+        return tuple(load_instructions_by_arch_from_db(conn, "ptx"))
+    finally:
+        conn.close()
+
+
+def _ptx_rows(db) -> list:
+    """All PTX rows behind db: a connection or a catalog path."""
+    if isinstance(db, str):
+        return list(_ptx_rows_by_path(db))
+    return load_instructions_by_arch_from_db(db, "ptx")
+
+
+def _segment_is_ptx(conn, segment: str) -> bool:
+    """True when one asm line of a .cu/.cuh document is PTX.
+
+    A dotted op token is PTX. A bare one is PTX only when the catalog
+    holds PTX rows for it and no host-ISA row; every other line resolves
+    as the host ISA, as in .c/.cpp.
+    """
+    probe = _mnemonic_from_asm_line(segment, False, ptx=True)
+    if not probe:
+        return False
+    if "." in probe[0]:
+        return True
+    if conn is None:
+        return False
+    rows = load_instructions_by_mnemonic_from_db(conn, probe[0])
+    return bool(rows) and all(row.architecture == "ptx" for row in rows)
+
+
 def _hint_label(
     db_path: str,
     mnemonic: str,
     operand_count: int,
     operands: str = "",
     intel: bool = False,
+    arch: frozenset | None = None,
 ) -> str | None:
-    chosen = _resolve_line_form(db_path, mnemonic, operand_count, operands, intel)
+    chosen = _resolve_line_form(db_path, mnemonic, operand_count, operands, intel, arch=arch)
     return _cut_label(chosen.summary or "") if chosen else None
 
 
@@ -1515,8 +1614,21 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
     db_path = conn.execute("PRAGMA database_list").fetchone()[2]
     source_lines = [line.rstrip("\r") for line in text.split("\n")]
     semicolon_is_comment = _semicolon_is_comment(language_id, uri)
+    ptx_doc = _is_ptx_doc(language_id, uri)
+    cuda_doc = _is_cuda_doc(language_id, uri)
     candidates = _asm_candidates(text, language_id, uri)
-    keys = identity_keys([segment for _line, segment in candidates], semicolon_is_comment, conn)
+    # A .cu/.cuh line resolves as PTX or as the host ISA line by line.
+    flags = [
+        ptx_doc or (cuda_doc and _segment_is_ptx(conn, segment)) for _line, segment in candidates
+    ]
+    host_keys = iter(
+        identity_keys(
+            [segment for (_line, segment), flag in zip(candidates, flags) if not flag],
+            semicolon_is_comment,
+            conn,
+        )
+    )
+    keys = [None if flag else next(host_keys) for flag in flags]
     records = {
         key: load_instruction_from_db(conn, key)
         for key in set(keys)
@@ -1525,22 +1637,26 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
     hints: dict[int, list[str]] = {}  # every instruction on the source line feeds its hint
     names: dict[int, list[str]] = {}  # the instruction names behind empty labels
     labels: dict[str, str | None] = {}  # one matcher run per distinct segment, not per line
-    for (line, segment), key in zip(candidates, keys):
+    for (line, segment), key, ptx in zip(candidates, keys, flags):
         if not start <= line <= end:
             continue
         record = records.get(key) if key else None
         if key == NO_CATALOG_ROW:
             # Identified form the catalog lacks: name it, never the old pick.
-            parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
+            parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment, ptx=ptx)
             label = f"{parsed[0]}: no measured row" if parsed else None
         elif record is not None:
             label = _cut_label(record.summary or "")
         elif segment in labels:
             label = labels[segment]
         else:
-            parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
+            parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment, ptx=ptx)
             label = labels[segment] = (
-                _hint_label(db_path, *parsed, intel=semicolon_is_comment) if parsed else None
+                _hint_label(
+                    db_path, *parsed, intel=semicolon_is_comment, arch=PTX_ARCH if ptx else None
+                )
+                if parsed
+                else None
             )
         if label is not None:
             hints.setdefault(line, []).append(label)
@@ -1550,7 +1666,7 @@ def _inlay_hints(conn, text: str, language_id: str, uri: str, start: int, end: i
                 if record is not None:
                     name = record.mnemonic
                 else:
-                    parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment)
+                    parsed = _mnemonic_from_asm_line(segment, semicolon_is_comment, ptx=ptx)
                     name = parsed[0] if parsed else None
                 if name:
                     names.setdefault(line, []).append(name)
@@ -1643,18 +1759,24 @@ def main() -> int:
             # In C/C++ only the asm strings hold instructions; intrinsics hover everywhere.
             language_id = session.languages.get(uri, "")
             is_c_doc = _is_c_doc(language_id, uri)
+            ptx_doc = _is_ptx_doc(language_id, uri)
+            cuda_doc = _is_cuda_doc(language_id, uri)
             allow_instruction = not is_c_doc or (_in_asm_string(text, line, character))
             operand_count = None
             operand_text = ""
             segment = None
+            ptx = ptx_doc
             if word and allow_instruction:
                 offset = _offset_at(text, line, character)
                 segment = _asm_line_at(text, language_id, uri, offset)
                 if segment:
+                    # A .cu/.cuh line resolves as PTX or as the host ISA line
+                    # by line, never by document.
+                    ptx = ptx_doc or (cuda_doc and _segment_is_ptx(conn, segment))
                     # The C-escape pair "\t" starts a segment in asm("...\n\t...").
                     # Strip the backslash so the mnemonic survives.
                     parsed = _mnemonic_from_asm_line(
-                        segment.lstrip("\\"), _semicolon_is_comment(language_id, uri)
+                        segment.lstrip("\\"), _semicolon_is_comment(language_id, uri), ptx=ptx
                     )
                     if parsed:
                         operand_text = parsed[2]
@@ -1670,7 +1792,7 @@ def main() -> int:
             # the whole document. A line holding several asm segments joins
             # its candidates only when exactly one text matches the segment.
             identity_key = None
-            if conn and operand_count is not None and segment:
+            if conn and operand_count is not None and segment and not ptx:
                 candidates = _asm_candidates(text, language_id, uri)
                 keys = identity_keys(
                     [seg for _line, seg in candidates],
@@ -1692,6 +1814,7 @@ def main() -> int:
                     operand_text=operand_text,
                     intel=_semicolon_is_comment(language_id, uri),
                     identity_key=identity_key,
+                    arch=PTX_ARCH if ptx else None,
                 )
                 if conn and word
                 else None

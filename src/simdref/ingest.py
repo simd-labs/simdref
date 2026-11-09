@@ -14,6 +14,7 @@ from simdref.ingest_catalog import (
 )
 from simdref.ingest_sources import (
     fetch_intel_data,
+    fetch_ptx_isa_data,
     fetch_riscv_rvv_intrinsics_data,
     fetch_riscv_unified_db_data,
     fetch_uops_xml,
@@ -23,6 +24,7 @@ from simdref.ingest_sources import (
 __all__ = [
     "build_catalog",
     "fetch_intel_data",
+    "fetch_ptx_isa_data",
     "fetch_riscv_rvv_intrinsics_data",
     "fetch_riscv_unified_db_data",
     "fetch_uops_xml",

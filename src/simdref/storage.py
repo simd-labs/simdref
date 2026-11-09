@@ -624,6 +624,16 @@ def load_instructions_by_mnemonic_from_db(
     return [InstructionRecord.from_dict(_unpack_payload(row["payload"])) for row in rows]
 
 
+def load_instructions_by_arch_from_db(
+    conn: sqlite3.Connection, architecture: str
+) -> list[InstructionRecord]:
+    rows = conn.execute(
+        "SELECT payload FROM instructions_data WHERE architecture = ? ORDER BY key",
+        (architecture,),
+    ).fetchall()
+    return [InstructionRecord.from_dict(_unpack_payload(row["payload"])) for row in rows]
+
+
 def load_instructions_by_mnemonic_prefix_from_db(
     conn: sqlite3.Connection, prefix: str, limit: int = 400
 ) -> list[InstructionRecord]:

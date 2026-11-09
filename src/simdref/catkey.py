@@ -61,7 +61,14 @@ def split_isa_parts(value: str) -> list[str]:
 
 
 # llvm-mc and record architecture names mapped to catalog architecture values.
-ISA_FAMILY = {"x86": "x86", "aarch64": "arm", "arm": "arm", "riscv32": "riscv", "riscv64": "riscv"}
+ISA_FAMILY = {
+    "x86": "x86",
+    "aarch64": "arm",
+    "arm": "arm",
+    "riscv32": "riscv",
+    "riscv64": "riscv",
+    "ptx": "ptx",
+}
 
 
 def isa_family(architecture: str | None) -> str | None:
@@ -75,6 +82,8 @@ def isa_family(architecture: str | None) -> str | None:
         return "arm"
     if name.startswith("riscv"):
         return "riscv"
+    if name.startswith("ptx"):
+        return "ptx"
     return "x86"
 
 

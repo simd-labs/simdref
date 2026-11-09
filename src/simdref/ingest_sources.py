@@ -60,6 +60,7 @@ RISCV_UNIFIED_DB_CANDIDATE_URLS = [
 # The dead static intrinsics.json URLs are gone: upstream no longer ships one.
 # tools/vendor_riscv_sources.py clones the upstream repos and generates the
 # bundle, and is the single source of truth for RVV data (see #65 item N1).
+PTX_ISA_DOC_URL = "https://docs.nvidia.com/cuda/parallel-thread-execution/"
 ARM_ACLE_NEON_DB_PATH = "tools/intrinsic_db/advsimd.csv"
 ARM_ACLE_NEON_CLASSIFICATION_PATH = "tools/intrinsic_db/advsimd_classification.csv"
 ARM_ACLE_MAIN_MD_PATH = "main/acle.md"
@@ -124,6 +125,12 @@ LOCAL_RISCV_RVV_INTRINSICS_JSONS = [
 ]
 LOCAL_RISCV_DOCS_JSONS = [
     _REPO_ROOT / "vendor" / "riscv" / "docs_pages.json",
+]
+LOCAL_PTX_BUNDLES = [
+    _REPO_ROOT / "vendor" / "ptx" / "ptx_instructions.json",
+]
+LOCAL_PTX_DOC_HTMLS = [
+    _REPO_ROOT / "vendor" / "ptx" / "parallel-thread-execution.html",
 ]
 
 
@@ -806,3 +813,24 @@ def fetch_riscv_rvv_intrinsics_data() -> tuple[str, SourceVersion]:
     if local is not None:
         return local
     raise SourceUnavailableError("RISC-V RVV intrinsics data is unreachable.")
+
+
+def fetch_ptx_isa_data() -> tuple[str, SourceVersion]:
+    local = _read_local_text(LOCAL_PTX_BUNDLES, "ptx-isa", "local-bundle")
+    if local is not None:
+        return local
+    local_doc = _read_local_text(LOCAL_PTX_DOC_HTMLS, "ptx-isa", "local-doc")
+    if local_doc is not None:
+        return local_doc
+    try:
+        text = _fetch_text(PTX_ISA_DOC_URL)
+    except Exception as exc:
+        raise SourceUnavailableError(
+            f"NVIDIA PTX ISA reference is unreachable at {PTX_ISA_DOC_URL}"
+        ) from exc
+    return text, SourceVersion(
+        source="ptx-isa",
+        version="live",
+        fetched_at=now_iso(),
+        url=PTX_ISA_DOC_URL,
+    )

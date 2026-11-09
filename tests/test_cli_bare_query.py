@@ -18,8 +18,10 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 import unittest.mock
+from pathlib import Path
 
 
 def _run_cli(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -226,6 +228,38 @@ class BareQueryEdgeTests(unittest.TestCase):
         ):
             rc = cli._smart_lookup("_mm_add")
         self.assertEqual(rc, 2)
+
+
+class ConcretePtxSpellingTests(unittest.TestCase):
+    def test_concrete_ptx_spelling_is_an_exact_lookup(self):
+        """`isa ld.global.nc.f32` is one concrete spelling of the
+        ld.global.nc row. The exact lookup path prints the summary record
+        (a "variants" payload) and exits 0; the fuzzy search path never
+        prints one. The local catalog has no PTX rows, so the test opens
+        the match-sample catalog instead."""
+        from conftest import build_match_catalog
+        from simdref import cli
+        from simdref.storage import build_sqlite
+        from simdref.storage import open_db as storage_open_db
+
+        database = Path(tempfile.mkdtemp(prefix="simdref-cli-match-")) / "catalog.db"
+        build_sqlite(build_match_catalog(), database)
+        captured: list = []
+        with (
+            unittest.mock.patch.object(cli, "ensure_runtime", lambda: None),
+            unittest.mock.patch.object(
+                cli, "open_db", lambda *args, **kwargs: storage_open_db(path=database)
+            ),
+            unittest.mock.patch.object(cli.typer, "echo", lambda s: captured.append(s)),
+            unittest.mock.patch.object(cli.sys.stdin, "isatty", return_value=False),
+            unittest.mock.patch.object(cli.sys.stdout, "isatty", return_value=False),
+        ):
+            code = cli._smart_lookup("ld.global.nc.f32", as_json=True)
+        self.assertEqual(code, 0)
+        payload = json.loads(captured[0])
+        keys = [variant["key"].casefold() for variant in payload["variants"]]
+        self.assertEqual(len(keys), 1)
+        self.assertTrue(keys[0].startswith("ld.global.nc "))
 
 
 if __name__ == "__main__":
