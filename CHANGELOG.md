@@ -5,15 +5,25 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.0.18], 2026-11-10
 
-### Changed
+### Added
 
-- The LSP hover shows the simdref web page link with the source link, for instructions and intrinsics.
+- CUDA C++ device intrinsics from the four clang CUDA headers at llvmorg-23.1.4 (8a7baac).
+- PTX links from parsed NVVM .td chains (8a7baac).
+- Hover and completion in `.cu` and `.cuh` files (8a7baac).
+- `isa <name>` lookup resolves CUDA names (8a7baac).
+- The LSP hover shows the simdref web page link next to the source link in editor hovers (fd3b08c).
 
 ### Fixed
 
-- The hover web link opens the record on the web page. The earlier key filled the query box.
+- Lines from unsupported architectures (PowerPC, MIPS, ARM32) answer unknown (#65 b06f494).
+- objdump bare branch targets resolve (#65 e760586).
+- Prefix words on plain asm lines are stripped (#65 4b7ec1e).
+- SME ZA-tile lines resolve to their ZA rows (#65 b71f74e).
+- Web links for Arm, RISC-V and PTX records open the record (#65 fd3b08c).
+- CI builds the CUDA catalog and fails on an empty family (2aecd46).
+- README PTX count corrected to catalog rows.
 
 ## [0.0.17], 2026-11-09
 
