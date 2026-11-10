@@ -239,6 +239,25 @@ class LspPtxTests(unittest.TestCase):
         self.assertEqual(kinds, {3})
         self.assertNotIn("frob d, [a]", [item["label"] for item in items])
 
+    def test_completion_ptx_dotted_name_still_completes(self):
+        # A hand-typed "frob." and a "." trigger both complete in a .ptx file.
+        text = "frob.\n"
+        self.assertTrue(self.server.completion(PTX_URI, "ptx", text, 0, 5))
+        msg = self.server.request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": PTX_URI},
+                "position": {"line": 0, "character": 5},
+                "context": {"triggerKind": 2, "triggerCharacter": "."},
+            },
+        )
+        self.assertTrue(msg["result"]["items"])
+
+    def test_completion_ptx_operand_and_comment_give_no_items(self):
+        text = "frob.f32 %f1, frob\n// frob comment\n"
+        self.assertEqual(self.server.completion(PTX_URI, "ptx", text, 0, 18), [])
+        self.assertEqual(self.server.completion(PTX_URI, "ptx", text, 1, 7), [])
+
     def test_completion_dot_prefix_unchanged_outside_ptx(self):
         # Control: a dotted prefix in a .s document keeps origin/main's
         # empty answer. The dot rule is ptx-only (review finding 1).

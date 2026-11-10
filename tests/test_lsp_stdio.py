@@ -1038,12 +1038,20 @@ C_COMPLETION_INTRINSICS = [
         "<arm_neon.h>",
         "arm",
     ),
+    _c_intrinsic(
+        "_mm256_cmpeq_epi8",
+        "__m256i _mm256_cmpeq_epi8 (__m256i a, __m256i b)",
+        "Compare packed 8-bit integers.",
+        "<immintrin.h>",
+        "x86",
+    ),
 ]
 C_COMPLETION_INSTRUCTIONS = [
     _c_insn("vaddps", "VADDPS (XMM, XMM, XMM)", "Add packed single precision values."),
     _c_insn("vmulps", "VMULPS (XMM, XMM, XMM)", "Multiply packed single precision values."),
     _c_insn("vmovaps", "VMOVAPS (XMM, XMM)", "Move aligned packed single precision values."),
     _c_insn("mov", "MOV (R64, R64)", "Move."),
+    _c_insn("cbw", "CBW (X86)", "Convert byte to word."),
 ]
 
 # One document per zone. Lines: 3-4 multi-line asm template, 5 asm with the
@@ -1159,10 +1167,9 @@ class LspCCompletionTests(unittest.TestCase):
         self.assertEqual(self._kinds(items), {3})
         self.assertEqual(self._labels(items), ["vaddq_f32"])
 
-    def test_comment_gives_intrinsics_only(self):
+    def test_comment_gives_no_items(self):
         items = self.server.completion(C_COMPLETION_URI, 12, self._col(12, "vaddps", 2))
-        self.assertEqual(self._kinds(items), {3})
-        self.assertEqual(self._labels(items), ["vaddq_f32"])
+        self.assertEqual(items, [])
 
     def test_plain_string_gives_no_mnemonics(self):
         items = self.server.completion(C_COMPLETION_URI, 11, self._col(11, "mov", 1))
@@ -1182,6 +1189,208 @@ class LspCCompletionTests(unittest.TestCase):
             sorted(zip(self._labels(items), [i["kind"] for i in items])),
             [("VADDPS (XMM, XMM, XMM)", 14), ("vaddq_f32", 3)],
         )
+
+
+SCOPE_C_URI = "file:///tmp/simdref_lsp_scope.c"
+SCOPE_C_TEXT = (
+    "// vaddps comment\n"
+    "/* _mm */\n"
+    'char *s = "_mm";\n'
+    "int y = foo.\n"
+    "_mm_add\n"
+    'void g(void) { asm("vadd %%xmm0, %%xmm1\\n\\tmov %%eax, vadd"); }\n'
+)
+SCOPE_ASM_URI = "file:///tmp/simdref_lsp_scope.s"
+SCOPE_ASM_TEXT = "# vadd comment\nvadd ymm0, vadd\n  vadd\nloop: vadd\n"
+SCOPE_NASM_URI = "file:///tmp/simdref_lsp_scope.asm"
+SCOPE_NASM_TEXT = "; vadd comment\nvadd ymm0, ymm1 ; vadd\n"
+
+
+class LspCompletionScopeTests(unittest.TestCase):
+    """Completion answers only where an item can be written."""
+
+    def setUp(self):
+        self.server = _Server(_c_completion_catalog())
+        self.addCleanup(self.server.stop)
+        self.caps = self.server.start()
+        self.server.open(SCOPE_C_URI, "c", SCOPE_C_TEXT)
+        self.server.open(SCOPE_ASM_URI, "asm", SCOPE_ASM_TEXT)
+        self.server.open(SCOPE_NASM_URI, "nasm", SCOPE_NASM_TEXT)
+
+    def _at(self, uri, text, line, marker, typed, occurrence=0):
+        row = text.split("\n")[line]
+        index = -1
+        for _ in range(occurrence + 1):
+            index = row.index(marker, index + 1)
+        return self.server.completion(uri, line, index + typed)
+
+    def _labels(self, items):
+        return [item["label"] for item in items]
+
+    def test_letters_are_not_trigger_characters(self):
+        triggers = self.caps["completionProvider"]["triggerCharacters"]
+        self.assertEqual(triggers, ["_", "."])
+
+    def test_c_line_comment_gives_no_items(self):
+        self.assertEqual(self._at(SCOPE_C_URI, SCOPE_C_TEXT, 0, "vaddps", 2), [])
+
+    def test_c_block_comment_gives_no_items(self):
+        self.assertEqual(self._at(SCOPE_C_URI, SCOPE_C_TEXT, 1, "_mm", 3), [])
+
+    def test_c_string_gives_no_items(self):
+        self.assertEqual(self._at(SCOPE_C_URI, SCOPE_C_TEXT, 2, "_mm", 3), [])
+
+    def test_dot_after_identifier_in_c_gives_no_items(self):
+        params = {
+            "textDocument": {"uri": SCOPE_C_URI},
+            "position": {"line": 3, "character": len("int y = foo.")},
+            "context": {"triggerKind": 2, "triggerCharacter": "."},
+        }
+        result = self.server.request("textDocument/completion", params)["result"]
+        self.assertEqual(result["items"], [])
+
+    def test_empty_prefix_gives_no_items_unless_invoked_by_hand(self):
+        def ask(kind):
+            params = {
+                "textDocument": {"uri": SCOPE_C_URI},
+                "position": {"line": 3, "character": len("int y = ")},
+                "context": {"triggerKind": kind},
+            }
+            return self.server.request("textDocument/completion", params)["result"]["items"]
+
+        self.assertEqual(ask(2), [])
+        self.assertTrue(ask(1))
+
+    def test_c_plain_code_still_completes_intrinsics(self):
+        items = self._at(SCOPE_C_URI, SCOPE_C_TEXT, 4, "_mm_add", 7)
+        self.assertEqual(self._labels(items), ["_mm_add_ps"])
+
+    def test_c_asm_template_keeps_mnemonics_at_statement_start(self):
+        items = self._at(SCOPE_C_URI, SCOPE_C_TEXT, 5, "vadd", 4)
+        self.assertEqual({item["kind"] for item in items}, {14})
+        self.assertTrue(items)
+
+    def test_c_asm_template_operand_gives_no_items(self):
+        self.assertEqual(self._at(SCOPE_C_URI, SCOPE_C_TEXT, 5, "vadd", 4, occurrence=1), [])
+
+    def test_asm_comment_lines_give_no_items(self):
+        self.assertEqual(self._at(SCOPE_ASM_URI, SCOPE_ASM_TEXT, 0, "vadd", 4), [])
+        self.assertEqual(self._at(SCOPE_NASM_URI, SCOPE_NASM_TEXT, 0, "vadd", 4), [])
+        self.assertEqual(self._at(SCOPE_NASM_URI, SCOPE_NASM_TEXT, 1, "vadd", 4, occurrence=1), [])
+
+    def test_asm_operand_position_gives_no_items(self):
+        self.assertEqual(self._at(SCOPE_ASM_URI, SCOPE_ASM_TEXT, 1, "vadd", 4, occurrence=1), [])
+
+    def test_asm_mnemonic_position_still_completes(self):
+        for line, marker in ((1, "vadd"), (2, "vadd"), (3, "vadd")):
+            items = self._at(SCOPE_ASM_URI, SCOPE_ASM_TEXT, line, marker, 4)
+            self.assertIn("VADDPS (XMM, XMM, XMM)", self._labels(items), (line, marker))
+
+
+REVIEW_QUOTE_URI = "file:///tmp/simdref_lsp_review_quote.c"
+REVIEW_QUOTE_TEXT = (
+    "x = '\"'; _mm_add\n"
+    "__m256i q = _mm256_cmpeq_epi8(in, _mm256_set1_epi8('\"')); __m256i b = _mm256_cmpeq\n"
+    "if (c=='\"') s = \"_mm\n"
+    "char c = 'm\n"
+    "y = '\\''; _mm_add\n"
+    'z = "a\\"_mm\n'
+)
+REVIEW_RAW_URI = "file:///tmp/simdref_lsp_review_raw.cpp"
+REVIEW_RAW_TEXT = 'auto s = R"(_mm_add\nstill _mm_add\n)" ;\nauto t = R"x(a"b)x"; _mm_add\n'
+REVIEW_MSC_URI = "file:///tmp/simdref_lsp_review_msvc.c"
+REVIEW_MSC_TEXT = (
+    "void f(){ __asm { vaddps xmm0, xmm1 }\n"
+    "}\n"
+    "void g(){ __asm vadd\n"
+    "}\n"
+    "void h(){ __asm mov eax, 1 __asm vadd\n"
+    "}\n"
+)
+REVIEW_OBJ_URI = "file:///tmp/simdref_lsp_review_obj.s"
+REVIEW_OBJ_TEXT = "  401000:\tc5 f4 58 c2          \tvadd ymm0, ymm1\n"
+
+
+class LspCompletionReviewTests(unittest.TestCase):
+    """The review round repros. A char literal and a raw string are their
+    own tokens. Each MSVC __asm statement starts a mnemonic position. An
+    objdump row offers items at the mnemonic column only. On the fixture
+    catalog, not the ambient one."""
+
+    def setUp(self):
+        self.server = _Server(_c_completion_catalog())
+        self.addCleanup(self.server.stop)
+        self.server.start()
+        self.server.open(REVIEW_QUOTE_URI, "c", REVIEW_QUOTE_TEXT)
+        self.server.open(REVIEW_RAW_URI, "cpp", REVIEW_RAW_TEXT)
+        self.server.open(REVIEW_MSC_URI, "c", REVIEW_MSC_TEXT)
+        self.server.open(REVIEW_OBJ_URI, "asm", REVIEW_OBJ_TEXT)
+
+    def _labels(self, items):
+        return [item["label"] for item in items]
+
+    def _end(self, uri, text, line):
+        return self.server.completion(uri, line, len(text.split("\n")[line]))
+
+    def _at(self, uri, text, line, marker, typed, occurrence=0):
+        row = text.split("\n")[line]
+        index = -1
+        for _ in range(occurrence + 1):
+            index = row.index(marker, index + 1)
+        return self.server.completion(uri, line, index + typed)
+
+    def test_char_literal_quote_keeps_the_rest_of_the_row_code(self):
+        items = self._end(REVIEW_QUOTE_URI, REVIEW_QUOTE_TEXT, 0)
+        self.assertEqual(self._labels(items), ["_mm_add_ps"])
+
+    def test_char_literal_quote_before_an_intrinsic_name(self):
+        items = self._end(REVIEW_QUOTE_URI, REVIEW_QUOTE_TEXT, 1)
+        self.assertEqual(self._labels(items), ["_mm256_cmpeq_epi8"])
+
+    def test_char_literal_quote_before_a_string_keeps_the_string(self):
+        self.assertEqual(self._end(REVIEW_QUOTE_URI, REVIEW_QUOTE_TEXT, 2), [])
+
+    def test_char_literal_tokens_stay_closed(self):
+        self.assertEqual(self._end(REVIEW_QUOTE_URI, REVIEW_QUOTE_TEXT, 3), [])
+        items = self._end(REVIEW_QUOTE_URI, REVIEW_QUOTE_TEXT, 4)
+        self.assertEqual(self._labels(items), ["_mm_add_ps"])
+        self.assertEqual(self._end(REVIEW_QUOTE_URI, REVIEW_QUOTE_TEXT, 5), [])
+
+    def test_raw_string_keeps_its_body_on_the_next_rows(self):
+        self.assertEqual(self._end(REVIEW_RAW_URI, REVIEW_RAW_TEXT, 0), [])
+        self.assertEqual(self._end(REVIEW_RAW_URI, REVIEW_RAW_TEXT, 1), [])
+        uri = "file:///tmp/simdref_lsp_review_raw_eof.cpp"
+        text = 'auto s = R"(_mm_add'
+        self.server.open(uri, "cpp", text)
+        self.assertEqual(self.server.completion(uri, 0, len(text)), [])
+
+    def test_raw_string_delimited_body_keeps_its_quotes(self):
+        items = self._end(REVIEW_RAW_URI, REVIEW_RAW_TEXT, 3)
+        self.assertEqual(self._labels(items), ["_mm_add_ps"])
+
+    def test_msvc_brace_statement_completes_at_the_mnemonic(self):
+        items = self._at(REVIEW_MSC_URI, REVIEW_MSC_TEXT, 0, "vaddps", 6)
+        self.assertEqual(self._labels(items), ["VADDPS (XMM, XMM, XMM)"])
+        self.assertEqual(self._at(REVIEW_MSC_URI, REVIEW_MSC_TEXT, 0, "xmm1", 2), [])
+
+    def test_msvc_row_statement_after_code_completes(self):
+        items = self._end(REVIEW_MSC_URI, REVIEW_MSC_TEXT, 2)
+        self.assertEqual(self._labels(items), ["VADDPS (XMM, XMM, XMM)"])
+
+    def test_msvc_second_statement_on_one_row_completes(self):
+        items = self._end(REVIEW_MSC_URI, REVIEW_MSC_TEXT, 4)
+        self.assertEqual(self._labels(items), ["VADDPS (XMM, XMM, XMM)"])
+        items = self._at(REVIEW_MSC_URI, REVIEW_MSC_TEXT, 4, "mov", 3)
+        self.assertEqual(self._labels(items), ["MOV (R64, R64)"])
+        self.assertEqual(self._at(REVIEW_MSC_URI, REVIEW_MSC_TEXT, 4, "eax", 2), [])
+
+    def test_objdump_row_completes_at_the_mnemonic_column(self):
+        items = self._at(REVIEW_OBJ_URI, REVIEW_OBJ_TEXT, 0, "vadd", 4)
+        self.assertEqual(sorted(self._labels(items)), ["VADDPS (XMM, XMM, XMM)", "vaddq_f32"])
+
+    def test_objdump_byte_column_gives_no_items(self):
+        self.assertEqual(self._at(REVIEW_OBJ_URI, REVIEW_OBJ_TEXT, 0, "c5", 1), [])
+        self.assertEqual(self._at(REVIEW_OBJ_URI, REVIEW_OBJ_TEXT, 0, "ymm0", 2), [])
 
 
 class MissingCatalogTests(unittest.TestCase):

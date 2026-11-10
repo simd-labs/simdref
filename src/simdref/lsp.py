@@ -1420,24 +1420,126 @@ def _completion_candidates(
     return items
 
 
+def _at_mnemonic(before: str, semicolon_is_comment: bool, ptx: bool) -> bool:
+    """True when the cursor ends the first word of an asm statement.
+
+    before is the text from the line start (or the template start) to the
+    cursor. A label, a PTX predicate and the x86 prefix words may come
+    first. A cursor inside a comment is not at a mnemonic.
+    """
+    from simdref.annotate import _strip_prefix_tokens  # annotate imports lsp
+
+    mark = "\0"  # a comment cut removes it, so the cursor is then in a comment
+    probe = asmline.cut_asm_comment(before + mark, _hash_opens_operand)
+    if semicolon_is_comment:
+        probe = asmline.cut_semicolon(probe)
+    else:
+        low, high = asmline.statement_spans(probe)[-1]
+        probe = probe[low:high]
+    rest = probe.lstrip()
+    while True:
+        parts = rest.split(None, 1)
+        if len(parts) == 2 and (parts[0].endswith(":") or (ptx and parts[0].startswith("@"))):
+            rest = parts[1]
+        else:
+            break
+    word = _strip_prefix_tokens(rest).removesuffix(mark)
+    return rest.endswith(mark) and (not word or asmline.word_at(word, len(word)) == word)
+
+
+def _msvc_before(text: str, offset: int) -> str:
+    """The MSVC __asm statement text before the cursor.
+
+    Each __asm keyword and each row inside a brace block starts a new
+    statement. The asm zone marks the keyword case at its low bound; the
+    row start bounds the brace case.
+    """
+    start = text.rfind("\n", 0, offset) + 1
+    zone = asmline.c_asm_zone_span_at(text, offset)
+    if zone is not None:
+        start = max(start, zone[1])
+    return text[start:offset]
+
+
+def _objdump_mnemonic_column(line: str) -> int | None:
+    """Start column of the mnemonic on an objdump address line, else None.
+
+    Reuses annotate's objdump line split: its rest starts at the mnemonic,
+    after the address and byte columns.
+    """
+    from simdref.annotate import _parse_objdump_instr  # annotate imports lsp
+
+    parsed = _parse_objdump_instr(line)
+    if parsed is None:
+        return None
+    return len(line.rstrip()) - len(parsed[1])
+
+
+def _template_before(text: str, offset: int) -> str | None:
+    """The asm statement text before the cursor inside an asm template string."""
+    for start, body in asmline.c_asm_literals(text):
+        if start <= offset <= start + len(body):
+            spaced = body[: offset - start].replace("\\t", " ")
+            return spaced[asmline.statement_spans(spaced)[-1][0] :]
+    return None
+
+
 def _completion_items(
-    conn, text: str, language_id: str, uri: str, prefix: str, line: int, character: int
+    conn,
+    text: str,
+    language_id: str,
+    uri: str,
+    prefix: str,
+    line: int,
+    character: int,
+    trigger_kind: int | None = None,
+    trigger_char: str | None = None,
 ) -> list[dict]:
     """Completion items for one cursor position.
 
-    Assembly documents keep the full pool. In C and C++ the pool follows
-    the cursor: mnemonics only inside an asm template string, an MSVC
-    __asm block or an MSVC __asm line; no simdref items in the operand and
-    clobber lists; intrinsics only everywhere else.
+    Completion answers only where the item kind can be written. Nothing
+    inside a comment or a plain string, nothing for an empty prefix unless
+    the user invoked completion by hand (trigger kind 1), nothing from a
+    "." trigger outside PTX names. Assembly and PTX documents offer items
+    at the mnemonic position of a statement only. In C and C++ the pool
+    follows the cursor: mnemonics only inside an asm template string, an
+    MSVC __asm block or an MSVC __asm line; no simdref items in the operand
+    and clobber lists; intrinsics only everywhere else.
     """
+    if not prefix and trigger_kind != 1:
+        return []
     ptx = _is_ptx_doc(language_id, uri) or _is_cuda_doc(language_id, uri)
     cuda = _is_cuda_doc(language_id, uri)
-    if _is_ptx_doc(language_id, uri):
-        return _completion_candidates(conn, prefix, kinds=_MNEMONIC_KINDS, ptx=True, cuda=cuda)
     if not _is_c_doc(language_id, uri):
-        return _completion_candidates(conn, prefix, ptx=ptx, cuda=cuda)
-    zone = asmline.c_asm_zone_at(text, _offset_at(text, line, character))
-    if zone == "operands":
+        is_ptx = _is_ptx_doc(language_id, uri)
+        if trigger_char == "." and not is_ptx:
+            return []
+        lines = text.split("\n")
+        source_line = lines[line].rstrip("\r") if line < len(lines) else ""
+        before = source_line[: _code_point_index(source_line, character)]
+        cut = _objdump_mnemonic_column(source_line)
+        if cut is not None:
+            # An objdump address row names its mnemonic after the address
+            # and byte columns; an item fits at that column only.
+            if len(before) < cut:
+                return []
+            before = before[cut:]
+        if not _at_mnemonic(before, _semicolon_is_comment(language_id, uri), is_ptx):
+            return []
+        return _completion_candidates(
+            conn, prefix, kinds=_MNEMONIC_KINDS if is_ptx else None, ptx=ptx, cuda=cuda
+        )
+    offset = _offset_at(text, line, character)
+    zone = asmline.c_asm_zone_at(text, offset)
+    if zone in ("operands", "comment", "string"):
+        return []
+    if trigger_char == "." and not (cuda and zone == "template"):
+        return []
+    if zone == "template":
+        before = _template_before(text, offset)
+        if before is None or not _at_mnemonic(before, False, cuda):
+            return []
+    elif zone == "msvc" and not _at_mnemonic(_msvc_before(text, offset), True, False):
         return []
     kinds = _MNEMONIC_KINDS if zone in ("template", "msvc") else _INTRINSIC_KINDS
     return _completion_candidates(conn, prefix, kinds=kinds, ptx=ptx, cuda=cuda)
@@ -1738,7 +1840,7 @@ def main() -> int:
                             "inlayHintProvider": True,
                             "completionProvider": {
                                 "resolveProvider": False,
-                                "triggerCharacters": ["_", ".", "m", "v"],
+                                "triggerCharacters": ["_", "."],
                             },
                         }
                     },
@@ -1852,8 +1954,19 @@ def main() -> int:
             language_id = session.languages.get(uri, "")
             line, character = params["position"]["line"], params["position"]["character"]
             prefix = _line_prefix(text, line, character)
+            context = params.get("context") or {}
             items = (
-                _completion_items(conn, text, language_id, uri, prefix, line, character)
+                _completion_items(
+                    conn,
+                    text,
+                    language_id,
+                    uri,
+                    prefix,
+                    line,
+                    character,
+                    context.get("triggerKind"),
+                    context.get("triggerCharacter"),
+                )
                 if conn
                 else []
             )
