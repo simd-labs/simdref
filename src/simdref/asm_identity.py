@@ -1403,6 +1403,40 @@ _ISA_CANDIDATES = (
 )
 
 
+def _reloc_branch_targets(text: str) -> str:
+    """Spell objdump's bare branch targets the fixup way ("je 7f37b" as ".+0x7f37b").
+
+    objdump prints branch targets as bare hex, and llvm-mc rejects the bare
+    spelling where the value holds an a-f letter: "7f37b" is no decimal
+    number and no valid symbol. The ".+0x" spelling is the same PC-relative
+    fixup the <sym> form answers with, and it carries no immediate range
+    check, so it assembles on every candidate triple for any address. A
+    token qualifies only when it starts with a digit, holds only hex digits
+    with at least one a-f letter (a decimal immediate assembles as-is), and
+    follows a separator, so the tail of "0x...", "0b..." or "#0x..." text is
+    never rewritten.
+    """
+    hexd = "0123456789abcdefABCDEF"
+    letters = "abcdefABCDEF"
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i].isdigit() and (i == 0 or text[i - 1] in " \t,"):
+            j = i
+            while j < n and text[j] in hexd:
+                j += 1
+            token = text[i:j]
+            if any(c in letters for c in token):
+                out.append(".+0x")
+            out.append(token)
+            i = j
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
 def _probe_all_triples(lines: list[str], llvm_mc: str) -> dict[tuple[str, str], list[dict]]:
     """Probe every candidate triple, one llvm-mc run per triple.
 
@@ -1412,6 +1446,7 @@ def _probe_all_triples(lines: list[str], llvm_mc: str) -> dict[tuple[str, str], 
     """
     from concurrent.futures import ThreadPoolExecutor
 
+    lines = [_reloc_branch_targets(line) for line in lines]
     with ThreadPoolExecutor(max_workers=len(_ISA_CANDIDATES)) as pool:
         futures = {
             (arch, syntax): pool.submit(_probe_lines_split, lines, arch, syntax, llvm_mc)
