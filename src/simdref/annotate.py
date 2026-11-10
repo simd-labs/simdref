@@ -19,7 +19,7 @@ from typing import Any, Iterable, Iterator
 from simdref import perf
 from simdref.arm_instructions import _CONDITION_CODES
 from simdref.asm_identity import isa_by_acceptance
-from simdref.catkey import ISA_FAMILY, isa_family as _isa_family
+from simdref.catkey import ISA_FAMILY, isa_family as _isa_family, key_names_za_tile, names_za_tile
 from simdref.lsp import NO_CATALOG_ROW, _document_arch, identity_keys
 from simdref.models import InstructionRecord
 from simdref.regtable import REG_TABLE, reg_rows
@@ -1047,6 +1047,19 @@ def pick_record(
     if "%" in operands or "$" in operands:
         # AT&T lists sources first; catalog form tokens are in Intel order.
         slots = list(reversed(slots))
+
+    # A ZA tile operand names the SME tile rows only, and a line without one
+    # never wants them (issue #65 M11): the rows share the mnemonic and
+    # operand count with the plain SVE/NEON forms, so operand shape alone
+    # picks a timed plain row where the ZA forms carry no timing. Same parity
+    # rule as the "_1to" broadcast filter in asm_identity.
+    za_pair = [
+        record
+        for record in candidates
+        if key_names_za_tile(str(getattr(record, "key", "") or "")) == names_za_tile(operands)
+    ]
+    if za_pair:
+        candidates = za_pair
 
     def score(rec: InstructionRecord) -> tuple[int, int, int, int]:
         measured = sum(

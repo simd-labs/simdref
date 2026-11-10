@@ -150,6 +150,35 @@ def _first_digits(text: str) -> int | None:
     return int(text[start:end]) if end > start else None
 
 
+def names_za_tile(text: str) -> bool:
+    """True when *text* names a ZA tile operand ("za0h", "za.s"), never ZT0.
+
+    A ZA tile name starts with "za" at an operand boundary and closes the
+    stem with a tile digit ("za0h"), a tile element letter ("zab") or the
+    full-register dot ("za.s"). One boundary scan; no regular expressions.
+    """
+    low = text.casefold()
+    for at in range(len(low) - 2):
+        if low[at] != "z" or low[at + 1] != "a":
+            continue
+        if at > 0 and (low[at - 1].isalnum() or low[at - 1] in "._"):
+            continue
+        if low[at + 2].isdecimal() or low[at + 2] in ".bhwdq":
+            return True
+    return False
+
+
+def key_names_za_tile(key: str) -> bool:
+    """True when a catalog key names a ZA tile operand form.
+
+    The tile encodes as a placeholder ("<ZAT...>"), the tile-slice register
+    ("<WV>") or a literal name ("ZA0<HV>"). ZT0 rows stay out: SVE counted
+    register-list keys reuse "<ZT..>" placeholder names for plain Z lists.
+    """
+    upper = key.upper()
+    return "<ZA" in upper or "<WV>" in upper or names_za_tile(key)
+
+
 def form_accept(op: str) -> frozenset:
     """The line classes a catalog-key operand accepts, as one frozenset.
 
@@ -200,8 +229,10 @@ def form_accept(op: str) -> frozenset:
     name = _cut_key_repeats(op.upper())
     if "<HASH>" in name:
         return IMMEDIATE_ACCEPT
-    # A ZA tile operand ("<ZAT...>[W1, #0]") is not a plain vector register.
-    if "<ZAT" in name:
+    # A ZA tile operand ("<ZAT...>[W1, #0]", "ZA0<HV>.B[W1, #0]",
+    # "Z3.4S[<WV>, #0]") is not a plain vector register: it matches a line's
+    # ZA tile operand only.
+    if key_names_za_tile(op):
         return frozenset({"za"})
     if _is_counted_vector(name):
         # A counted register list accepts only the same count.

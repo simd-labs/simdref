@@ -652,6 +652,10 @@ def _operand_class(op: str, intel: bool, arch: frozenset) -> str | None:
     if "{" in op:
         op = strip_braces(op).strip()
         name = op.lstrip("*").lstrip("%").casefold()
+    if "arm" in arch and catkey.names_za_tile(op):
+        # A ZA tile slice holds brackets ("za.s[w8, 0, vgx2]") that must not
+        # read as a memory address (issue #65 M11).
+        return "za"
     if "(" in op or "[" in op:
         sized = intel_size_bits(op)
         if sized:
