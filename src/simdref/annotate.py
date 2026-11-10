@@ -471,7 +471,8 @@ def _asm_line(stripped: str, obj: _ObjdumpRecord | None, track_positions: bool) 
         return AsmLine(LineKind.LABEL, stripped)
 
     head, comment = _split_comment(stripped)
-    m = _instr_head(head)
+    indent = head[: len(head) - len(head.lstrip())]
+    m = _instr_head(indent + _strip_prefix_tokens(head))
     if not m:
         return AsmLine(LineKind.COMMENT, stripped)
     return AsmLine(
