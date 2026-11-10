@@ -566,7 +566,9 @@ def _classify_line(
         elif _is_arrangement(name) or _is_a64_scalar(name) or name == "wsp":
             strong.add("arm")
         elif _is_arm32_scalar(name):
-            strong.add("arm")
+            # ARM32 is no simdref arch: its spellings name an empty bucket,
+            # never the A64 rows of the "arm" architecture (issue #65 B6).
+            strong.add("arm32")
         elif _is_a64_fp(name):
             # s0-s11 are also RISC-V saved registers: a weak vote there, and
             # the mnemonic's catalog rows arbitrate between arm and riscv.

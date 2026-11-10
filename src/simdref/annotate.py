@@ -19,8 +19,17 @@ from typing import Any, Iterable, Iterator
 from simdref import perf
 from simdref.arm_instructions import _CONDITION_CODES
 from simdref.asm_identity import isa_by_acceptance
-from simdref.catkey import ISA_FAMILY, isa_family as _isa_family, key_names_za_tile, names_za_tile
-from simdref.lsp import NO_CATALOG_ROW, _document_arch, identity_keys
+from simdref.catkey import (
+    IMMEDIATE_ACCEPT,
+    ISA_FAMILY,
+    LITERAL_ACCEPT,
+    form_accept,
+    isa_family as _isa_family,
+    key_names_za_tile,
+    names_za_tile,
+    operands_of_key,
+)
+from simdref.lsp import NO_CATALOG_ROW, _classify_line, _document_arch, identity_keys
 from simdref.models import InstructionRecord
 from simdref.regtable import REG_TABLE, reg_rows
 from simdref.storage import load_instruction_from_db, load_instructions_by_mnemonic_from_db
@@ -617,6 +626,42 @@ def _voter_names():
 
 _EXCL_ARM, _SHARED, _RISCV = _voter_names()
 
+# The register families simdref supports: REG_TABLE also carries ARM32 spellings.
+_SUPPORTED_FAMILIES = frozenset({"x86", "a64", "riscv"})
+
+
+def _foreign_operands(operands: str) -> bool:
+    """True when the operands parse as no supported arch's operands.
+
+    A ``$``-sigil register (the MIPS/PPC spelling) belongs to no supported
+    arch, and a line whose register words all name unsupported families
+    (ARM32's r0-r15, ip, pc) carries no supported evidence. A word absent
+    from REG_TABLE is a symbol and stays neutral, and one supported-family
+    register anywhere clears the whole line (issue #65 B2/B6).
+    """
+    unsupported = sigil = False
+    i = 0
+    n = len(operands)
+    while i < n:
+        if not (operands[i] == "_" or operands[i].isalnum()):
+            i += 1
+            continue
+        j = i
+        while j < n and (operands[j] == "_" or operands[j].isalnum()):
+            j += 1
+        if i > 0 and operands[i - 1] == "$" and not operands[i].isdigit():
+            sigil = True
+        else:
+            families = {
+                family for _klass, _width, family in REG_TABLE.get(operands[i:j].casefold(), ())
+            }
+            if families & _SUPPORTED_FAMILIES:
+                return False
+            if families:
+                unsupported = True
+        i = j
+    return sigil or unsupported
+
 
 def _isa_votes(text: str) -> tuple[int, int, int]:
     """(excl_arm, excl_riscv, shared) register votes of one instruction text."""
@@ -631,7 +676,9 @@ def _isa_votes(text: str) -> tuple[int, int, int]:
         while j < n and (text[j] == "_" or text[j].isalnum()):
             j += 1
         token = text[i:j]
-        if i == 0 or text[i - 1] != "%":
+        # '%' starts an AT&T register and '$' a sigil register of no
+        # supported arch (MIPS/PPC): the name inside never votes (issue #65).
+        if i == 0 or text[i - 1] not in "%$":
             if token in _EXCL_ARM:
                 excl_arm += 1
             elif token in _SHARED:
@@ -1077,6 +1124,49 @@ def pick_record(
     return max(candidates, key=score)
 
 
+def _record_takes_line(record: InstructionRecord, operands: str) -> bool:
+    """Whether the record's key accepts the line's operand classes.
+
+    Classes and accepts come from the catalog: the lsp line classifier and
+    catkey's accept sets. A bare key constrains nothing, a literal key operand
+    (the zero-idiom rows) constrains nothing, and an input the classifier
+    gave no class constrains nothing. Register and memory classes ride each
+    other here exactly like the form pick, so the only hard mismatch is an
+    immediate input against a key operand that accepts no immediate: on an
+    undecided line that pick is a foreign borrow, not an answer (a bare
+    "1, 2, 3" never names a register-class row, issue #65 B2). A decided
+    line named its family already, so only the undecided line is judged.
+    """
+    ops = operands_of_key(record.key)
+    if not ops:
+        return True
+    arch, classes, _reverse, _weak = _classify_line(operands, False)
+    if arch:
+        # A decided line named its family; the family-pinned pick stands.
+        return True
+    if "%" in operands or "$" in operands:
+        # AT&T lists sources first and key operands are in Intel order, so
+        # the classes flip to meet the key (the rule pick_record's slots
+        # use). A sigil-less line keeps its order: Intel and ARM both name
+        # the destination first, as the key does.
+        classes = list(reversed(classes))
+    immediates = [cls for cls in classes if cls in ("i", "lit0", "lit1")]
+    if not immediates:
+        return True
+    if len(ops) != len(classes):
+        return False
+    for cls, op in zip(classes, ops):
+        accept = form_accept(op)
+        if (
+            cls in ("i", "lit0", "lit1")
+            and accept
+            and accept not in LITERAL_ACCEPT
+            and accept.isdisjoint(IMMEDIATE_ACCEPT)
+        ):
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Aggregation
 # ---------------------------------------------------------------------------
@@ -1453,12 +1543,15 @@ def _annotate_instruction(
     line_isa: str | None = None,
     line_number: int | None = None,
     identity_cache: dict[str, tuple[InstructionRecord, PerfSummary | None]] | None = None,
+    foreign: bool = False,
 ) -> tuple[str, dict[str, Any] | None]:
     """Return the rendered output line and an optional JSON record.
 
     ``line_isa`` names the family the line's own evidence shows (a pinned
     ``--isa`` counts as one). None marks a neutral line in auto mode: the
-    stream family answers first, then the family that holds rows.
+    stream family answers first, then the family that holds rows. ``foreign``
+    marks a line whose operands parse as no supported arch's operands
+    (PPC, MIPS, ARM32): no supported family's rows answer it (issue #65 B2/B6).
     """
     if stats is not None:
         stats["parsed"] = stats.get("parsed", 0) + 1
@@ -1523,7 +1616,9 @@ def _annotate_instruction(
     else:
         isa = line_isa or opts.isa
         pick_isa = isa
-        if lookup_cache is not None:
+        if foreign:
+            records = []
+        elif lookup_cache is not None:
             records = lookup_cache.get((parsed.mnemonic, isa))
             if records is None:
                 # Module-level call (not a captured reference) so tests can
@@ -1532,16 +1627,21 @@ def _annotate_instruction(
                 lookup_cache[(parsed.mnemonic, isa)] = records
         else:
             records = lookup(parsed.mnemonic, conn, isa=isa)
-        if not records and line_isa is None:
+        if not records and line_isa is None and not foreign:
             # A neutral line whose stream family holds no rows gets the rows
             # of the family that has them (issue #57 batch: jnle, bare b).
+            # A foreign line borrows nothing (issue #65 B2/B6).
             pick_isa = None
             records = lookup(parsed.mnemonic, conn, isa=None)
             if lookup_cache is not None:
                 lookup_cache[(parsed.mnemonic, None)] = records
-        if stats is not None and records:
-            stats["recognized"] = stats.get("recognized", 0) + 1
         record = pick_record(records, arch=opts.arch, operands=parsed.operands, isa=pick_isa)
+        if record is not None and not _record_takes_line(record, parsed.operands):
+            # The key does not take the line's operand classes: a foreign
+            # borrow, not an answer (issue #65 B2).
+            record = None
+        if stats is not None and record is not None:
+            stats["recognized"] = stats.get("recognized", 0) + 1
 
     if record is None:
         if opts.unknown == "drop":
@@ -1700,6 +1800,7 @@ def annotate_stream(
     }
     auto_isa = opts.isa not in ("x86", "arm", "riscv")
     line_family: dict[int, str] = {}
+    foreign: set[int] = set()
     if auto_isa:
         # Assembler acceptance decides each line's family: one llvm-mc run
         # per candidate triple. The register vote below is the fallback when
@@ -1707,6 +1808,13 @@ def annotate_stream(
         probe_texts = [text for _index, text in items]
         families, majority = isa_by_acceptance(probe_texts)
         line_family = {index: family for (index, _text), family in zip(items, families) if family}
+        # The line's own parse names foreign architectures (PPC/MIPS/ARM32):
+        # those lines borrow no rows from a supported family (issue #65 B2/B6).
+        foreign = {
+            index
+            for index, parsed in enumerate(parsed_lines)
+            if parsed.kind == LineKind.INSTRUCTION and _foreign_operands(parsed.operands)
+        }
         # auto: the acceptance majority names the ISA, then the input
         # signals, then the document arch from _document_arch; x86 stays
         # the guess when all stay silent.
@@ -1743,6 +1851,11 @@ def annotate_stream(
             if not collecting_json:
                 yield parsed.raw + "\n"
             continue
+        line_isa = opts.isa
+        if auto_isa:
+            # A pin forces one family; auto mode splits the batch per line,
+            # the assembler verdict first and the register vote as fallback.
+            line_isa = line_family.get(index) or _line_isa(f"{parsed.mnemonic} {parsed.operands}")
         out_line, record = _annotate_instruction(
             parsed,
             opts,
@@ -1750,13 +1863,10 @@ def annotate_stream(
             lookup_cache,
             stats,
             identity_key=identity.get(index),
-            # A pin forces one family; auto mode splits the batch per line,
-            # the assembler verdict first and the register vote as fallback.
-            line_isa=opts.isa
-            if not auto_isa
-            else line_family.get(index) or _line_isa(f"{parsed.mnemonic} {parsed.operands}"),
+            line_isa=line_isa,
             line_number=index + 1,
             identity_cache=identity_cache,
+            foreign=index in foreign if line_isa is None else False,
         )
         if collecting_json:
             if record is not None:

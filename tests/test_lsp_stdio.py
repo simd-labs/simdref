@@ -944,13 +944,15 @@ class LspArmFixtureTests(unittest.TestCase):
         self.assertTrue(caps.get("inlayHintProvider"), "inlayHintProvider not advertised")
 
     def test_arm_scalar_lines_keep_the_arm_form(self):
-        # Scalar arm rows show the generated sentence. "r0" and a bare "sp"
-        # are not x86 registers, and a "#16" immediate excludes x86 forms.
-        lines = ("sub sp, sp, #16", "add sp, sp, #16", "add r0, r1, r2", "add r8, r9, #16")
+        # Scalar arm rows show the generated sentence. A bare "sp" is not an
+        # x86 register, and a "#16" immediate excludes x86 forms. The ARM32
+        # rN-with-'#' spellings are a foreign arch (issue #65 B6): they hint
+        # nothing, and the r-list cases live in test_issue_65_foreign_arch.
+        lines = ("sub sp, sp, #16", "add sp, sp, #16")
         self.server.open(ASM_URI, "asm", "\n".join(lines) + "\n")
         self.assertEqual(
             [h["label"] for h in self.server.hints(ASM_URI)],
-            ["Subtract operands.", "Add operands.", "Add operands.", "Add operands."],
+            ["Subtract operands.", "Add operands."],
         )
 
     def test_arm_three_register_add_keeps_the_arm_form(self):
