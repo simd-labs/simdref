@@ -132,6 +132,9 @@ LOCAL_PTX_BUNDLES = [
 LOCAL_PTX_DOC_HTMLS = [
     _REPO_ROOT / "vendor" / "ptx" / "parallel-thread-execution.html",
 ]
+LOCAL_CUDA_BUNDLES = [
+    _REPO_ROOT / "vendor" / "cuda" / "cuda_intrinsics.json",
+]
 
 
 def now_iso() -> str:
@@ -833,4 +836,23 @@ def fetch_ptx_isa_data() -> tuple[str, SourceVersion]:
         version="live",
         fetched_at=now_iso(),
         url=PTX_ISA_DOC_URL,
+    )
+
+
+CUDA_INTRINSICS_DOC_URL = "https://docs.nvidia.com/cuda/cuda-c-programming-guide/"
+
+
+def fetch_cuda_data() -> tuple[str, SourceVersion]:
+    local = _read_local_text(LOCAL_CUDA_BUNDLES, "cuda-intrinsics", "local-bundle")
+    if local is not None:
+        return local
+    # Return empty bundle if not found - CUDA intrinsics are optional
+    empty_bundle = (
+        '{"format": "clang-cuda-headers-v2", "intrinsics": [], "metadata": {"total_intrinsics": 0}}'
+    )
+    return empty_bundle, SourceVersion(
+        source="cuda-intrinsics",
+        version="empty",
+        fetched_at=now_iso(),
+        url="local:empty",
     )

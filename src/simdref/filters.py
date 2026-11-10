@@ -27,6 +27,7 @@ ISA_FAMILY_ORDER: dict[str, int] = {
     "SVML": 10,
     "Other": 11,
     "PTX": 12,
+    "CUDA": 13,
 }
 
 DEFAULT_ENABLED_ISAS: tuple[str, ...] = ("SSE", "AVX", "AVX-512", "Arm", "RISC-V")

@@ -367,6 +367,7 @@ def display_architecture(architecture: str) -> str:
         "x86": "x86",
         "arm": "Arm",
         "riscv": "RISC-V",
+        "cuda": "CUDA",
     }.get((architecture or "").lower(), architecture or "-")
 
 
@@ -390,6 +391,8 @@ def isa_family(isa: str) -> str:
         return "RISC-V"
     if d == "PTX":
         return "PTX"
+    if d == "CUDA":
+        return "CUDA"
     if d.startswith("APX"):
         return "APX"
     if d.startswith("AMX"):
@@ -1203,6 +1206,7 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
         table.add_row("source", item.url)
     table.add_row("architecture", display_architecture(item.architecture))
     table.add_row("isa", ", ".join(item.isa) or "-")
+    table.add_row("instructions", ", ".join(item.instructions) or "-")
     table.add_row("category", category_display_text(item))
     if item.description:
         table.add_row("description", item.description)

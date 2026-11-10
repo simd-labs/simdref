@@ -68,6 +68,7 @@ ISA_FAMILY = {
     "riscv32": "riscv",
     "riscv64": "riscv",
     "ptx": "ptx",
+    "cuda": "cuda",
 }
 
 
@@ -84,6 +85,8 @@ def isa_family(architecture: str | None) -> str | None:
         return "riscv"
     if name.startswith("ptx"):
         return "ptx"
+    if name.startswith("cuda"):
+        return "cuda"
     return "x86"
 
 

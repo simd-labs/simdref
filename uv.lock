@@ -1230,7 +1230,7 @@ wheels = [
 
 [[package]]
 name = "simdref"
-version = "0.0.16"
+version = "0.0.17"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

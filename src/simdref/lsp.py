@@ -1293,8 +1293,12 @@ def _hover_markdown(
     intel: bool = False,
     identity_key: str | None = None,
     arch: frozenset | None = None,
+    cuda: bool = False,
 ) -> str | None:
     intrinsic = load_intrinsic_from_db(conn, word)
+    if intrinsic is not None and intrinsic.architecture == "cuda" and not cuda:
+        # CUDA device intrinsics surface only in CUDA documents.
+        intrinsic = None
     if intrinsic is not None:
         lines = [f"```c\n{intrinsic.signature}\n```"]
         if intrinsic.description:
@@ -1366,7 +1370,12 @@ _MNEMONIC_KINDS = frozenset({14})
 
 
 def _completion_candidates(
-    conn, prefix: str, limit: int = 50, kinds: frozenset[int] | None = None, ptx: bool = False
+    conn,
+    prefix: str,
+    limit: int = 50,
+    kinds: frozenset[int] | None = None,
+    ptx: bool = False,
+    cuda: bool = False,
 ) -> list[dict]:
     """Completion items for a word prefix, deduped by (kind, label).
 
@@ -1379,6 +1388,9 @@ def _completion_candidates(
     items: list[dict] = []
     candidate_limit = max(limit * 3, 100)
     intrinsics = search_intrinsic_candidates_from_db(conn, prefix or "_mm", limit=candidate_limit)
+    if not cuda:
+        # CUDA device intrinsics surface only in CUDA documents.
+        intrinsics = [item for item in intrinsics if item.architecture != "cuda"]
     instructions = search_instruction_candidates_from_db(
         conn, prefix or "_mm", limit=candidate_limit
     )
@@ -1419,15 +1431,16 @@ def _completion_items(
     clobber lists; intrinsics only everywhere else.
     """
     ptx = _is_ptx_doc(language_id, uri) or _is_cuda_doc(language_id, uri)
+    cuda = _is_cuda_doc(language_id, uri)
     if _is_ptx_doc(language_id, uri):
-        return _completion_candidates(conn, prefix, kinds=_MNEMONIC_KINDS, ptx=True)
+        return _completion_candidates(conn, prefix, kinds=_MNEMONIC_KINDS, ptx=True, cuda=cuda)
     if not _is_c_doc(language_id, uri):
-        return _completion_candidates(conn, prefix, ptx=ptx)
+        return _completion_candidates(conn, prefix, ptx=ptx, cuda=cuda)
     zone = asmline.c_asm_zone_at(text, _offset_at(text, line, character))
     if zone == "operands":
         return []
     kinds = _MNEMONIC_KINDS if zone in ("template", "msvc") else _INTRINSIC_KINDS
-    return _completion_candidates(conn, prefix, kinds=kinds, ptx=ptx)
+    return _completion_candidates(conn, prefix, kinds=kinds, ptx=ptx, cuda=cuda)
 
 
 def _is_c_doc(language_id: str, uri: str) -> bool:
@@ -1820,6 +1833,7 @@ def main() -> int:
                     intel=_semicolon_is_comment(language_id, uri),
                     identity_key=identity_key,
                     arch=PTX_ARCH if ptx else None,
+                    cuda=cuda_doc,
                 )
                 if conn and word
                 else None

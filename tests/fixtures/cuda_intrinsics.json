@@ -1,0 +1,170 @@
+{
+  "format": "clang-cuda-headers-v2",
+  "upstream": {
+    "repo": "https://github.com/llvm/llvm-project",
+    "ref": "llvmorg-23.1.4",
+    "license": "Apache-2.0 WITH LLVM-exception"
+  },
+  "intrinsics": [
+    {
+      "name": "__shfl_sync",
+      "signature": "__shfl_sync(...)  // 2 overloads",
+      "description": "CUDA device intrinsic from __clang_cuda_intrinsics.h.",
+      "header": "__clang_cuda_intrinsics.h",
+      "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#__shfl_sync",
+      "architecture": "cuda",
+      "isa": [
+        "CUDA"
+      ],
+      "category": "",
+      "subcategory": "",
+      "instructions": [
+        "shfl.sync.idx.b32"
+      ],
+      "instruction_refs": [
+        {
+          "name": "shfl.sync.idx.b32",
+          "form": "",
+          "architecture": "ptx"
+        }
+      ],
+      "metadata": {
+        "classification": "full_chain"
+      },
+      "source": "clang-cuda-headers",
+      "doc_sections": {},
+      "notes": [],
+      "aliases": []
+    },
+    {
+      "name": "__ldg",
+      "signature": "char __ldg(const char *ptr)",
+      "description": "CUDA device intrinsic from __clang_cuda_intrinsics.h.",
+      "header": "__clang_cuda_intrinsics.h",
+      "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#__ldg",
+      "architecture": "cuda",
+      "isa": [
+        "CUDA"
+      ],
+      "category": "",
+      "subcategory": "",
+      "instructions": [],
+      "instruction_refs": [],
+      "metadata": {
+        "classification": "unchainable_nvvm"
+      },
+      "source": "clang-cuda-headers",
+      "doc_sections": {},
+      "notes": [],
+      "aliases": [
+        "short __ldg(const short *ptr)",
+        "int __ldg(const int *ptr)",
+        "long __ldg(const long *ptr)",
+        "long long __ldg(const long long *ptr)",
+        "unsigned char __ldg(const unsigned char *ptr)",
+        "signed char __ldg(const signed char *ptr)",
+        "unsigned short __ldg(const unsigned short *ptr)",
+        "unsigned int __ldg(const unsigned int *ptr)",
+        "unsigned long __ldg(const unsigned long *ptr)",
+        "unsigned long long __ldg(const unsigned long long *ptr)",
+        "float __ldg(const float *ptr)",
+        "double __ldg(const double *ptr)",
+        "char2 __ldg(const char2 *ptr)",
+        "char4 __ldg(const char4 *ptr)",
+        "short2 __ldg(const short2 *ptr)",
+        "short4 __ldg(const short4 *ptr)",
+        "int2 __ldg(const int2 *ptr)",
+        "int4 __ldg(const int4 *ptr)",
+        "longlong2 __ldg(const longlong2 *ptr)",
+        "uchar2 __ldg(const uchar2 *ptr)",
+        "uchar4 __ldg(const uchar4 *ptr)",
+        "ushort2 __ldg(const ushort2 *ptr)",
+        "ushort4 __ldg(const ushort4 *ptr)",
+        "uint2 __ldg(const uint2 *ptr)",
+        "uint4 __ldg(const uint4 *ptr)",
+        "ulonglong2 __ldg(const ulonglong2 *ptr)",
+        "float2 __ldg(const float2 *ptr)",
+        "float4 __ldg(const float4 *ptr)",
+        "double2 __ldg(const double2 *ptr)"
+      ]
+    },
+    {
+      "name": "__popc",
+      "signature": "int __popc(unsigned int __a)",
+      "description": "CUDA device intrinsic from __clang_cuda_device_functions.h.",
+      "header": "__clang_cuda_device_functions.h",
+      "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#__popc",
+      "architecture": "cuda",
+      "isa": [
+        "CUDA"
+      ],
+      "category": "",
+      "subcategory": "",
+      "instructions": [],
+      "instruction_refs": [],
+      "metadata": {
+        "classification": "libdevice"
+      },
+      "source": "clang-cuda-headers",
+      "doc_sections": {},
+      "notes": [],
+      "aliases": []
+    },
+    {
+      "name": "__uAtomicAdd",
+      "signature": "unsigned int __uAtomicAdd(unsigned int *__p, unsigned int __v)",
+      "description": "CUDA device intrinsic from __clang_cuda_device_functions.h.",
+      "header": "__clang_cuda_device_functions.h",
+      "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#__uAtomicAdd",
+      "architecture": "cuda",
+      "isa": [
+        "CUDA"
+      ],
+      "category": "",
+      "subcategory": "",
+      "instructions": [],
+      "instruction_refs": [],
+      "metadata": {
+        "classification": "atomic"
+      },
+      "source": "clang-cuda-headers",
+      "doc_sections": {},
+      "notes": [],
+      "aliases": []
+    },
+    {
+      "name": "__sinf",
+      "signature": "float __sinf(float __a)",
+      "description": "CUDA device intrinsic from __clang_cuda_device_functions.h.",
+      "header": "__clang_cuda_device_functions.h",
+      "url": "https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#__sinf",
+      "architecture": "cuda",
+      "isa": [
+        "CUDA"
+      ],
+      "category": "",
+      "subcategory": "",
+      "instructions": [],
+      "instruction_refs": [],
+      "metadata": {
+        "classification": "libdevice"
+      },
+      "source": "clang-cuda-headers",
+      "doc_sections": {},
+      "notes": [],
+      "aliases": []
+    }
+  ],
+  "metadata": {
+    "source_file_count": 4,
+    "td_file_count": 4,
+    "ptx_linked_count": 1,
+    "classification": {
+      "full_chain": 1,
+      "unchainable_nvvm": 1,
+      "libdevice": 2,
+      "atomic": 1
+    },
+    "total_intrinsics": 5
+  }
+}

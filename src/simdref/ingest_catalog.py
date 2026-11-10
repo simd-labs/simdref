@@ -21,12 +21,14 @@ from simdref.catkey import (
     parse_key,
     substitute_placeholders,
 )
+from simdref.cuda import parse_cuda_intrinsics_payload
 from simdref.display import strip_instruction_decorators, strip_leading_tags
 from simdref.htmltext import squeeze, strip_html, tidy, unwrap_anchors
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
 from simdref.ingest_sources import (
     fetch_arm_a64_data,
     fetch_arm_acle_data,
+    fetch_cuda_data,
     fetch_intel_data,
     fetch_ptx_isa_data,
     fetch_riscv_rvv_intrinsics_data,
@@ -1622,11 +1624,15 @@ def build_catalog(
     emit("Fetching PTX ISA reference")
     ptx_text, ptx_source = fetch_ptx_isa_data()
     emit(f"Fetched PTX ISA reference from {ptx_source.url}")
+    emit("Fetching CUDA intrinsics data")
+    cuda_text, cuda_source = fetch_cuda_data()
+    emit(f"Fetched CUDA intrinsics data from {cuda_source.url}")
     emit("Parsing intrinsic catalog")
     intrinsics = parse_intel_payload(intel_text)
     arm_intrinsics = parse_arm_intrinsics_payload(arm_acle_text)
     intrinsics.extend(arm_intrinsics)
     intrinsics.extend(parse_riscv_intrinsics_payload(riscv_intrinsics_text))
+    intrinsics.extend(parse_cuda_intrinsics_payload(cuda_text))
     emit(f"Parsed {len(intrinsics)} intrinsics")
     emit("Parsing instruction catalog")
     instructions = parse_uops_xml(uops_text)
@@ -1668,6 +1674,7 @@ def build_catalog(
             riscv_instructions_source,
             *perf_sources_version,
             ptx_source,
+            cuda_source,
         ],
         generated_at=now_iso(),
     )
