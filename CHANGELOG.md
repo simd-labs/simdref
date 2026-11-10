@@ -5,6 +5,16 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- The LSP hover shows the simdref web page link with the source link, for instructions and intrinsics.
+
+### Fixed
+
+- The hover web link opens the record on the web page. The earlier key filled the query box.
+
 ## [0.0.17], 2026-11-09
 
 ### Added

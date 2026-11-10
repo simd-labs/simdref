@@ -507,10 +507,17 @@ def instruction_markdown(item, conn=None) -> str:
     """
     lines = [f"```asm\n{display_instruction_form(item.key)}\n```"]
     lines.append(f"**isa.** {display_isa(item.isa)}")
-    for key, value in instruction_metadata_rows(item):
+    # The web app keys an entry by db_key. A display-key link opens no
+    # detail page. It fills the query box instead.
+    link = f"[simdref]({web_deep_link('instruction', item.db_key)})"
+    rows = instruction_metadata_rows(item)
+    for key, value in rows:
         if key != "isa":
             # Escaping a URL would break the editor's autolink.
-            lines.append(f"**{key}.** {value if value.startswith('http') else _md_escape(value)}")
+            row = f"**{key}.** {value if value.startswith('http') else _md_escape(value)}"
+            lines.append(f"{row} | {link}" if key == "url" else row)
+    if not any(key == "url" for key, _ in rows):
+        lines.append(link)
     if item.description:
         shown: set[str] = set()
         for section in _DESCRIPTION_ORDER:

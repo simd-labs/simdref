@@ -24,11 +24,11 @@ from simdref.storage import build_sqlite, open_db
 
 def _form_evidence(fragment: str) -> str:
     # The hover body hides unexpandable <RULE> tokens under the mnemonic;
-    # the picked row's key stays in the deep link, URL-encoded, and is the
-    # pick evidence. The site link keeps only parentheses literal.
+    # the picked row's entry key stays in the deep link, case-folded and
+    # URL-encoded. The site link keeps only parentheses literal.
     if "<" not in fragment:
         return fragment
-    return quote(fragment, safe="()")
+    return quote(fragment.casefold(), safe="()")
 
 
 def _record(mnemonic: str, form: str, summary: str, isa: str, architecture: str = "arm"):

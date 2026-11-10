@@ -299,8 +299,11 @@ class LspEndToEndTests(unittest.TestCase):
         # The per-uarch perf table as a Markdown table.
         self.assertIn("| microarch |", value)
         self.assertIn("| ZEN5 |", value)
-        # Links at the end: web deep link, uops.info, felixcloutier.
-        self.assertIn("https://simdref.diamondinoia.com/#VADDPS%20(YMM%2C%20YMM%2C%20YMM)", value)
+        # The web deep link sits on the source url row, keyed by the web app
+        # entry key; uops.info and felixcloutier are the source url rows.
+        self.assertIn(
+            "https://simdref.diamondinoia.com/#x86%3Avaddps%20(ymm%2C%20ymm%2C%20ymm)", value
+        )
         self.assertIn("https://www.uops.info/html-instr/VADDPS_YMM_YMM_YMM.html", value)
         self.assertIn("https://www.felixcloutier.com/x86/addps", value)
 
@@ -737,10 +740,11 @@ class LspEndToEndTests(unittest.TestCase):
         result = self.server.hover(uri, 0, 1)
         self.assertIsNotNone(result, "hover on an arm fp add returned null")
         value = result["contents"]["value"]
-        self.assertIn("XDORXZR", value)
-        self.assertNotIn("R16", value)
-        self.assertNotIn("R64", value)
-        self.assertNotIn("M16", value)
+        # The deep link holds the picked row's entry key (case-folded).
+        self.assertIn("xdorxzr", value)
+        self.assertNotIn("r16", value)
+        self.assertNotIn("r64", value)
+        self.assertNotIn("m16", value)
 
     def test_arm_x_registers_pick_the_x_form(self):
         # AArch64: x0-x30 are 64-bit and w0-w30 are 32-bit. The width classes must
@@ -749,10 +753,11 @@ class LspEndToEndTests(unittest.TestCase):
         self.server.open(uri, "asm", "add x0, x1, x2\nadd w0, w1, w2\n")
         hover_x = self.server.hover(uri, 0, 1)["contents"]["value"]
         hover_w = self.server.hover(uri, 1, 1)["contents"]["value"]
-        self.assertIn("XD", hover_x)
-        self.assertNotIn("WD", hover_x)
-        self.assertIn("WD", hover_w)
-        self.assertNotIn("XD", hover_w)
+        # The deep link holds the picked row's entry key (case-folded).
+        self.assertIn("xdorxzr", hover_x)
+        self.assertNotIn("wdorwzr", hover_x)
+        self.assertIn("wdorwzr", hover_w)
+        self.assertNotIn("xdorxzr", hover_w)
 
     def test_arm32_addw_does_not_show_x86(self):
         # ARM32: addw is not in the catalog. The x86-gated suffix strip must not
@@ -972,7 +977,7 @@ class LspArmFixtureTests(unittest.TestCase):
         self.assertIsNotNone(result, "hover on an arm vector add returned null")
         value = result["contents"]["value"]
         # Byte identity picks the vector row; the deep link holds its key.
-        self.assertIn("ADD%20(V0.4S%2C%20V1.4S%2C%20V2.4S)", value)
+        self.assertIn("arm%3Aadd%20(v0.4s%2C%20v1.4s%2C%20v2.4s)", value)
         self.assertNotIn("V0.<T_OPTION>", value)
         self.assertNotIn("ADD (R16", value)
         # The rendered summary stays the ACLE text of the vector row.

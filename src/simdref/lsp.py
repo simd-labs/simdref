@@ -1310,6 +1310,7 @@ def _hover_markdown(
             )
         if intrinsic.url:
             meta.append(f"[source]({intrinsic.url})")
+        meta.append(f"[simdref]({web_deep_link('intrinsic', intrinsic.name)})")
         if meta:
             lines.append(" | ".join(meta))
         if intrinsic.instructions:
@@ -1350,9 +1351,7 @@ def _hover_markdown(
             conn, word, operand_count, operand_text, intel, exact=exact, arch=arch
         )
     if instruction is not None:
-        # The url and reference rows of the body already carry the source links.
-        link = web_deep_link("instruction", instruction.key)
-        return instruction_markdown(instruction, conn=conn) + f"\n\nFull page: {link}"
+        return instruction_markdown(instruction, conn=conn)
     return None
 
 

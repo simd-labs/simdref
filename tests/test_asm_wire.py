@@ -17,7 +17,9 @@ from simdref import cli as cli_mod
 from simdref import lsp
 from simdref.asm_identity import _tool_path
 from simdref.lsp import _document_arch, identity_keys
+from simdref.models import Catalog, InstructionRecord, IntrinsicRecord, SourceVersion
 from simdref.storage import (
+    build_sqlite,
     load_instruction_from_db,
     load_instructions_by_mnemonic_from_db,
     open_db,
@@ -131,13 +133,15 @@ class TestConsumers:
             keys = identity_keys(["add x0, x1, x2", "ret"], False, conn)
             ret = load_instructions_by_mnemonic_from_db(conn, "RET")[0]
             body = lsp._hover_markdown(conn, "ret", identity_key=keys[1])
-            expect = (
-                lsp.instruction_markdown(ret, conn=conn)
-                + f"\n\nFull page: {lsp.web_deep_link('instruction', ret.key)}"
-            )
+            expect = lsp.instruction_markdown(ret, conn=conn)
         finally:
             conn.close()
         assert body == expect
+        assert body is not None and "Full page" not in body
+        # A row with no source url still shows the web link, keyed by the web
+        # app entry key (db_key).
+        assert "**url.** " not in body
+        assert f"[simdref]({lsp.web_deep_link('instruction', ret.db_key)})" in body
 
     def test_annotate_stream_reads_the_byte_identity_record(self, tmp_path, monkeypatch):
         conn = open_db(path=_wire_db(tmp_path))
@@ -171,3 +175,68 @@ class TestConsumers:
         assert payload["mode"] == "exact"
         assert payload["match_kind"] == "instruction"
         assert len(payload["results"]) == 1
+
+
+class TestHoverWebLink:
+    def test_instruction_hover_puts_the_web_link_on_the_source_url_row(self, tmp_path):
+        record = InstructionRecord(
+            mnemonic="VADDPS",
+            form="VADDPS (YMM, YMM, YMM)",
+            summary="Add packed single precision values.",
+            architecture="x86",
+            isa=["AVX"],
+            metadata={"url": "https://example.com/vaddps"},
+        )
+        db = tmp_path / "urlrow.db"
+        build_sqlite(
+            Catalog(
+                intrinsics=[],
+                instructions=[record],
+                sources=[
+                    SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")
+                ],
+                generated_at="2025-01-01",
+            ),
+            db,
+        )
+        conn = open_db(path=db)
+        try:
+            body = lsp._hover_markdown(conn, "vaddps", identity_key=record.db_key)
+        finally:
+            conn.close()
+        assert body is not None and "Full page" not in body
+        link = lsp.web_deep_link("instruction", record.db_key)
+        url_line = next(line for line in body.splitlines() if line.startswith("**url.** "))
+        assert url_line.endswith(f" | [simdref]({link})")
+
+    def test_intrinsic_hover_puts_the_web_link_next_to_the_source(self, tmp_path):
+        db = tmp_path / "intrinsics.db"
+        build_sqlite(
+            Catalog(
+                intrinsics=[
+                    IntrinsicRecord(
+                        name="_mm_add_ps",
+                        signature="__m128 _mm_add_ps (__m128 a, __m128 b)",
+                        description="Add packed single precision values.",
+                        header="<immintrin.h>",
+                        url="https://example.com/_mm_add_ps",
+                        architecture="x86",
+                        isa=["SSE"],
+                    )
+                ],
+                instructions=[],
+                sources=[
+                    SourceVersion(source="t", version="t", fetched_at="2025-01-01", url="test://")
+                ],
+                generated_at="2025-01-01",
+            ),
+            db,
+        )
+        conn = open_db(path=db)
+        try:
+            body = lsp._hover_markdown(conn, "_mm_add_ps")
+        finally:
+            conn.close()
+        link = lsp.web_deep_link("intrinsic", "_mm_add_ps")
+        assert body is not None
+        assert f"[source](https://example.com/_mm_add_ps) | [simdref]({link})" in body
