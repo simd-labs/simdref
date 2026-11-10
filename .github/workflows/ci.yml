@@ -95,6 +95,11 @@ jobs:
           RISCV_UDB_COMMIT: 798d6a54d709a1584e7fa81bd8cc4ec7b7803a42
         run: python tools/vendor_riscv_sources.py
 
+      - name: Vendor CUDA sources
+        # fetch_cuda_data falls back to an empty bundle when no local
+        # bundle exists, so CI must build this one like the RISC-V feeds.
+        run: python tools/vendor_cuda_sources.py
+
       - name: Download upstream cache (fallback)
         # Intel source fallback for the build below. A missing asset must
         # not fail CI: the live sources may still be reachable.
@@ -107,6 +112,11 @@ jobs:
 
       - name: Build catalog
         run: python -u -m simdref build
+
+      - name: Check catalog family coverage
+        # A lost source must fail loud here: the empty-CUDA-bundle fallback
+        # shipped a catalog with 0 CUDA rows and no step noticed.
+        run: python tools/check_catalog_families.py data/derived/catalog.db
 
       - name: Validate upstream ingestion
         run: python tools/validate_sources.py --require-sdm
