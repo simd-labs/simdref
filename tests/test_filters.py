@@ -147,8 +147,15 @@ class CategoryAggregationTests(unittest.TestCase):
 
 class ArchPresetsTests(unittest.TestCase):
     def test_all_expected_presets_present(self):
-        expected = {"default", "intel", "arm32", "arm64", "riscv", "none", "all"}
+        expected = {"default", "intel", "arm32", "arm64", "riscv", "cuda", "none", "all"}
         self.assertEqual(expected, set(ARCH_PRESETS.keys()))
+
+    def test_cuda_preset_enables_only_cuda(self):
+        preset = ARCH_PRESETS["cuda"]
+        self.assertEqual(preset.families, frozenset({"CUDA"}))
+        self.assertEqual(preset.subs, frozenset())
+        self.assertIsNone(preset.arm_arch)
+        self.assertEqual(preset.kind, frozenset({"intrinsic", "instruction"}))
 
     def test_intel_preset_is_strict_x86_64_v4(self):
         preset = ARCH_PRESETS["intel"]

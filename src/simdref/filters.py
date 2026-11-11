@@ -184,6 +184,14 @@ ARCH_PRESETS: dict[str, PresetSpec] = {
         arm_arch=None,
         kind=frozenset({"intrinsic", "instruction"}),
     ),
+    # CUDA has no sub-ISA breakdown in FAMILY_SUB_ORDER, so subs stays empty;
+    # the family filter alone scopes results to CUDA rows.
+    "cuda": PresetSpec(
+        families=frozenset({"CUDA"}),
+        subs=frozenset(),
+        arm_arch=None,
+        kind=frozenset({"intrinsic", "instruction"}),
+    ),
     "none": PresetSpec.empty(),
     "all": PresetSpec.all(),
 }

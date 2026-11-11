@@ -8,7 +8,10 @@ cannot find a catalog skip rather than fail.
 from __future__ import annotations
 
 import asyncio
+import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 try:
@@ -238,6 +241,75 @@ class TuiMissingSectionTests(unittest.TestCase):
         )
         lines = self._markup(app._build_instruction_payload(full))
         self.assertFalse(any("no data" in line for line in lines), lines)
+
+
+@unittest.skipUnless(HAS_TEXTUAL, "textual required")
+class TuiCudaPresetTests(unittest.TestCase):
+    """The CUDA preset button sits by None and scopes results to CUDA rows."""
+
+    def _run(self, coro):
+        asyncio.run(coro)
+
+    def test_cuda_button_orders_bar_and_scopes_results(self):
+        from simdref import tui
+        from simdref.display import isa_family
+        from simdref.storage import open_db
+        from test_cuda_wiring import _build_cuda_catalog
+
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmp:
+                database = _build_cuda_catalog(Path(tmp))
+                with (
+                    patch.object(tui, "open_db", lambda *a, **k: open_db(database)),
+                    patch.dict(os.environ, {"XDG_STATE_HOME": tmp}),
+                ):
+                    app = tui.SimdrefApp(initial_query="__shfl_sync")
+                    async with app.run_test(size=(160, 45)) as pilot:
+                        # Let queued mounts land, or the preset click races
+                        # the initial sub-ISA row build.
+                        for _ in range(3):
+                            await pilot.pause()
+                        modes = [b.mode for b in app.query(tui.PresetButton)]
+                        self.assertEqual(
+                            modes,
+                            [
+                                "default",
+                                "intel",
+                                "arm32",
+                                "arm64",
+                                "riscv",
+                                "cuda",
+                                "none",
+                                "all",
+                            ],
+                        )
+                        cuda_btn = next(b for b in app.query(tui.PresetButton) if b.mode == "cuda")
+                        await pilot.click(cuda_btn)
+                        await pilot.pause()
+                        self.assertEqual(app._enabled_families, {"CUDA"})
+                        # CUDA has no sub-ISAs: the bar must drop the stale
+                        # rows of the previously enabled families.
+                        self.assertEqual(list(app.query(tui.SubIsaToggle)), [])
+                        results = app._current_results
+                        self.assertTrue(results, "CUDA preset shows no __shfl_sync results")
+                        with open_db(database) as conn:
+                            for res in results:
+                                if res.kind == "intrinsic":
+                                    row = conn.execute(
+                                        "SELECT isa FROM intrinsics_data WHERE name = ?", (res.key,)
+                                    ).fetchone()
+                                else:
+                                    row = conn.execute(
+                                        "SELECT isa FROM instructions_data WHERE db_key = ?",
+                                        (res.key,),
+                                    ).fetchone()
+                                self.assertIsNotNone(row, res.key)
+                                families = {
+                                    isa_family(v) for v in (row[0] or "").replace(",", " ").split()
+                                }
+                                self.assertEqual(families, {"CUDA"}, res.key)
+
+        self._run(scenario())
 
 
 if __name__ == "__main__":

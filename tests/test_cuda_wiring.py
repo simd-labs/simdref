@@ -67,6 +67,30 @@ class CliLookupTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("shfl.sync", out)
 
+    def test_cli_preset_cuda_accepted_and_scopes_to_cuda(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = _build_cuda_catalog(Path(tmp))
+            buf = io.StringIO()
+            with (
+                unittest.mock.patch.object(cli, "open_db", lambda *a, **k: open_db(database)),
+                unittest.mock.patch.object(cli, "SQLITE_PATH", database),
+                unittest.mock.patch.object(cli, "sqlite_schema_is_current", lambda *a, **k: True),
+                unittest.mock.patch.object(
+                    cli, "CATALOG_PATH", database.parent / "missing.msgpack"
+                ),
+                unittest.mock.patch.object(
+                    sys, "argv", ["isa", "llm", "query", "__shfl_sync", "--preset", "cuda"]
+                ),
+                redirect_stdout(buf),
+            ):
+                try:
+                    code = cli.main()
+                except SystemExit as exc:  # typer standalone mode exits on success too
+                    code = exc.code
+        out = buf.getvalue()
+        self.assertEqual(code, 0, out)
+        self.assertIn("__shfl_sync", out)
+
     def test_manpage_names_shfl_sync(self):
         with tempfile.TemporaryDirectory() as tmp:
             database = _build_cuda_catalog(Path(tmp))

@@ -17,7 +17,7 @@ Resolve one query (intrinsic name, mnemonic, free-form search) and give one payl
 | `--format, -F json\|ndjson\|markdown`  | `json`  | Pretty JSON, one-record-per-line NDJSON, Markdown.                                                              |
 | `--limit N`                            | `8`     | Search-results cap when the query falls through to search mode.                                                 |
 | `--isa FAM` (repeatable)               | all     | Filter by ISA family (`x86`, `SSE`, `AVX`, `Arm`, `RISC-V`, …).                                                 |
-| `--preset NAME`                        | none    | Preset name (`default`, `intel`, `arm32`, `arm64`, `riscv`, `none`, `all`).                                     |
+| `--preset NAME`                        | none    | Preset name (`default`, `intel`, `arm32`, `arm64`, `riscv`, `cuda`, `none`, `all`).                             |
 | `--source-kind measured\|modeled\|any` | `any`   | Perf-row provenance. `measured` = uops.info, InstLatX64, Intel OptRef. `modeled` = Intel guide, AMD, Arm, LLVM. |
 | `--arch CORE`                          | none    | Pin lat/cpi/ports to one core (`znver4`, `skylake-x`).                                                          |
 

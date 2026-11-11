@@ -873,6 +873,16 @@ class SimdrefApp(App):
         margin: 0 1;
         overflow-x: auto;
     }
+    /* Family chips drop inner padding so the bar fits a 100-column
+       terminal without a scrollbar covering the row. */
+    #isa-bar _ToggleChip {
+        padding: 0;
+    }
+    #preset-bar {
+        height: 1;
+        margin: 0 1;
+        overflow-x: auto;
+    }
     #kind-bar {
         height: 1;
         margin: 0 1;
@@ -904,7 +914,7 @@ class SimdrefApp(App):
         padding: 0 1 0 0;
         text-style: underline;
     }
-    #isa-bar .preset-btn {
+    .preset-btn {
         width: auto;
         background: $surface;
         color: $warning;
@@ -1015,11 +1025,13 @@ class SimdrefApp(App):
                     yield ToggleAllLabel("ISA:", classes="isa-label", id="isa-toggle-all")
                     for family in _ISA_FAMILIES:
                         yield IsaToggle(family, enabled=family in self._enabled_families)
+                with Horizontal(id="preset-bar"):
                     yield PresetButton("Default", "default", classes="preset-btn")
                     yield PresetButton("Intel", "intel", classes="preset-btn")
                     yield PresetButton("Arm32", "arm32", classes="preset-btn")
                     yield PresetButton("Arm64", "arm64", classes="preset-btn")
                     yield PresetButton("RISC-V", "riscv", classes="preset-btn")
+                    yield PresetButton("CUDA", "cuda", classes="preset-btn")
                     yield PresetButton("None", "none", classes="preset-btn")
                     yield PresetButton("All", "all", classes="preset-btn")
                 yield VerticalScroll(id="sub-isa-container")
@@ -1153,7 +1165,7 @@ class SimdrefApp(App):
             parent_row = toggle.parent
             # The family prefix label is the first child in each row.
             fam_label = parent_row.children[0] if parent_row is not None else None
-            fam_text = getattr(fam_label, "renderable", None)
+            fam_text = getattr(fam_label, "content", None)
             fam = str(fam_text).split(":", 1)[0].strip() if fam_text else ""
             if fam:
                 current_keys.add((fam, toggle.isa))
@@ -1170,7 +1182,7 @@ class SimdrefApp(App):
             for toggle in current:
                 parent_row = toggle.parent
                 fam_label = parent_row.children[0] if parent_row is not None else None
-                fam_text = getattr(fam_label, "renderable", None)
+                fam_text = getattr(fam_label, "content", None)
                 fam = str(fam_text).split(":", 1)[0].strip() if fam_text else ""
                 if self._enabled_sub_isas is not None:
                     enabled = toggle.isa in self._enabled_sub_isas

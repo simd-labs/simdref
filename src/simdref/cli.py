@@ -1992,7 +1992,7 @@ def llm_query(
     preset: str = typer.Option(
         None,
         "--preset",
-        help="Apply a named preset (default, intel, arm32, arm64, riscv, none, all).",
+        help="Apply a named preset (default, intel, arm32, arm64, riscv, cuda, none, all).",
     ),
     source_kind: str = typer.Option(
         "any", "--source-kind", help="Filter perf rows by provenance: measured, modeled, or any."
@@ -2120,7 +2120,7 @@ def llm_batch(
     preset: str = typer.Option(
         None,
         "--preset",
-        help="Apply a named preset (default, intel, arm32, arm64, riscv, none, all).",
+        help="Apply a named preset (default, intel, arm32, arm64, riscv, cuda, none, all).",
     ),
     source_kind: str = typer.Option(
         "any", "--source-kind", help="Filter perf rows by provenance: measured, modeled, or any."
