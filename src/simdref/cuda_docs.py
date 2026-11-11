@@ -23,6 +23,8 @@ import json
 import unicodedata
 from html.parser import HTMLParser
 
+from simdref.urls import resolve_url
+
 DOC_BUNDLE_FORMAT = "cuda-docs-v1"
 
 _MATH_INDEX_URL = "https://docs.nvidia.com/cuda/cuda-math-api/"
@@ -1012,20 +1014,6 @@ def _page_hrefs(html: str) -> list[str]:
     return out
 
 
-def _resolve_url(base: str, href: str) -> str:
-    """Resolve a relative href against a page URL.
-
-    shortcut: no dot segments ("../") handling, the doc pages do not
-    use them; switch to urllib.parse if that changes.
-    """
-    if href.startswith("http"):
-        return href
-    if href.startswith("/"):
-        host_end = base.find("/", base.find("://") + 3)
-        return (base[:host_end] if host_end != -1 else base) + href
-    return base.rsplit("/", 1)[0] + "/" + href
-
-
 def build_docs(fetch, names: set[str]) -> dict:
     """Fetch and store the doc pages at build time.
 
@@ -1062,7 +1050,7 @@ def build_docs(fetch, names: set[str]) -> dict:
         fragless = href.partition("#")[0]
         if not fragless.rsplit("/", 1)[-1].startswith("group__CUDA__MATH"):
             continue
-        url = _resolve_url(_MATH_INDEX_URL, fragless)
+        url = resolve_url(_MATH_INDEX_URL, fragless)
         if url not in math_urls:
             math_urls.append(url)
     math_htmls = []
@@ -1093,7 +1081,7 @@ def build_docs(fetch, names: set[str]) -> dict:
             continue
         if name not in lib_index:
             continue
-        url = _resolve_url(_LIBDEVICE_INDEX_URL, lib_index[name].partition("#")[0])
+        url = resolve_url(_LIBDEVICE_INDEX_URL, lib_index[name].partition("#")[0])
         if url in lib_urls:
             continue
         lib_urls.append(url)

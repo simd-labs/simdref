@@ -18,6 +18,7 @@ from simdref.catkey import build_key as _build_key
 from simdref.catkey import normalize_isa as _normalize_isa
 from simdref.htmltext import strip_html, tag_at
 from simdref.models import InstructionRecord
+from simdref.urls import resolve_url
 
 BUNDLE_FORMAT = "ptx-isa-v1"
 PTX_ISA_DOC_URL = "https://docs.nvidia.com/cuda/parallel-thread-execution/"
@@ -354,7 +355,7 @@ def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
     set_names = frozenset(qualifiers)
     versions = _ptx_versions(_notes_prose(body, _RUBRIC_PTX_NOTES))
     floors = _sm_floors(_notes_prose(body, _RUBRIC_TARGET_NOTES))
-    url = f"#{section_id}"
+    url = resolve_url(PTX_ISA_DOC_URL, "#" + section_id)
     rows: list[dict[str, Any]] = []
     for template in templates:
         parsed = _template_parts(template, set_names)
@@ -500,13 +501,15 @@ def parse_ptx_instructions_payload(text: str) -> list[InstructionRecord]:
         floors = [str(item).strip() for item in (row.get("sm") or []) if str(item).strip()]
         syntax = str(row.get("syntax") or "").strip()
         metadata: dict[str, str] = {
-            "url": str(row.get("url") or "").strip(),
+            "url": resolve_url(PTX_ISA_DOC_URL, str(row.get("url") or "")),
             "ptx_isa": ", ".join(versions),
             "sm": ", ".join(floors),
         }
         line_urls = row.get("urls")
         if isinstance(line_urls, list) and line_urls:
-            metadata["urls"] = json.dumps([str(item).strip() for item in line_urls])
+            metadata["urls"] = json.dumps(
+                [resolve_url(PTX_ISA_DOC_URL, str(item)) for item in line_urls]
+            )
         if qualifiers:
             metadata["qualifiers"] = json.dumps(qualifiers, sort_keys=True)
         full = dict(row)

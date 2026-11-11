@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `min_sm` and `min_ptx` floors per CUDA row, from the NVVM `.td` call graph, the header guards and the linked PTX rows.
 - SM level filter for CUDA intrinsics and PTX instructions: `--sm sm_XX` on the CLI and an `SM:` chip in the TUI ISA bar. The web export carries `sm_levels` and each row's `min_sm`.
 
+### Fixed
+
+- Source links of PTX rows and of x86 rows (uops.info, felixcloutier) are full URLs. A PTX row showed `https://www.#...` before. One shared url builder gives no url when the base is not a full URL. The fix appears in the next release catalog, after `isa update`.
+
 ## [0.0.19], 2026-11-10
 
 ### Fixed

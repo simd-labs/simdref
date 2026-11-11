@@ -17,6 +17,8 @@ from simdref.ptx import (
     pick_spelling,
 )
 
+PTX = "https://docs.nvidia.com/cuda/parallel-thread-execution/"
+
 
 @pytest.fixture(scope="module")
 def fixture_html() -> str:
@@ -52,7 +54,7 @@ def test_frob_row_fields(rows):
     }
     assert row["ptx_isa"] == ["2.0", "3.1"]
     assert row["sm"] == ["sm_75", "sm_80"]
-    assert row["url"] == "#widget-instructions-frob"
+    assert row["url"] == PTX + "#widget-instructions-frob"
 
 
 def test_chain_drops_set_name_segments(rows):
@@ -67,7 +69,7 @@ def test_multi_op_heading(rows):
     flop = next(row for row in rows if row["mnemonic"] == "flop")
     assert flop["form"] == "[a]"
     assert flop["category"] == "Cache Instructions"
-    assert flop["url"] == "#cache-instructions-flop-floop"
+    assert flop["url"] == PTX + "#cache-instructions-flop-floop"
     assert flop["ptx_isa"] == []
     assert flop["sm"] == []
 
@@ -143,7 +145,7 @@ def test_bundle_round_trip(rows, records):
     assert record.isa == ["PTX"]
     assert record.source == "ptx-isa"
     assert record.description["Syntax"] == "frob{.fast}.vec.type d, [a];"
-    assert record.metadata["url"] == "#widget-instructions-frob"
+    assert record.metadata["url"] == PTX + "#widget-instructions-frob"
     assert record.metadata["ptx_isa"] == "2.0, 3.1"
     assert record.metadata["sm"] == "sm_75, sm_80"
     summary = record.summary
@@ -210,10 +212,10 @@ def test_merged_rows_name_the_section_of_each_syntax_line(match_records):
     # so a concrete spelling reaches the section that documents it.
     add = next(r for r in match_records if r.mnemonic == "add" and r.form == "d, a, b")
     assert json.loads(add.metadata["urls"]) == [
-        "#integer-arithmetic-instructions-add",
-        "#integer-arithmetic-instructions-add",
-        "#floating-point-instructions-add",
-        "#floating-point-instructions-add",
+        PTX + "#integer-arithmetic-instructions-add",
+        PTX + "#integer-arithmetic-instructions-add",
+        PTX + "#floating-point-instructions-add",
+        PTX + "#floating-point-instructions-add",
     ]
 
 
@@ -227,21 +229,21 @@ def test_pick_spelling_resolves_concrete_spellings(match_records):
             "ld.global.nc.f32",
             "%f1, [%rd1]",
             "ld.global.nc",
-            "#data-movement-and-conversion-instructions-ld-global-nc",
+            PTX + "#data-movement-and-conversion-instructions-ld-global-nc",
         ),
         (
             "ld.global.cg.nc.f32",
             "%f1, [%rd1]",
             "ld.global.nc",
-            "#data-movement-and-conversion-instructions-ld-global-nc",
+            PTX + "#data-movement-and-conversion-instructions-ld-global-nc",
         ),
-        ("add.f32", "%f1, %f2, %f3", "add", "#floating-point-instructions-add"),
-        ("add.s32", "%r1, %r2, %r3", "add", "#integer-arithmetic-instructions-add"),
+        ("add.f32", "%f1, %f2, %f3", "add", PTX + "#floating-point-instructions-add"),
+        ("add.s32", "%r1, %r2, %r3", "add", PTX + "#integer-arithmetic-instructions-add"),
         (
             "vadd.u32.s32.sat",
             "%r1, %r2, %r3",
             "vop.dtype.atype.btype",
-            "#scalar-video-instructions-vadd-vsub-vabsdiff-vmin-vmax",
+            PTX + "#scalar-video-instructions-vadd-vsub-vabsdiff-vmin-vmax",
         ),
     ]
     for spelling, operands, mnemonic, url in cases:

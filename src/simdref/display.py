@@ -32,6 +32,7 @@ from simdref.perf_sources.merge import (
 )
 from simdref.queries import linked_instruction_records
 from simdref.search import _normalize_text
+from simdref.urls import canonical_url
 
 if TYPE_CHECKING:
     import sqlite3
@@ -625,14 +626,6 @@ def _perf_markdown_lines(rows: list[dict]) -> list[str]:
             table.append("| " + " | ".join(cells) + " |")
         sections.append(f"## {perf_panel_title(kind)}\n\n" + "\n".join(table))
     return sections
-
-
-def canonical_url(path: str) -> str:
-    if not path:
-        return ""
-    if path.startswith("http"):
-        return path
-    return f"https://www.{path.lstrip('/')}"
 
 
 def instruction_query_text(item) -> str:

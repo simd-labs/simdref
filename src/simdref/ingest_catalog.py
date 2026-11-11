@@ -45,6 +45,7 @@ from simdref.ingest_sources import (
 from simdref.models import Catalog, InstructionRecord, IntrinsicRecord, SourceVersion
 from simdref.ptx import parse_ptx_instructions_payload, pick_spelling
 from simdref.riscv import parse_riscv_instruction_payload, parse_riscv_intrinsics_payload
+from simdref.urls import canonical_url
 
 _UOPS_METADATA_KEYS = frozenset(
     {"category", "cpl", "extension", "iclass", "iform", "url", "url-ref"}
@@ -1147,6 +1148,8 @@ def _parse_uops_xml_keyed(source: str | Path) -> tuple[list[InstructionRecord], 
             key: (
                 _intern_small(value.strip())
                 if key in {"category", "cpl", "extension", "iclass"}
+                else canonical_url(value)
+                if key in {"url", "url-ref"}
                 else value.strip()
             )
             for key, value in node.attrib.items()

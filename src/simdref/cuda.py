@@ -14,6 +14,7 @@ from typing import Any
 
 from simdref.cuda_docs import declares_name, tex_to_text
 from simdref.models import IntrinsicRecord
+from simdref.urls import resolve_url
 
 BUNDLE_FORMAT = "clang-cuda-headers-v2"
 CUDA_INTRINSICS_DOC_URL = "https://docs.nvidia.com/cuda/cuda-c-programming-guide/"
@@ -257,7 +258,7 @@ def apply_cuda_docs(
         entry, source = hit
         anchor = str(entry.get("anchor") or "")
         page = str(entry.get("page") or "")
-        row.url = page + ("#" + anchor if anchor else "")
+        row.url = resolve_url(page, "#" + anchor) if anchor else resolve_url(page)
         if entry.get("signature"):
             row.signature = str(entry["signature"])
         description = str(entry.get("description") or "")
