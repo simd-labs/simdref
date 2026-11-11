@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from simdref import __version__
-from simdref.filters import FilterSpec, CategorySpec
+from simdref.filters import FilterSpec, CategorySpec, record_sm_floor, sm_levels
 from simdref.models import Catalog
 from simdref.display import (
     display_architecture,
@@ -214,6 +214,9 @@ def _filter_spec_for_catalog(catalog: Catalog) -> FilterSpec:
         CategorySpec(family=fam, category=cat, subcategory=sub, count=n)
         for (fam, cat, sub), n in sorted(aggregate.items())
     ]
+    spec.sm_levels = tuple(
+        sm_levels(record_sm_floor(item) for item in [*catalog.intrinsics, *catalog.instructions])
+    )
     return spec
 
 

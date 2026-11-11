@@ -120,12 +120,21 @@ DEFAULT_PRESET_SUBS: set[str] = X86_64_V4_SUBS | ARM_ALL_SUBS | RVV_SUBS
 ARM_ARCH_VALUES: tuple[str, ...] = ("A32", "A64", "BOTH")
 
 
-def _sm_number(value: str) -> int:
-    """The numeric part of an "sm_XX" floor string."""
-    text = value.strip()
-    if text.startswith("sm_"):
-        text = text[3:]
-    return int(text)
+def sm_number(value: str) -> int:
+    """The numeric level of an "sm_XX" floor string.
+
+    The parse splits on "_", so a suffix letter stays in the label but
+    not in the number: "sm_90a" is level 90. The plain number works too.
+    """
+    text = value.strip().split("_")[-1]
+    digits = ""
+    for ch in text:
+        if not ch.isdigit():
+            break
+        digits += ch
+    if not digits:
+        raise ValueError(f"not an sm level: {value!r}")
+    return int(digits)
 
 
 def runs_on_sm(min_sm: str | None, chosen_sm: str | None) -> bool:
@@ -138,7 +147,57 @@ def runs_on_sm(min_sm: str | None, chosen_sm: str | None) -> bool:
     """
     if not min_sm or not chosen_sm:
         return True
-    return _sm_number(min_sm) <= _sm_number(chosen_sm)
+    return sm_number(min_sm) <= sm_number(chosen_sm)
+
+
+def record_sm_floor(record: Any) -> str:
+    """The sm floor of one record. Empty means every sm level.
+
+    CUDA intrinsics carry metadata["min_sm"]. PTX rows list their
+    target levels in metadata["sm"]; the smallest one is the floor.
+    Records of other families carry no floor key and always pass.
+    """
+    metadata = (
+        record.get("metadata") if isinstance(record, dict) else getattr(record, "metadata", None)
+    )
+    metadata = metadata or {}
+    floor = metadata.get("min_sm") or ""
+    if floor:
+        return str(floor)
+    sm = metadata.get("sm") or ""
+    tokens = (sm.split(",") if isinstance(sm, str) else [str(t) for t in sm]) if sm else []
+    tokens = [t.strip() for t in tokens if str(t).strip()]
+    return min(tokens, key=sm_number) if tokens else ""
+
+
+def sm_levels(floors: Iterable[str]) -> list[str]:
+    """The distinct non-empty floors, sorted by level, suffix kept."""
+    return sorted({f for f in floors if f}, key=lambda f: (sm_number(f), f))
+
+
+def sm_floors_from_db(conn: sqlite3.Connection) -> dict[str, str]:
+    """Record key to sm floor, for the CUDA intrinsic and PTX rows only.
+
+    The floors live inside the msgpack payload, so one scan per catalog
+    feeds both the sm level list and the search-side filter.
+    """
+    from simdref.storage import _unpack_payload  # local import avoids cycle
+
+    floors: dict[str, str] = {}
+    queries = (
+        ("SELECT name, payload FROM intrinsics_data WHERE architecture = 'cuda'"),
+        ("SELECT db_key, payload FROM instructions_data WHERE architecture = 'ptx'"),
+    )
+    for sql in queries:
+        try:
+            rows = conn.execute(sql).fetchall()
+        except sqlite3.Error:
+            continue
+        for row in rows:
+            floor = record_sm_floor(_unpack_payload(row[1]))
+            if floor:
+                floors[row[0]] = floor
+    return floors
 
 
 @dataclass(frozen=True)
@@ -251,6 +310,7 @@ class FilterSpec:
     categories: list[CategorySpec] = field(default_factory=list)
     presets: dict[str, PresetSpec] = field(default_factory=lambda: dict(ARCH_PRESETS))
     arm_arch_values: tuple[str, ...] = ARM_ARCH_VALUES
+    sm_levels: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         """JSON-friendly projection used by the web SPA."""
@@ -262,6 +322,7 @@ class FilterSpec:
             "categories": [c.to_dict() for c in self.categories],
             "presets": {name: spec.to_dict() for name, spec in self.presets.items()},
             "arm_arch_values": list(self.arm_arch_values),
+            "sm_levels": list(self.sm_levels),
         }
 
     # --- in-memory predicate --------------------------------------------------
@@ -335,6 +396,31 @@ class FilterSpec:
 
 
 # ---------------------------------------------------------------------------
+# Filter state
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FilterState:
+    """The filter choices of one surface: ISA families and the sm level.
+
+    ``min_sm`` is an "sm_XX" level from the catalog floor list, or ""
+    for no sm filter.
+    """
+
+    enabled_families: frozenset[str] = frozenset()
+    min_sm: str = ""
+
+    def matches(self, record: Any, spec: FilterSpec | None = None) -> bool:
+        """Whether one record passes the family and the sm filter."""
+        spec = spec if spec is not None else FilterSpec()
+        families = self.enabled_families or None
+        return spec.matches(record, enabled_families=families) and runs_on_sm(
+            record_sm_floor(record), self.min_sm
+        )
+
+
+# ---------------------------------------------------------------------------
 # DB-backed category aggregation
 # ---------------------------------------------------------------------------
 
@@ -393,6 +479,7 @@ def build_filter_spec(conn: sqlite3.Connection | None = None) -> FilterSpec:
     if conn is not None:
         try:
             spec.categories = load_categories_from_db(conn)
+            spec.sm_levels = tuple(sm_levels(sm_floors_from_db(conn).values()))
         except sqlite3.Error:
             spec.categories = []
     return spec

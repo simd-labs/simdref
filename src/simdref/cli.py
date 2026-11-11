@@ -917,11 +917,13 @@ def _payload_source_kinds(arch_details) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _print_search_results_runtime(conn, query: str, limit: int = 20, as_json: bool = False) -> int:
+def _print_search_results_runtime(
+    conn, query: str, limit: int = 20, as_json: bool = False, state=None
+) -> int:
     """Render the ranked search table (or JSON) in the search's own
     relevance order. Returns the number of rows actually printed — callers
     use 0 to fall through to the no-match branch instead of printing an
-    empty table."""
+    empty table. *state* hides rows the sm filter excludes."""
     results, intrinsic_map, instruction_map = _search_runtime(conn, query, limit=limit)
     prepared_rows = []
     for result in results:
@@ -934,6 +936,8 @@ def _print_search_results_runtime(conn, query: str, limit: int = 20, as_json: bo
             if item is not None:
                 if not isa_visible(item.isa, show_fp16=SHOW_FP16_ISAS):
                     continue
+                if state is not None and not state.matches(item):
+                    continue
                 arch = display_architecture(item.architecture)
                 isa = display_isa(item.isa)
                 lat, cpi = variant_perf_summary(item.arch_details, perf.record_iclass(item))
@@ -941,6 +945,8 @@ def _print_search_results_runtime(conn, query: str, limit: int = 20, as_json: bo
             item = intrinsic_map.get(result.key)
             if item is not None:
                 if not isa_visible(item.isa, show_fp16=SHOW_FP16_ISAS):
+                    continue
+                if state is not None and not state.matches(item):
                     continue
                 arch = display_architecture(item.architecture)
                 isa = display_isa(item.isa)
@@ -987,18 +993,31 @@ def _smart_lookup(
     preset: str | None = None,
     arch: str | None = None,
     as_json: bool = False,
+    sm: str | None = None,
 ) -> int:
     """Dispatch a bare query.
 
     Exact intrinsic match prints the intrinsic detail and exits 0. Exact
     instruction match prints a plain-text (or JSON) summary and exits 0;
     ``--arch`` applies to this branch only. Fuzzy hits print the ranked
-    search list (or JSON) and exit 0, on a TTY or not. Nothing found opens
+    search list (or JSON) and exit 0, on a TTY or not. ``--sm`` hides the
+    records whose sm floor fails the chosen level. Nothing found opens
     the TUI on a TTY (never under ``--json``) or exits 2 non-interactively.
     """
     ensure_runtime()
+    from simdref.filters import FilterState, sm_number
+
+    if sm:
+        try:
+            sm_number(sm)
+        except ValueError:
+            err_console.print(f"--sm {sm!r} is not an sm level (want sm_XX)", style="red")
+            return 1
+    state = FilterState(min_sm=sm or "")
     with contextlib.closing(open_db()) as conn:
         intrinsic = load_intrinsic_from_db(conn, query)
+        if intrinsic is not None and not state.matches(intrinsic):
+            intrinsic = None
         if intrinsic is not None and arch is not None:
             err_console.print("--arch applies to instruction queries only", style="red")
             return 2
@@ -1008,7 +1027,7 @@ def _smart_lookup(
             else:
                 render_intrinsic(None, intrinsic, conn=conn)
             return 0
-        records = _find_instructions_fast(query)
+        records = [r for r in _find_instructions_fast(query) if state.matches(r)]
         if records:
             return _print_non_interactive_summary(
                 query, records=records, arch=arch, as_json=as_json
@@ -1016,7 +1035,7 @@ def _smart_lookup(
         if arch is not None:
             err_console.print("--arch applies to instruction queries only", style="red")
             return 2
-        printed = _print_search_results_runtime(conn, query, as_json=as_json)
+        printed = _print_search_results_runtime(conn, query, as_json=as_json, state=state)
         if printed:
             if not as_json and sys.stdin.isatty() and sys.stdout.isatty():
                 # A fuzzy match on a TTY opens the TUI (preset as passed, like
@@ -2471,6 +2490,7 @@ def main() -> int:
     # dispatch.
     initial_preset: str | None = None
     bare_arch: str | None = None
+    bare_sm: str | None = None
     bare_json = False
     _cleaned: list[str] = []
     _i = 0
@@ -2490,6 +2510,14 @@ def main() -> int:
             continue
         if arg.startswith("--arch="):
             bare_arch = arg.split("=", 1)[1]
+            _i += 1
+            continue
+        if arg == "--sm" and _i + 1 < len(argv):
+            bare_sm = argv[_i + 1]
+            _i += 2
+            continue
+        if arg.startswith("--sm="):
+            bare_sm = arg.split("=", 1)[1]
             _i += 1
             continue
         if arg == "--json":
@@ -2531,7 +2559,11 @@ def main() -> int:
         if len(argv) > 1 and argv[0].lower() in {"show", "lookup", "info"}:
             argv = argv[1:]
         return _smart_lookup(
-            " ".join(argv), preset=initial_preset, arch=bare_arch, as_json=bare_json
+            " ".join(argv),
+            preset=initial_preset,
+            arch=bare_arch,
+            as_json=bare_json,
+            sm=bare_sm,
         )
     if not argv:
         ensure_runtime()

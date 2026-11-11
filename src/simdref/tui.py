@@ -272,6 +272,8 @@ def _fts_search(
     offset: int = 0,
     limit: int = 30,
     enabled_kinds: set[str] | None = None,
+    min_sm: str = "",
+    sm_floors: dict[str, str] | None = None,
 ) -> list[SearchResult]:
     """Search using SQLite FTS5 with ISA family and sub-ISA filtering."""
     _t_start = time.perf_counter() if _PROFILE else 0.0
@@ -428,6 +430,11 @@ def _fts_search(
     # Sort by (biased) match score descending. The kind tiebreaker follows the
     # query classification so a mnemonic-like query ("add") doesn't get its
     # instructions buried under intrinsics with identical text scores.
+    if min_sm:
+        from simdref.filters import runs_on_sm
+
+        floors = sm_floors or {}
+        candidates = [c for c in candidates if runs_on_sm(floors.get(c[1].key, ""), min_sm)]
     candidates.sort(
         key=lambda c: (
             -c[0],
@@ -600,6 +607,48 @@ class KindToggle(_ToggleChip):
     def __init__(self, kind: str, label: str, enabled: bool = True) -> None:
         super().__init__(label, enabled)
         self.kind = kind
+
+
+class SmChip(Static):
+    """Chip that cycles the sm level filter: off, then each catalog floor."""
+
+    DEFAULT_CSS = """
+    SmChip {
+        width: auto;
+        height: 1;
+        padding: 0 1;
+        margin: 0 0 0 1;
+        background: $surface;
+        color: $warning;
+    }
+    SmChip.active {
+        background: $accent;
+        color: $text;
+    }
+    """
+
+    class Changed(Message):
+        """Posted when the picked sm level changes."""
+
+        def __init__(self, min_sm: str) -> None:
+            super().__init__()
+            self.min_sm = min_sm
+
+    def __init__(self, levels: list[str], **kwargs) -> None:
+        super().__init__("SM: off", **kwargs)
+        self.levels = list(levels)
+        self.min_sm = ""
+
+    def _label(self) -> str:
+        return f"SM: {self.min_sm or 'off'}"
+
+    def on_click(self) -> None:
+        """Cycle off -> each catalog floor -> off."""
+        index = self.levels.index(self.min_sm) + 1 if self.min_sm in self.levels else 0
+        self.min_sm = self.levels[index] if index < len(self.levels) else ""
+        self.update(self._label())
+        self.set_class(bool(self.min_sm), "active")
+        self.post_message(self.Changed(self.min_sm))
 
 
 class SearchInput(Input):
@@ -1009,6 +1058,9 @@ class SimdrefApp(App):
         # Cached frozensets of filter state passed to _fts_search; cleared
         # whenever a toggle changes. Avoids rebuilding sets per keystroke.
         self._filter_fs_cache: tuple[frozenset[str], frozenset[str] | None] | None = None
+        # sm filter: the chosen level and the record-key -> floor map.
+        self._min_sm: str = ""
+        self._sm_floors: dict[str, str] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -1026,6 +1078,7 @@ class SimdrefApp(App):
                     yield ToggleAllLabel("ISA:", classes="isa-label", id="isa-toggle-all")
                     for family in _ISA_FAMILIES:
                         yield IsaToggle(family, enabled=family in self._enabled_families)
+                    yield SmChip([], id="sm-chip")
                 with Horizontal(id="preset-bar"):
                     yield PresetButton("Default", "default", classes="preset-btn")
                     yield PresetButton("Intel", "intel", classes="preset-btn")
@@ -1099,6 +1152,10 @@ class SimdrefApp(App):
         self._needs_update = False
         self._conn = open_db()
         self._build_family_subs()
+        from simdref.filters import sm_floors_from_db, sm_levels
+
+        self._sm_floors = sm_floors_from_db(self._conn)
+        self.query_one("#sm-chip", SmChip).levels = sm_levels(self._sm_floors.values())
         if self._initial_preset:
             self._apply_initial_preset(self._initial_preset)
         # Defer until first layout pass so container width is known
@@ -1152,6 +1209,11 @@ class SimdrefApp(App):
             self._enabled_families, self._enabled_sub_isas, self._family_subs
         )
 
+    def _refresh_sm_chip(self) -> None:
+        """Show the sm selector only while the CUDA or PTX family is on."""
+        chip = self.query_one("#sm-chip", SmChip)
+        chip.display = bool({"CUDA", "PTX"} & self._enabled_families)
+
     def _refresh_sub_isa_bar(self) -> None:
         """Rebuild the sub-ISA rows — one or more rows per enabled family.
 
@@ -1159,6 +1221,7 @@ class SimdrefApp(App):
         changed, just update each SubIsaToggle's enabled state in place.
         Full remount is reserved for family-set or layout-width changes.
         """
+        self._refresh_sm_chip()
         container = self.query_one("#sub-isa-container", VerticalScroll)
         current = list(container.query(SubIsaToggle))
         current_keys: set[tuple[str, str]] = set()
@@ -1294,6 +1357,14 @@ class SimdrefApp(App):
                 self._enabled_kinds.add(toggle.kind)
             else:
                 self._enabled_kinds.discard(toggle.kind)
+        query = self.query_one("#search-input", Input).value.strip()
+        if query:
+            self._do_search(query)
+
+    @on(SmChip.Changed)
+    def on_sm_changed(self, event: SmChip.Changed) -> None:
+        """Re-run search when the sm level filter changes."""
+        self._min_sm = event.min_sm
         query = self.query_one("#search-input", Input).value.strip()
         if query:
             self._do_search(query)
@@ -1467,6 +1538,8 @@ class SimdrefApp(App):
             offset=0,
             limit=_INITIAL_RESULT_BATCH,
             enabled_kinds=set(self._enabled_kinds) if self._enabled_kinds else None,
+            min_sm=self._min_sm,
+            sm_floors=self._sm_floors,
         )
         self._current_results = results
         self._has_more_results = len(results) == _INITIAL_RESULT_BATCH
@@ -1503,6 +1576,8 @@ class SimdrefApp(App):
             offset=len(self._current_results),
             limit=_RESULT_BATCH_SIZE,
             enabled_kinds=set(self._enabled_kinds) if self._enabled_kinds else None,
+            min_sm=self._min_sm,
+            sm_floors=self._sm_floors,
         )
         if not more:
             self._has_more_results = False

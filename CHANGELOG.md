@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CUDA intrinsic rows carry NVIDIA documentation: signature, description, parameters, return value and accuracy, with a Source link per name. The rows appear in the next release catalog, after `isa update`.
 - PTX instruction links of the CUDA rows resolve through one spelling rule against the parsed PTX qualifier sets.
 - `min_sm` and `min_ptx` floors per CUDA row, from the NVVM `.td` call graph, the header guards and the linked PTX rows.
+- SM level filter for CUDA intrinsics and PTX instructions: `--sm sm_XX` on the CLI and an `SM:` chip in the TUI ISA bar. The web export carries `sm_levels` and each row's `min_sm`.
 
 ## [0.0.19], 2026-11-10
 
