@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PTX instruction links of the CUDA rows resolve through one spelling rule against the parsed PTX qualifier sets.
 - `min_sm` and `min_ptx` floors per CUDA row, from the NVVM `.td` call graph, the header guards and the linked PTX rows.
 - SM level filter for CUDA intrinsics and PTX instructions: `--sm sm_XX` on the CLI and an `SM:` chip in the TUI ISA bar. The web export carries `sm_levels` and each row's `min_sm`.
+- The web intrinsic search shard carries an interned `sm` column: each row holds its SM floor or null, so the web filters rows by SM level.
 
 ### Fixed
 

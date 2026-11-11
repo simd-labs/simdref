@@ -163,26 +163,27 @@ def _decode_instructions(payload: dict) -> list[dict]:
         search_fields = payload["fields"].get(
             i, [display_mnemonic, display_key, display_form, full, display_isa]
         )
-        out.append(
-            {
-                "key": key,
-                "mnemonic": mnemonic,
-                "form": form,
-                "architecture": architecture,
-                "summary": summary,
-                "isa": isa,
-                "lat": lat,
-                "cpi": cpi,
-                "display_architecture": display_architecture,
-                "display_key": display_key,
-                "display_form": display_form,
-                "display_mnemonic": display_mnemonic,
-                "display_isa": display_isa,
-                "isa_families": isa_families,
-                "isa_subs": isa_subs,
-                "search_fields": search_fields,
-            }
-        )
+        entry = {
+            "key": key,
+            "mnemonic": mnemonic,
+            "form": form,
+            "architecture": architecture,
+            "summary": summary,
+            "isa": isa,
+            "lat": lat,
+            "cpi": cpi,
+            "display_architecture": display_architecture,
+            "display_key": display_key,
+            "display_form": display_form,
+            "display_mnemonic": display_mnemonic,
+            "display_isa": display_isa,
+            "isa_families": isa_families,
+            "isa_subs": isa_subs,
+            "search_fields": search_fields,
+        }
+        if c["sm"][i] >= 0:
+            entry["sm"] = payload["sm"][c["sm"][i]]
+        out.append(entry)
     return out
 
 

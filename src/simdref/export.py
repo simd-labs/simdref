@@ -313,6 +313,9 @@ def _search_intrinsics(catalog: Catalog, instr_perf: dict[str, tuple[str, str]])
             entry["category"] = category
         if item.subcategory:
             entry["subcategory"] = item.subcategory
+        sm = record_sm_floor(item)
+        if sm:
+            entry["sm"] = sm
         out.append(entry)
     return out
 
@@ -323,29 +326,31 @@ def _search_instructions(catalog: Catalog, instr_perf: dict[str, tuple[str, str]
     for item in catalog.instructions:
         lat, cpi = instr_perf[item.db_key]
         fields = _instruction_search_fields(item)
-        out.append(
-            {
-                "key": item.db_key,
-                "mnemonic": item.mnemonic,
-                "form": item.form,
-                "architecture": item.architecture,
-                "summary": _truncate(item.summary or "", 80),
-                "isa": item.isa,
-                "linked_intrinsics": item.linked_intrinsics,
-                "lat": lat,
-                "cpi": cpi,
-                "display_architecture": display_architecture(item.architecture),
-                "display_key": display_instruction_form(item.key),
-                "display_form": display_instruction_form(item.form),
-                "display_mnemonic": strip_instruction_decorators(item.mnemonic),
-                "display_isa": display_isa(item.isa),
-                "isa_families": isa_families(item.isa),
-                "isa_subs": list(
-                    dict.fromkeys(filter(None, (isa_to_sub_isa(value) for value in item.isa)))
-                ),
-                "search_fields": fields,
-            }
-        )
+        entry: dict = {
+            "key": item.db_key,
+            "mnemonic": item.mnemonic,
+            "form": item.form,
+            "architecture": item.architecture,
+            "summary": _truncate(item.summary or "", 80),
+            "isa": item.isa,
+            "linked_intrinsics": item.linked_intrinsics,
+            "lat": lat,
+            "cpi": cpi,
+            "display_architecture": display_architecture(item.architecture),
+            "display_key": display_instruction_form(item.key),
+            "display_form": display_instruction_form(item.form),
+            "display_mnemonic": strip_instruction_decorators(item.mnemonic),
+            "display_isa": display_isa(item.isa),
+            "isa_families": isa_families(item.isa),
+            "isa_subs": list(
+                dict.fromkeys(filter(None, (isa_to_sub_isa(value) for value in item.isa)))
+            ),
+            "search_fields": fields,
+        }
+        sm = record_sm_floor(item)
+        if sm:
+            entry["sm"] = sm
+        out.append(entry)
     return out
 
 
@@ -372,8 +377,10 @@ def _columnar_instructions(entries: list[dict]) -> dict:
     isa, isas = _interner()
     arch, archs = _interner()
     perf, perfs = _interner()
+    sm, sms = _interner()
     cols: dict[str, list] = {
-        k: [] for k in ("dkey", "dform", "form", "dmn", "mn", "key", "sum", "isa", "arch", "perf")
+        k: []
+        for k in ("dkey", "dform", "form", "dmn", "mn", "key", "sum", "isa", "arch", "perf", "sm")
     }
     fields: dict[int, list] = {}
     summaries: dict[int, str] = {}
@@ -391,6 +398,7 @@ def _columnar_instructions(entries: list[dict]) -> dict:
         cols["isa"].append(isa([e["isa"], e["display_isa"], e["isa_families"], e["isa_subs"]]))
         cols["arch"].append(arch([e["architecture"], e["display_architecture"]]))
         cols["perf"].append(perf([e["lat"], e["cpi"]]))
+        cols["sm"].append(-1 if e.get("sm") is None else sm(e["sm"]))
         if f != [
             e["display_mnemonic"],
             e["display_key"],
@@ -407,6 +415,7 @@ def _columnar_instructions(entries: list[dict]) -> dict:
         "isa": isas,
         "arch": archs,
         "perf": perfs,
+        "sm": sms,
         "fields": fields,
         "summaries": summaries,
     }
@@ -415,7 +424,8 @@ def _columnar_instructions(entries: list[dict]) -> dict:
 def _columnar_intrinsics(entries: list[dict]) -> dict:
     """Column-encode ``_search_intrinsics`` rows; ``decodeIntrinsics`` in app.js inverts it exactly."""
     tables = {
-        k: _interner() for k in ("isa", "arch", "perf", "desc", "ins", "prim", "arm", "cat", "sub")
+        k: _interner()
+        for k in ("isa", "arch", "perf", "desc", "ins", "prim", "arm", "cat", "sub", "sm")
     }
     cols: dict[str, list] = {k: [] for k in ("name", *tables)}
     fields: dict[int, list] = {}
@@ -432,6 +442,7 @@ def _columnar_intrinsics(entries: list[dict]) -> dict:
             "arm": e.get("arm_arch"),
             "cat": e.get("category"),
             "sub": e.get("subcategory"),
+            "sm": e.get("sm"),
         }
         cols["name"].append(e["name"])
         for k, (intern, _) in tables.items():
