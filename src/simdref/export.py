@@ -563,6 +563,8 @@ def _detail_chunks(catalog: Catalog) -> dict[str, dict]:
                     "policy",
                     "tail_policy",
                     "mask_policy",
+                    "sm",
+                    "ptx_isa",
                 }
             },
             "pdf_refs": normalize_pdf_refs(item.pdf_refs, item.metadata),

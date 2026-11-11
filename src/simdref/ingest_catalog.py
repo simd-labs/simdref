@@ -21,7 +21,12 @@ from simdref.catkey import (
     parse_key,
     substitute_placeholders,
 )
-from simdref.cuda import parse_cuda_intrinsics_payload
+from simdref.cuda import (
+    apply_cuda_docs,
+    parse_cuda_calls,
+    parse_cuda_intrinsics_payload,
+)
+from simdref.cuda_docs import parse_docs_bundle
 from simdref.display import strip_instruction_decorators, strip_leading_tags
 from simdref.htmltext import squeeze, strip_html, tidy, unwrap_anchors
 from simdref.ingest_pdf import find_pdf_source_path, load_or_parse_pdf_source, merge_pdf_enrichment
@@ -29,6 +34,7 @@ from simdref.ingest_sources import (
     fetch_arm_a64_data,
     fetch_arm_acle_data,
     fetch_cuda_data,
+    fetch_cuda_doc_data,
     fetch_intel_data,
     fetch_ptx_isa_data,
     fetch_riscv_rvv_intrinsics_data,
@@ -37,7 +43,7 @@ from simdref.ingest_sources import (
     now_iso,
 )
 from simdref.models import Catalog, InstructionRecord, IntrinsicRecord, SourceVersion
-from simdref.ptx import parse_ptx_instructions_payload
+from simdref.ptx import parse_ptx_instructions_payload, pick_spelling
 from simdref.riscv import parse_riscv_instruction_payload, parse_riscv_intrinsics_payload
 
 _UOPS_METADATA_KEYS = frozenset(
@@ -1446,15 +1452,94 @@ def _resolve_instruction_ref(
     return matched, resolved
 
 
+def _floor_num(value: str) -> tuple[int, int]:
+    """A comparable number of an sm_XX or X.Y floor string."""
+    text = value.strip()
+    if text.startswith("sm_"):
+        text = text[3:]
+    if "." in text:
+        head, _, tail = text.partition(".")
+        digits = tail[:1] or "0"
+        return (int(head or 0), int(digits))
+    return (int(text or 0), 0)
+
+
+def _fill_floors_from_rows(intrinsic: IntrinsicRecord, rows: list[InstructionRecord]) -> None:
+    """min_sm and min_ptx from the linked PTX rows, when still empty.
+
+    The last tier of the floor chain. The first token of a PTX row
+    metadata floor is its floor: the vendor parse lists it first.
+    """
+    sm_values = []
+    ptx_values = []
+    for row in rows:
+        sm = (row.metadata.get("sm") or "").split(",")
+        if sm and sm[0].strip():
+            sm_values.append(sm[0].strip())
+        isa = (row.metadata.get("ptx_isa") or "").split(",")
+        if isa and isa[0].strip():
+            ptx_values.append(isa[0].strip())
+    if sm_values and not intrinsic.metadata.get("min_sm"):
+        intrinsic.metadata["min_sm"] = max(sm_values, key=_floor_num)
+        intrinsic.metadata["min_sm_from"] = "ptx-row"
+    if ptx_values and not intrinsic.metadata.get("min_ptx"):
+        intrinsic.metadata["min_ptx"] = max(ptx_values, key=_floor_num)
+        intrinsic.metadata["min_ptx_from"] = "ptx-row"
+
+
 def link_records(intrinsics: list[IntrinsicRecord], instructions: list[InstructionRecord]) -> None:
     by_mnemonic, by_key, by_iform = _instruction_indexes(instructions)
+    ptx_rows = [item for item in instructions if item.architecture == "ptx"]
+    ptx_by_key = {item.db_key: item for item in ptx_rows}
     for intrinsic in intrinsics:
         linked: list[str] = []
         resolved_refs: list[dict[str, str]] = []
+        ptx_matches: list[InstructionRecord] = []
         refs = intrinsic.instruction_refs or [
             {"name": name, "form": "", "xed": ""} for name in intrinsic.instructions
         ]
         for ref in refs:
+            ref_arch = (
+                ref.get("architecture", intrinsic.architecture).strip() or intrinsic.architecture
+            )
+            if ref_arch == "ptx":
+                # One rule for PTX refs: the concrete spelling resolves
+                # against the parsed qualifier sets of the PTX rows.
+                name = ref.get("name", "").strip()
+                row = pick_spelling(ptx_rows, name) if name else None
+                if row is not None:
+                    real = ptx_by_key.get(row.db_key, row)
+                    if intrinsic.name not in real.linked_intrinsics:
+                        real.linked_intrinsics.append(intrinsic.name)
+                    linked.append(real.key)
+                    ptx_matches.append(real)
+                    resolved_refs.append(
+                        dict(ref)
+                        | {
+                            "architecture": "ptx",
+                            "name": name,
+                            "form": "",
+                            "xed": "",
+                            "match_count": "1",
+                            "resolution": "ptx-spelling",
+                            "key": real.db_key,
+                            "display_key": real.key,
+                        }
+                    )
+                elif name:
+                    linked.append(name)
+                    resolved_refs.append(
+                        dict(ref)
+                        | {
+                            "architecture": "ptx",
+                            "name": name,
+                            "form": "",
+                            "xed": "",
+                            "match_count": "0",
+                            "resolution": "unresolved",
+                        }
+                    )
+                continue
             matched, resolved = _resolve_instruction_ref(
                 intrinsic,
                 ref,
@@ -1469,6 +1554,9 @@ def link_records(intrinsics: list[IntrinsicRecord], instructions: list[Instructi
                     linked.append(fallback)
                     resolved_refs.append(dict(ref) | resolved)
                 continue
+            ptx_matches.extend(
+                instruction for instruction in matched if instruction.architecture == "ptx"
+            )
             for instruction in matched:
                 if intrinsic.name not in instruction.linked_intrinsics:
                     instruction.linked_intrinsics.append(intrinsic.name)
@@ -1484,6 +1572,8 @@ def link_records(intrinsics: list[IntrinsicRecord], instructions: list[Instructi
                 )
         intrinsic.instructions = list(dict.fromkeys(linked))
         intrinsic.instruction_refs = resolved_refs
+        if ptx_matches:
+            _fill_floors_from_rows(intrinsic, ptx_matches)
 
 
 def _backfill_amx_tile_summaries(
@@ -1632,8 +1722,14 @@ def build_catalog(
     arm_intrinsics = parse_arm_intrinsics_payload(arm_acle_text)
     intrinsics.extend(arm_intrinsics)
     intrinsics.extend(parse_riscv_intrinsics_payload(riscv_intrinsics_text))
-    intrinsics.extend(parse_cuda_intrinsics_payload(cuda_text))
+    cuda_rows = parse_cuda_intrinsics_payload(cuda_text)
+    intrinsics.extend(cuda_rows)
     emit(f"Parsed {len(intrinsics)} intrinsics")
+    emit("Fetching CUDA documentation pages")
+    cuda_doc_text, cuda_doc_source = fetch_cuda_doc_data({row.name for row in cuda_rows})
+    emit(f"Fetched CUDA documentation pages from {cuda_doc_source.url}")
+    apply_cuda_docs(cuda_rows, parse_cuda_calls(cuda_text), parse_docs_bundle(cuda_doc_text))
+    emit("Joined CUDA documentation into the CUDA rows")
     emit("Parsing instruction catalog")
     instructions = parse_uops_xml(uops_text)
     instructions.extend(parse_arm_instruction_payload(arm_a64_text))
@@ -1675,6 +1771,7 @@ def build_catalog(
             *perf_sources_version,
             ptx_source,
             cuda_source,
+            cuda_doc_source,
         ],
         generated_at=now_iso(),
     )

@@ -120,6 +120,7 @@ from simdref.display import (
     display_isa,
     display_instruction_form,
     display_uarch,
+    doc_math_fields,
     isa_family,
     operand_flags_text,
     perf_panel_border,
@@ -1731,7 +1732,9 @@ class SimdrefApp(App):
         else:
             payload.append(_NO_DATA("no linked instruction: no operands or performance data"))
         if intrinsic.doc_sections:
-            self._append_description_sections(payload, intrinsic.doc_sections)
+            self._append_description_sections(
+                payload, intrinsic.doc_sections, doc_math_fields(intrinsic)
+            )
         if linked and linked.description:
             self._append_description_sections(payload, linked.description)
         return payload
@@ -1852,19 +1855,24 @@ class SimdrefApp(App):
             payload.append(("collapsible", panel, title, False))
 
     def _append_description_sections(
-        self, payload: list[tuple], description: dict[str, str]
+        self,
+        payload: list[tuple],
+        description: dict[str, str],
+        math_fields: set[str] | frozenset[str] = frozenset(),
     ) -> None:
         shown: set[str] = set()
         for key in _DESCRIPTION_ORDER:
             if key in description:
-                self._append_one_section(payload, key, description[key])
+                self._append_one_section(payload, key, description[key], math=key in math_fields)
                 shown.add(key)
         for key, value in description.items():
             if key not in shown:
-                self._append_one_section(payload, key, value)
+                self._append_one_section(payload, key, value, math=key in math_fields)
 
-    def _append_one_section(self, payload: list[tuple], title: str, body: str) -> None:
-        lang = _CODE_SECTION_LANG.get(title)
+    def _append_one_section(
+        self, payload: list[tuple], title: str, body: str, math: bool = False
+    ) -> None:
+        lang = "tex" if math else _CODE_SECTION_LANG.get(title)
         renderable = Syntax(body, lang, theme="monokai", word_wrap=True) if lang else body
         expanded = title in _EXPANDED_SECTIONS or self._all_expanded
         payload.append(("collapsible", renderable, title, not expanded))

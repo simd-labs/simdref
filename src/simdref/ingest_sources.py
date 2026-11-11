@@ -135,6 +135,9 @@ LOCAL_PTX_DOC_HTMLS = [
 LOCAL_CUDA_BUNDLES = [
     _REPO_ROOT / "vendor" / "cuda" / "cuda_intrinsics.json",
 ]
+LOCAL_CUDA_DOC_BUNDLES = [
+    _REPO_ROOT / "vendor" / "cuda" / "cuda_docs.json",
+]
 
 
 def now_iso() -> str:
@@ -856,3 +859,32 @@ def fetch_cuda_data() -> tuple[str, SourceVersion]:
         fetched_at=now_iso(),
         url="local:empty",
     )
+
+
+def fetch_cuda_doc_data(names) -> tuple[str, SourceVersion]:
+    """CUDA documentation pages for the catalog build.
+
+    The local bundle comes from tools/vendor_cuda_sources.py. Without
+    one the build fetches the NVIDIA doc pages itself and parses them
+    with the same recipe. The pages are raw data. No NVIDIA text is
+    stored in git. *names* selects the libdevice pages to fetch.
+    """
+    local = _read_local_text(LOCAL_CUDA_DOC_BUNDLES, "cuda-docs", "local-bundle")
+    if local is not None:
+        return local
+    from simdref.cuda_docs import build_docs
+
+    bundle = build_docs(_fetch_text, set(names))
+    text = json.dumps(bundle)
+    return text, SourceVersion(
+        source="cuda-docs",
+        version="sha256:" + _sha256_bytes(text),
+        fetched_at=now_iso(),
+        url="https://docs.nvidia.com/cuda/",
+    )
+
+
+def _sha256_bytes(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()

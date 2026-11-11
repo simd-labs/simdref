@@ -1150,15 +1150,22 @@ _CODE_SECTION_LANG = {
 }
 
 
+def doc_math_fields(item) -> set[str]:
+    """Section names whose stored text is TeX math source."""
+    return {name for name, text in item.doc_sections.items() if "\\(" in text}
+
+
 def print_description_sections(
     description: dict[str, str],
     full: bool = False,
+    math_fields: set[str] | frozenset[str] = frozenset(),
 ) -> None:
     """Render instruction description sections as Rich panels.
 
     By default, the SDM table sections (Opcode & Modes, Operand Encoding)
     are expanded. Other sections show a collapsed summary line.  Pass
-    *full=True* to expand everything.
+    *full=True* to expand everything. A section in *math_fields* renders
+    as TeX math source.
     """
     if not description:
         return
@@ -1166,15 +1173,15 @@ def print_description_sections(
     for key in _DESCRIPTION_ORDER:
         if key in description:
             expand = full or key in _EXPANDED_SECTIONS
-            _print_section(key, description[key], expand=expand)
+            _print_section(key, description[key], expand=expand, math=key in math_fields)
             shown.add(key)
     for key, value in description.items():
         if key not in shown:
             expand = full or key in _EXPANDED_SECTIONS
-            _print_section(key, value, expand=expand)
+            _print_section(key, value, expand=expand, math=key in math_fields)
 
 
-def _print_section(title: str, body: str, expand: bool = True) -> None:
+def _print_section(title: str, body: str, expand: bool = True, math: bool = False) -> None:
     from rich.syntax import Syntax
     from rich.text import Text
 
@@ -1184,7 +1191,7 @@ def _print_section(title: str, body: str, expand: bool = True) -> None:
         console.print(summary)
         return
 
-    lang = _CODE_SECTION_LANG.get(title)
+    lang = "tex" if math else _CODE_SECTION_LANG.get(title)
     if lang:
         syntax = Syntax(body, lang, theme="monokai", word_wrap=True)
         console.print(Panel(syntax, title=title, border_style="dim"))
@@ -1233,7 +1240,7 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
             table.add_row(key, value)
     console.print(Panel(table, title=f"intrinsic: {item.name}", border_style="cyan"))
     if not short and item.doc_sections:
-        print_description_sections(item.doc_sections, full=full)
+        print_description_sections(item.doc_sections, full=full, math_fields=doc_math_fields(item))
     if not short and primary and primary.description:
         print_description_sections(primary.description, full=full)
     if linked:

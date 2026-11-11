@@ -346,6 +346,81 @@ def parse_builtins_nvptx(text: str) -> set[str]:
     return out
 
 
+def _def_statements(text: str) -> list[str]:
+    """Join def statements. A statement can span several physical lines."""
+    out: list[str] = []
+    cur = ""
+    in_str = False
+    for ln in strip_comments(text).split("\n"):
+        s = ln.strip()
+        if not cur:
+            if not s.startswith("def "):
+                continue
+        else:
+            cur += " "
+        for c in s:
+            cur += c
+            if c == '"':
+                in_str = not in_str
+        if not in_str and s.endswith(";"):
+            out.append(cur)
+            cur = ""
+    return out
+
+
+def _split_top_commas(s: str) -> list[str]:
+    """Split on commas outside quotes and brackets."""
+    out: list[str] = []
+    cur = ""
+    depth = 0
+    in_str = False
+    for c in s:
+        if c == '"':
+            in_str = not in_str
+        if not in_str:
+            if c in "<([{":
+                depth += 1
+            elif c in ">)]}":
+                depth -= 1
+            elif c == "," and depth == 0:
+                out.append(cur)
+                cur = ""
+                continue
+        cur += c
+    out.append(cur)
+    return [a.strip() for a in out]
+
+
+def builtin_feature_floors(text: str) -> dict[str, tuple[str, str]]:
+    """Map builtin name to (min_sm, min_ptx). Only defs with a floor.
+
+    A def looks like ``def __nvvm_foo : NVPTXBuiltinSM<"int()", SM_70>;``.
+    The first template arg is the prototype and has no floor. The other
+    args carry tokens like ``SM_70`` or ``PTX78``. PTX78 means PTX 7.8.
+    """
+    out: dict[str, tuple[str, str]] = {}
+    for stmt in _def_statements(text):
+        head, sep, tail = stmt.partition(" : ")
+        if not sep or "NVPTXBuiltin" not in tail:
+            continue
+        name = head[4:].strip()
+        lt = tail.find("<")
+        gt = tail.rfind(">")
+        if lt < 0 or gt <= lt:
+            continue
+        min_sm = ""
+        min_ptx = ""
+        for tok in _split_top_commas(tail[lt + 1 : gt])[1:]:
+            if tok.startswith("SM_"):
+                min_sm = tok.lower()
+            elif tok.startswith("PTX") and tok[3:].isdigit():
+                n = int(tok[3:])
+                min_ptx = f"{n // 10}.{n % 10}"
+        if min_sm or min_ptx:
+            out[name] = (min_sm, min_ptx)
+    return out
+
+
 def parse_alias_block(text: str) -> dict[str, tuple[str, str]]:
     """Parse comment block: //   * llvm.nvvm.X --> target"""
     out = {}
@@ -1226,6 +1301,176 @@ def classify(
 
 
 # ----------------------------------------------------------------
+# Per-row enrichment: calls, arch guards, feature floors
+# ----------------------------------------------------------------
+
+
+def identifier_tokens(text: str) -> set[str]:
+    """Split text on every char outside [A-Za-z0-9_]."""
+    out: set[str] = set()
+    cur = ""
+    for c in text + " ":
+        if c.isalnum() or c == "_":
+            cur += c
+        elif cur:
+            out.add(cur)
+            cur = ""
+    return out
+
+
+def extract_calls(body: str, function_names: set[str], self_name: str) -> list[str]:
+    """Names the body uses: sibling functions and __nvvm_/__nv_ builtins."""
+    calls = {
+        tok
+        for tok in identifier_tokens(body)
+        if tok != self_name
+        and (tok in function_names or tok.startswith("__nvvm_") or tok.startswith("__nv_"))
+    }
+    return sorted(calls)
+
+
+def _arch_guard_of(directive: str) -> str:
+    """NNN of ``__CUDA_ARCH__ >= NNN`` or ``__CUDA_ARCH__ > NNN`` in one directive."""
+    toks = directive.split()
+    for i, tok in enumerate(toks):
+        if tok != "__CUDA_ARCH__" or i + 2 >= len(toks):
+            continue
+        if toks[i + 1] not in (">=", ">"):
+            continue
+        num = ""
+        for c in toks[i + 2]:
+            if not c.isdigit():
+                break
+            num += c
+        return num
+    return ""
+
+
+def arch_guard_lines(text: str) -> list[str]:
+    """Innermost open __CUDA_ARCH__ guard per logical line. '' when none."""
+    stack: list[str] = []
+    out: list[str] = []
+    for ln in logical_lines(strip_comments(text)):
+        s = ln.strip()
+        if s.startswith("#if"):
+            # shortcut: an #elif/#else branch keeps the guard. No function
+            # definition sits in such a branch today. Upgrade when one does.
+            stack.append(_arch_guard_of(s))
+        elif s.startswith("#endif"):
+            if stack:
+                stack.pop()
+        out.append(next((g for g in reversed(stack) if g), ""))
+    return out
+
+
+def arch_guard_for_name(texts: list[str], name: str) -> str:
+    """Guard at the first ``name(`` use in the texts. '' when none.
+
+    For a plain function this is its definition line. A name can also be
+    used first as a call in a guarded block. That call site then carries
+    the guard of the row.
+    """
+    for text in texts:
+        lls = logical_lines(strip_comments(text))
+        guards = arch_guard_lines(text)
+        for i, ln in enumerate(lls):
+            j = ln.find(name)
+            while j >= 0:
+                before = ln[j - 1] if j > 0 else " "
+                after = ln[j + len(name) :].lstrip()
+                if not (before.isalnum() or before == "_") and after.startswith("("):
+                    return guards[i]
+                j = ln.find(name, j + 1)
+    return ""
+
+
+def _sm_num(value: str) -> int:
+    digits = ""
+    for c in value:
+        if c.isdigit():
+            digits += c
+    return int(digits) if digits else 0
+
+
+def _ptx_num(value: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in value.split("."))
+
+
+def min_floors(
+    calls: list[str],
+    calls_by_name: dict[str, list[str]],
+    builtin_floors: dict[str, tuple[str, str]],
+    arch_guard: str,
+) -> tuple[str, str]:
+    """(min_sm, min_ptx) from the builtins reachable over the calls graph.
+
+    The sm floor is the highest one over all reachable __nvvm_ builtins.
+    When no reachable builtin has an sm floor, the __CUDA_ARCH__ guard is
+    the floor. The ptx floor is the highest reachable one.
+    """
+    seen_funcs: set[str] = set()
+    sm_vals: list[str] = []
+    ptx_vals: list[str] = []
+    stack = list(calls)
+    while stack:
+        tok = stack.pop()
+        if tok in calls_by_name:
+            if tok not in seen_funcs:
+                seen_funcs.add(tok)
+                stack.extend(calls_by_name[tok])
+            continue
+        if tok.startswith("__nvvm_"):
+            floor = builtin_floors.get(tok)
+            if floor:
+                if floor[0]:
+                    sm_vals.append(floor[0])
+                if floor[1]:
+                    ptx_vals.append(floor[1])
+    if sm_vals:
+        min_sm = max(sm_vals, key=_sm_num)
+    elif arch_guard:
+        min_sm = f"sm_{int(arch_guard) // 10}"
+    else:
+        min_sm = ""
+    min_ptx = max(ptx_vals, key=_ptx_num) if ptx_vals else ""
+    return min_sm, min_ptx
+
+
+DIM_SUFFIXES = ("_x", "_y", "_z", "_w")
+
+
+def special_register_tokens(builtin_names: set[str]) -> set[str]:
+    """PTX special register tokens from the ``__nvvm_read_ptx_sreg_*`` defs."""
+    out: set[str] = set()
+    for nm in builtin_names:
+        if not nm.startswith("__nvvm_read_ptx_sreg_"):
+            continue
+        tok = nm[len("__nvvm_read_ptx_sreg_") :]
+        for suf in DIM_SUFFIXES:
+            if tok.endswith(suf):
+                tok = tok[: -len(suf)]
+                break
+        if tok:
+            out.add(tok)
+    return out
+
+
+def drop_special_register_refs(
+    instructions: list[str], sreg_tokens: set[str]
+) -> tuple[list[str], list[str]]:
+    """Split refs into (kept, dropped). A special register read is no
+    instruction. Its first dot token names the register."""
+    kept: list[str] = []
+    dropped: list[str] = []
+    for op in instructions:
+        if op.split(".")[0] in sreg_tokens:
+            dropped.append(op)
+        else:
+            kept.append(op)
+    return kept, dropped
+
+
+# ----------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------
 
@@ -1239,6 +1484,8 @@ def main() -> None:
     # Fetch headers
     print("Fetching clang CUDA headers...")
     all_intr: list[dict] = []
+    header_texts: list[str] = []
+    function_names: set[str] = set()
     for hpath in CLANG_HEADER_PATHS:
         header_name = Path(hpath).name
         print(f"  {header_name}...")
@@ -1247,7 +1494,9 @@ def main() -> None:
         except Exception as exc:
             print(f"    ERROR: {exc}", file=sys.stderr)
             continue
+        header_texts.append(text)
         funcs = parse_functions_from_text(text, header_name)
+        function_names.update(f["name"] for f in funcs)
         all_intr.extend(funcs)
         print(f"    -> {len(funcs)} definitions")
         if header_name == "__clang_cuda_intrinsics.h":
@@ -1280,6 +1529,15 @@ def main() -> None:
                 )
             print(f"    -> {len(accessors)} builtin vars")
 
+    # Calls per row: macros use their intrinsic lists, builtin vars none
+    for intr in all_intr:
+        if intr.get("_is_macro"):
+            intr["calls"] = sorted(intr.get("_nvvm_intrinsics") or [])
+        elif intr.get("_is_builtin_var"):
+            intr["calls"] = []
+        else:
+            intr["calls"] = extract_calls(intr.get("body", ""), function_names, intr["name"])
+
     # Fetch .td files
     print("\nFetching .td files...")
     td_texts = {}
@@ -1300,6 +1558,12 @@ def main() -> None:
         td_texts["NVPTXIntrinsics.td"],
     )
     print(f"  Builtin->PTX mappings: {len(builtin_to_ptx)}")
+
+    # Feature floors and special register tokens from BuiltinsNVPTX.td
+    builtin_floors = builtin_feature_floors(td_texts["BuiltinsNVPTX.td"])
+    sreg_tokens = special_register_tokens(parse_builtins_nvptx(td_texts["BuiltinsNVPTX.td"]))
+    print(f"  Builtin feature floors: {len(builtin_floors)}")
+    print(f"  Special register tokens: {len(sreg_tokens)}")
 
     # Classify
     print("\nClassifying intrinsics...")
@@ -1333,6 +1597,10 @@ def main() -> None:
             "subcategory": "",
             "instructions": ptx_ops,
             "instruction_refs": [{"name": op, "form": "", "architecture": "ptx"} for op in ptx_ops],
+            "calls": intr.get("calls", []),
+            "arch_guard": "",
+            "min_sm": "",
+            "min_ptx": "",
             "metadata": {"classification": cls},
             "source": "clang-cuda-headers",
             "doc_sections": {},
@@ -1350,10 +1618,43 @@ def main() -> None:
                     existing["instruction_refs"].append(
                         {"name": op, "form": "", "architecture": "ptx"}
                     )
+            for call in rec["calls"]:
+                if call not in existing["calls"]:
+                    existing["calls"].append(call)
         else:
             seen[name] = rec
 
     unique = list(seen.values())
+
+    # Guards, floors and special register refs per row
+    calls_by_name = {r["name"]: r["calls"] for r in unique}
+    dropped_refs: set[str] = set()
+    dropped_rows = 0
+    guarded_rows = 0
+    floored_rows = 0
+    for r in unique:
+        r["calls"] = sorted(r["calls"])
+        r["arch_guard"] = arch_guard_for_name(header_texts, r["name"])
+        r["min_sm"], r["min_ptx"] = min_floors(
+            r["calls"], calls_by_name, builtin_floors, r["arch_guard"]
+        )
+        # Floor provenance for the sm coverage counts.
+        td_sm, td_ptx = min_floors(r["calls"], calls_by_name, builtin_floors, "")
+        r["min_sm_from"] = "nvvm-td" if td_sm else ("cuda-arch-guard" if r["min_sm"] else "")
+        r["min_ptx_from"] = "nvvm-td" if td_ptx else ""
+        # The design doc stores the two floors in row metadata.
+        r["metadata"]["min_sm"] = r["min_sm"]
+        r["metadata"]["min_ptx"] = r["min_ptx"]
+        kept, dropped = drop_special_register_refs(r["instructions"], sreg_tokens)
+        r["instructions"] = kept
+        r["instruction_refs"] = [{"name": op, "form": "", "architecture": "ptx"} for op in kept]
+        if dropped:
+            dropped_rows += 1
+            dropped_refs.update(dropped)
+        if r["arch_guard"]:
+            guarded_rows += 1
+        if r["min_sm"]:
+            floored_rows += 1
 
     # Build bundle
     bundle = {
@@ -1370,6 +1671,11 @@ def main() -> None:
             "ptx_linked_count": ptx_linked,
             "classification": dict(counts),
             "total_intrinsics": len(unique),
+            "builtin_floors": len(builtin_floors),
+            "guarded_rows": guarded_rows,
+            "floored_rows": floored_rows,
+            "dropped_special_register_refs": sorted(dropped_refs),
+            "dropped_special_register_ref_rows": dropped_rows,
         },
     }
 
@@ -1379,6 +1685,30 @@ def main() -> None:
     print(f"Total intrinsics: {len(unique)}")
     print(f"Classifications: {dict(counts)}")
     print(f"PTX-linked: {ptx_linked}")
+
+    # Doc pages, fetched here and parsed at catalog build time. The
+    # bundle is gitignored data, like the intrinsics bundle. The catalog
+    # build fetches the pages itself when this file is missing.
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "src"))
+        from simdref.cuda_docs import build_docs
+
+        docs = build_docs(_fetch, {r["name"] for r in unique})
+        docs_path = args.out_dir / "cuda_docs.json"
+        docs_path.write_text(json.dumps(docs))
+        print(f"Wrote {docs_path}")
+        print(f"Doc pages: {docs['metadata']}")
+    except Exception as exc:
+        print(f"Doc page fetch failed: {exc}", file=sys.stderr)
+    print(f"Builtin feature floors: {len(builtin_floors)}")
+    print(f"Rows with arch guard: {guarded_rows}")
+    print(f"Rows with min_sm: {floored_rows}")
+    print(f"Rows with min_ptx: {sum(1 for r in unique if r['min_ptx'])}")
+    kept_refs = sum(len(r["instructions"]) for r in unique)
+    print(
+        f"Refs kept: {kept_refs}, dropped special-register refs: "
+        f"{len(dropped_refs)} in {dropped_rows} rows"
+    )
 
 
 if __name__ == "__main__":

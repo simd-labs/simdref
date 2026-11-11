@@ -120,6 +120,27 @@ DEFAULT_PRESET_SUBS: set[str] = X86_64_V4_SUBS | ARM_ALL_SUBS | RVV_SUBS
 ARM_ARCH_VALUES: tuple[str, ...] = ("A32", "A64", "BOTH")
 
 
+def _sm_number(value: str) -> int:
+    """The numeric part of an "sm_XX" floor string."""
+    text = value.strip()
+    if text.startswith("sm_"):
+        text = text[3:]
+    return int(text)
+
+
+def runs_on_sm(min_sm: str | None, chosen_sm: str | None) -> bool:
+    """Return whether a record floor passes the chosen sm level.
+
+    One rule for the TUI, the CLI and the web export. An empty side
+    passes: a record with no floor runs on every sm level, and no choice
+    keeps every record. Both sides use the "sm_XX" form; the plain
+    number works too.
+    """
+    if not min_sm or not chosen_sm:
+        return True
+    return _sm_number(min_sm) <= _sm_number(chosen_sm)
+
+
 @dataclass(frozen=True)
 class PresetSpec:
     """Declarative preset: families + subs + arm_arch + kind applied atomically."""

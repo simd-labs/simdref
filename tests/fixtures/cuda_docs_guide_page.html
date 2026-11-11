@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<!-- Synthetic fixture. Same element shape as a guide page. -->
+<html>
+<body>
+<section id="zyx-warp-vote">
+<h2>Warp vote</h2>
+<div class="highlight"><pre>unsigned int __zyx_ballot_v3(unsigned int pred);
+int __zyx_count_v4(int val);
+int __zyx_dup_v1(int lane);</pre></div>
+<p>These zyx vote calls return lane votes.</p>
+<p>They work on zyx warps only.</p>
+</section>
+<div class="section" id="zyx-shuffle">
+<div class="highlight"><pre>int __zyx_dup_v1(int src);</pre></div>
+<p>The duplicate name keeps the first section.</p>
+<div class="highlight"><pre>int __zyx_late_v8(int lane);</pre></div>
+<p>The late call runs after the first block.</p>
+<p>A prose-only name like __zyx_prose_only never enters the map.</p>
+</div>
+</body>
+</html>

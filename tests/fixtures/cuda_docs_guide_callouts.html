@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!-- Synthetic fixture. Callouts and example sub-headings stop a description. -->
+<html>
+<body>
+<section id="zyx-warp-shuffle">
+<h3>Warp shuffle</h3>
+<div class="admonition hint">
+<p class="admonition-title">Hint</p>
+<p>Use the zyx helper for shuffles.</p>
+</div>
+<div class="highlight"><pre>int __zyx_mask_v9(unsigned mask);</pre></div>
+<p>These zyx shuffle calls move values inside a warp.</p>
+<p>They take a <span class="math notranslate nohighlight">\(2^{n}\)</span> mask.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>These intrinsics do not imply a memory barrier.</p>
+</div>
+<p class="rubric" id="zyx-examples-broadcast">Example 3: zyx reduction</p>
+<p>See the zyx example on Compiler Explorer.</p>
+</section>
+<section id="zyx-vote">
+<div class="highlight"><pre>int __zyx_rub_v10(int lane);</pre></div>
+<p>The rubric cut works on this call.</p>
+<p class="rubric">Example 4: zyx rubric</p>
+<p>This paragraph heads an example.</p>
+</section>
+<section id="zyx-reduce">
+<div class="highlight"><pre>int __zyx_exa_v11(int lane);</pre></div>
+<p>The example section cut works on this call.</p>
+<section id="zyx-examples">
+<h3>Examples</h3>
+<p>Example code for the zyx call.</p>
+</section>
+</section>
+<section id="zyx-lead">
+<div class="highlight"><pre>int __zyx_lea_v12(int lane);</pre></div>
+<p>The lead-in cut works on this call.</p>
+<p>Examples of valid zyx usage:</p>
+<div class="highlight"><pre>int u = __zyx_lea_v12(1);</pre></div>
+<p>This example text never enters the description.</p>
+</section>
+</body>
+</html>
