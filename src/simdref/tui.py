@@ -116,6 +116,7 @@ from simdref.display import (
     DEFAULT_SUBS,
     FAMILY_SUB_ORDER,
     ISA_FAMILY_ORDER,
+    PRESET_ONLY_FAMILIES,
     category_display_text,
     display_isa,
     display_instruction_form,
@@ -150,6 +151,9 @@ from simdref.ui_labels import UI_LABELS
 _INITIAL_RESULT_BATCH = 50
 _RESULT_BATCH_SIZE = 10
 _RESULT_PREFETCH_THRESHOLD = 5
+# Count cap for the hidden-rows note. The candidate fetch starts at 2*limit
+# rows and stops at 5000, so 2500 is the largest count that fetches at all.
+_SM_HIDDEN_POOL = 2500
 
 
 def _NO_DATA(text: str) -> tuple[str, str]:
@@ -160,6 +164,10 @@ def _NO_DATA(text: str) -> tuple[str, str]:
 _ISA_FAMILIES: list[str] = [
     name for name, _ in sorted(ISA_FAMILY_ORDER.items(), key=lambda item: item[1])
 ]
+
+# The chip row mirrors FilterSpec.chip_families: preset-only families stay
+# reachable through the preset row, never as a chip.
+_ISA_CHIP_FAMILIES: list[str] = [f for f in _ISA_FAMILIES if f not in PRESET_ONLY_FAMILIES]
 
 
 def _isa_matches_sub(isa: str, sub_isa: str) -> bool:
@@ -581,6 +589,9 @@ class PresetButton(Static):
         super().__init__(label, **kwargs)
         self.mode = mode
 
+    def set_active(self, active: bool) -> None:
+        self.set_class(active, "active")
+
     def on_click(self) -> None:
         self.post_message(self.Clicked(self.mode))
 
@@ -972,6 +983,10 @@ class SimdrefApp(App):
         margin: 0 0 0 1;
         text-style: bold;
     }
+    .preset-btn.active {
+        background: $accent;
+        color: $text;
+    }
     /* Results list sizes to its content but never takes more than 20% of
        the terminal height. Detail pane soaks up the remainder with 1fr,
        so short result lists (e.g. 2 matches) don't leave blank rows above
@@ -1061,6 +1076,9 @@ class SimdrefApp(App):
         # sm filter: the chosen level and the record-key -> floor map.
         self._min_sm: str = ""
         self._sm_floors: dict[str, str] | None = None
+        # The preset the filter state still matches exactly, or None after a
+        # hand toggle. Drives the preset button style and the ISA summary.
+        self._active_preset: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -1076,7 +1094,7 @@ class SimdrefApp(App):
                 )
                 with Horizontal(id="isa-bar"):
                     yield ToggleAllLabel("ISA:", classes="isa-label", id="isa-toggle-all")
-                    for family in _ISA_FAMILIES:
+                    for family in _ISA_CHIP_FAMILIES:
                         yield IsaToggle(family, enabled=family in self._enabled_families)
                     yield SmChip([], id="sm-chip")
                 with Horizontal(id="preset-bar"):
@@ -1158,6 +1176,7 @@ class SimdrefApp(App):
         self.query_one("#sm-chip", SmChip).levels = sm_levels(self._sm_floors.values())
         if self._initial_preset:
             self._apply_initial_preset(self._initial_preset)
+        self._refresh_isa_summary()
         # Defer until first layout pass so container width is known
         self.call_after_refresh(self._refresh_sub_isa_bar)
         # Apply initial tab + annotate seed before focusing anything.
@@ -1328,6 +1347,8 @@ class SimdrefApp(App):
         """Re-run search when ISA or sub-ISA filter changes."""
         toggle = event.toggle
         if isinstance(toggle, IsaToggle):
+            # A hand toggle breaks the preset match: clear its button mark.
+            self._set_active_preset(None)
             if toggle.enabled:
                 self._enabled_families.add(toggle.family)
                 # Add default subs for newly enabled family
@@ -1344,6 +1365,7 @@ class SimdrefApp(App):
                 self._enabled_families, self._enabled_sub_isas, self._family_subs
             )
             self._refresh_sub_isa_bar()
+            self._refresh_isa_summary()
         elif isinstance(toggle, SubIsaToggle):
             all_subs = list(self.query(SubIsaToggle))
             enabled = {t.isa for t in all_subs if t.enabled}
@@ -1374,6 +1396,8 @@ class SimdrefApp(App):
         """Toggle all chips in the same bar/row."""
         label = event.label
         if label.id == "isa-toggle-all":
+            # A hand toggle breaks the preset match: clear its button mark.
+            self._set_active_preset(None)
             toggles = list(self.query(IsaToggle))
             target = not any(t.enabled for t in toggles)
             for t in toggles:
@@ -1391,6 +1415,7 @@ class SimdrefApp(App):
                 self._enabled_families, self._enabled_sub_isas, self._family_subs
             )
             self._refresh_sub_isa_bar()
+            self._refresh_isa_summary()
         else:
             # Family-level sub toggle: find sibling SubIsaToggles in same row
             row = label.parent
@@ -1413,6 +1438,33 @@ class SimdrefApp(App):
         if query:
             self._do_search(query)
 
+    def _set_active_preset(self, name: str | None) -> None:
+        """Mark one preset button active, or clear every mark on None."""
+        self._active_preset = name
+        for button in self.query(PresetButton):
+            button.set_active(button.mode == name)
+
+    def _isa_summary_text(self) -> str:
+        """The enabled families, worded like the web's ISA button label.
+
+        Chip families come first in family order, then the preset-only
+        families by name, so the CUDA preset reads "CUDA, PTX".
+        """
+        if self._active_preset == "all":
+            return "ISA: All"
+        enabled = self._enabled_families
+        chips = [f for f in _ISA_FAMILIES if f in enabled and f not in PRESET_ONLY_FAMILIES]
+        preset_only = sorted(f for f in enabled if f in PRESET_ONLY_FAMILIES)
+        active = chips + preset_only
+        if not active:
+            return "ISA: None"
+        if len(active) <= 3:
+            return "ISA: " + ", ".join(active)
+        return f"ISA: {', '.join(active[:2])} +{len(active) - 2}"
+
+    def _refresh_isa_summary(self) -> None:
+        self.query_one("#isa-toggle-all", ToggleAllLabel).update(self._isa_summary_text())
+
     def _apply_preset(self, name: str, preset) -> None:
         """Set the family, sub-ISA and kind state from a named preset."""
         if name == "all":
@@ -1430,6 +1482,8 @@ class SimdrefApp(App):
         self._enabled_sub_isas = _normalize_sub_isa_selection(
             self._enabled_families, self._enabled_sub_isas, self._family_subs
         )
+        self._set_active_preset(name)
+        self._refresh_isa_summary()
 
     def _apply_initial_preset(self, name: str) -> None:
         """Apply a named preset before first render (used for --preset CLI flag)."""
@@ -1548,6 +1602,9 @@ class SimdrefApp(App):
         suffix = " +" if self._has_more_results else ""
         if not results:
             status_text = f"  {UI_LABELS['no_matches']} for '{query}'"
+            note = self._sm_hidden_note(query)
+            if note:
+                results_list.append(ListItem(Static(note, classes="sm-hidden-note")))
         else:
             status_text = f"  {len(results)}{suffix} {UI_LABELS['results_for']} '{query}'"
         self.query_one("#status-label", Label).update(status_text)
@@ -1559,6 +1616,28 @@ class SimdrefApp(App):
             # prefetches from the previous query.
             if len(results) > 1:
                 self._prefetch_neighbours(list(results))
+
+    def _sm_hidden_note(self, query: str) -> str:
+        """One line naming the rows the SM filter hides. Empty shows nothing.
+
+        The count is the pool the same query shows with the SM filter off,
+        capped at _SM_HIDDEN_POOL like the web.
+        """
+        if not self._min_sm:
+            return ""
+        assert self._conn is not None
+        hidden = _fts_search(
+            self._conn,
+            query,
+            self._enabled_families,
+            self._enabled_sub_isas,
+            offset=0,
+            limit=_SM_HIDDEN_POOL,
+            enabled_kinds=set(self._enabled_kinds) if self._enabled_kinds else None,
+            min_sm="",
+            sm_floors=self._sm_floors,
+        )
+        return f"{len(hidden)} rows hidden by the SM filter" if hidden else ""
 
     def _maybe_load_more_results(self, current_index: int) -> None:
         """Load another page when navigation reaches the end of the loaded list."""

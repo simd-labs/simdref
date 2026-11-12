@@ -161,6 +161,16 @@ def test_filter_spec_json_exposes_presets(catalog: Catalog, tmp_path: Path):
     assert set(presets["all"]["kind"]) == {"intrinsic", "instruction"}
 
 
+def test_filter_spec_json_carries_chip_families(catalog: Catalog, tmp_path: Path):
+    export_site_data(catalog, tmp_path)
+    spec = json.loads((tmp_path / "filter_spec.json").read_text())
+    chips = spec.get("chip_families") or []
+    assert chips, "filter_spec.json has no chip_families"
+    # The chips list every family the UI shows; CUDA and PTX are preset-only.
+    assert "CUDA" not in chips and "PTX" not in chips
+    assert set(chips) == set(spec["family_order"]) - {"PTX", "CUDA"}
+
+
 def test_search_index_intrinsics_have_required_fields(catalog: Catalog, tmp_path: Path):
     export_site_data(catalog, tmp_path)
     payload = json.loads((tmp_path / "search-index-intrinsics.json").read_text())

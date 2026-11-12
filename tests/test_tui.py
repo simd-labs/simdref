@@ -286,7 +286,7 @@ class TuiCudaPresetTests(unittest.TestCase):
                         cuda_btn = next(b for b in app.query(tui.PresetButton) if b.mode == "cuda")
                         await pilot.click(cuda_btn)
                         await pilot.pause()
-                        self.assertEqual(app._enabled_families, {"CUDA"})
+                        self.assertEqual(app._enabled_families, {"CUDA", "PTX"})
                         # CUDA has no sub-ISAs: the bar must drop the stale
                         # rows of the previously enabled families.
                         self.assertEqual(list(app.query(tui.SubIsaToggle)), [])
@@ -307,7 +307,98 @@ class TuiCudaPresetTests(unittest.TestCase):
                                 families = {
                                     isa_family(v) for v in (row[0] or "").replace(",", " ").split()
                                 }
-                                self.assertEqual(families, {"CUDA"}, res.key)
+                                self.assertTrue(families <= {"CUDA", "PTX"}, res.key)
+
+        self._run(scenario())
+
+
+@unittest.skipUnless(HAS_TEXTUAL, "textual required")
+class TuiWebParityTests(unittest.TestCase):
+    """The TUI names filter state the same way the web UI does."""
+
+    def _run(self, coro):
+        asyncio.run(coro)
+
+    def _scenario_app(self, tmp: str, query: str = ""):
+        from simdref import tui
+        from simdref.storage import open_db
+        from test_cuda_wiring import _build_cuda_catalog
+
+        database = _build_cuda_catalog(Path(tmp))
+        patchers = (
+            patch.object(tui, "open_db", lambda *a, **k: open_db(database)),
+            patch.dict(os.environ, {"XDG_STATE_HOME": tmp}),
+        )
+        return tui, patchers, tui.SimdrefApp(initial_query=query)
+
+    def test_sm_hidden_note_names_the_rows_the_filter_hides(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmp:
+                tui, patchers, app = self._scenario_app(tmp, query="frob")
+                with patchers[0], patchers[1]:
+                    async with app.run_test(size=(160, 45)) as pilot:
+                        for _ in range(3):
+                            await pilot.pause()
+                        cuda_btn = next(b for b in app.query(tui.PresetButton) if b.mode == "cuda")
+                        await pilot.click(cuda_btn)
+                        await pilot.pause()
+                        app._do_search("frob")
+                        await pilot.pause()
+                        self.assertTrue(app._current_results, "sm off must show the frob rows")
+                        self.assertFalse(list(app.query(".sm-hidden-note")))
+                        app._min_sm = "sm_50"
+                        app._do_search("frob")
+                        await pilot.pause()
+                        self.assertEqual(app._current_results, [])
+                        notes = list(app.query(".sm-hidden-note"))
+                        self.assertTrue(notes, "no hidden-rows note with the SM filter on")
+                        self.assertEqual(str(notes[0].content), "3 rows hidden by the SM filter")
+
+        self._run(scenario())
+
+    def test_active_preset_mark_clears_on_hand_toggle(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmp:
+                tui, patchers, app = self._scenario_app(tmp)
+                with patchers[0], patchers[1]:
+                    async with app.run_test(size=(160, 45)) as pilot:
+                        for _ in range(3):
+                            await pilot.pause()
+                        cuda_btn = next(b for b in app.query(tui.PresetButton) if b.mode == "cuda")
+                        await pilot.click(cuda_btn)
+                        await pilot.pause()
+                        active = [
+                            b.mode for b in app.query(tui.PresetButton) if b.has_class("active")
+                        ]
+                        self.assertEqual(active, ["cuda"], "clicked preset button must be active")
+                        chip = list(app.query(tui.IsaToggle))[0]
+                        await pilot.click(chip)
+                        await pilot.pause()
+                        active = [
+                            b.mode for b in app.query(tui.PresetButton) if b.has_class("active")
+                        ]
+                        self.assertEqual(active, [], "hand toggle must clear the preset mark")
+
+        self._run(scenario())
+
+    def test_isa_summary_names_enabled_families(self):
+        async def scenario():
+            with tempfile.TemporaryDirectory() as tmp:
+                tui, patchers, app = self._scenario_app(tmp)
+                with patchers[0], patchers[1]:
+                    async with app.run_test(size=(160, 45)) as pilot:
+                        for _ in range(3):
+                            await pilot.pause()
+                        label = app.query_one("#isa-toggle-all")
+                        self.assertEqual(str(label.content), "ISA: SSE, AVX, AVX-512")
+                        cuda_btn = next(b for b in app.query(tui.PresetButton) if b.mode == "cuda")
+                        await pilot.click(cuda_btn)
+                        await pilot.pause()
+                        self.assertEqual(str(label.content), "ISA: CUDA, PTX")
+                        none_btn = next(b for b in app.query(tui.PresetButton) if b.mode == "none")
+                        await pilot.click(none_btn)
+                        await pilot.pause()
+                        self.assertEqual(str(label.content), "ISA: None")
 
         self._run(scenario())
 

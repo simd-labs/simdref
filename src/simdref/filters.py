@@ -30,7 +30,10 @@ ISA_FAMILY_ORDER: dict[str, int] = {
     "CUDA": 13,
 }
 
-DEFAULT_ENABLED_ISAS: tuple[str, ...] = ("SSE", "AVX", "AVX-512", "Arm", "RISC-V")
+DEFAULT_ENABLED_ISAS: tuple[str, ...] = ("SSE", "AVX", "AVX-512")
+
+# Families reachable only through a preset, never as a family chip.
+PRESET_ONLY_FAMILIES: tuple[str, ...] = ("PTX", "CUDA")
 
 FAMILY_SUB_ORDER: dict[str, list[str]] = {
     "SSE": ["SSE", "SSE2", "SSE3", "SSSE3", "SSE4.1", "SSE4.2"],
@@ -113,8 +116,8 @@ ARM32_SUBS: set[str] = {"NEON", "MVE"}
 ARM64_SUBS: set[str] = {"NEON", "SVE", "SVE2", "SME"}
 RVV_SUBS: set[str] = {"V", "ZVE", "ZV"}
 
-# Default preset mirrors DEFAULT_ENABLED_ISAS but uses strict-v4 on x86.
-DEFAULT_PRESET_SUBS: set[str] = X86_64_V4_SUBS | ARM_ALL_SUBS | RVV_SUBS
+# Default preset mirrors DEFAULT_ENABLED_ISAS and uses strict-v4 on x86.
+DEFAULT_PRESET_SUBS: set[str] = set(X86_64_V4_SUBS)
 
 # arm_arch facet values (NULL excluded; filter logic handles missing values).
 ARM_ARCH_VALUES: tuple[str, ...] = ("A32", "A64", "BOTH")
@@ -234,7 +237,7 @@ class PresetSpec:
 
 ARCH_PRESETS: dict[str, PresetSpec] = {
     "default": PresetSpec(
-        families=frozenset({"SSE", "AVX", "AVX-512", "Arm", "RISC-V"}),
+        families=frozenset({"SSE", "AVX", "AVX-512"}),
         subs=frozenset(DEFAULT_PRESET_SUBS),
         arm_arch=None,
         kind=frozenset({"intrinsic"}),
@@ -265,9 +268,9 @@ ARCH_PRESETS: dict[str, PresetSpec] = {
         kind=frozenset({"intrinsic", "instruction"}),
     ),
     # CUDA has no sub-ISA breakdown in FAMILY_SUB_ORDER, so subs stays empty;
-    # the family filter alone scopes results to CUDA rows.
+    # the family filter alone scopes results to CUDA and PTX rows.
     "cuda": PresetSpec(
-        families=frozenset({"CUDA"}),
+        families=frozenset({"CUDA", "PTX"}),
         subs=frozenset(),
         arm_arch=None,
         kind=frozenset({"intrinsic", "instruction"}),
@@ -300,6 +303,10 @@ class FilterSpec:
     """Filterable facets usable by TUI, web, CLI, and LLM consumers."""
 
     family_order: dict[str, int] = field(default_factory=lambda: dict(ISA_FAMILY_ORDER))
+    # The family chips a surface shows: every family but the preset-only ones.
+    chip_families: tuple[str, ...] = field(
+        default_factory=lambda: tuple(n for n in ISA_FAMILY_ORDER if n not in PRESET_ONLY_FAMILIES)
+    )
     family_sub_order: dict[str, list[str]] = field(
         default_factory=lambda: {k: list(v) for k, v in FAMILY_SUB_ORDER.items()}
     )
@@ -316,6 +323,7 @@ class FilterSpec:
         """JSON-friendly projection used by the web SPA."""
         return {
             "family_order": dict(self.family_order),
+            "chip_families": list(self.chip_families),
             "family_sub_order": {k: list(v) for k, v in self.family_sub_order.items()},
             "default_enabled": list(self.default_enabled),
             "default_subs": {k: sorted(v) for k, v in self.default_subs.items()},

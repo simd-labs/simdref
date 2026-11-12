@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `min_sm` and `min_ptx` floors per CUDA row, from the NVVM `.td` call graph, the header guards and the linked PTX rows.
 - SM level filter for CUDA intrinsics and PTX instructions: `--sm sm_XX` on the CLI and an `SM:` chip in the TUI ISA bar. The web export carries `sm_levels` and each row's `min_sm`.
 - The web intrinsic search shard carries an interned `sm` column: each row holds its SM floor or null, so the web filters rows by SM level.
+- TUI parity with the web UI: the ISA label names the enabled families, and the active preset button shows an active style.
+- An empty result list under the SM filter shows one line with the count of hidden rows.
+
+### Changed
+
+- The Default preset and the default ISA families are x86 SIMD only (SSE, AVX, AVX-512). Use the Arm32, Arm64 or RISC-V preset for those rows.
+- The CUDA preset selects the CUDA and PTX families, so PTX instruction rows show under it.
+- CUDA and PTX are no longer family chips in the TUI. Reach them through the CUDA or All preset.
+- `filter_spec.json` carries `chip_families`: the family names that render as chips. A family outside the list is reachable only through a preset.
 
 ### Fixed
 

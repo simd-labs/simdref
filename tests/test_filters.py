@@ -11,6 +11,7 @@ from simdref.filters import (
     ARM64_SUBS,
     CategorySpec,
     FilterSpec,
+    PRESET_ONLY_FAMILIES,
     PresetSpec,
     X86_64_V4_SUBS,
     build_filter_spec,
@@ -150,9 +151,9 @@ class ArchPresetsTests(unittest.TestCase):
         expected = {"default", "intel", "arm32", "arm64", "riscv", "cuda", "none", "all"}
         self.assertEqual(expected, set(ARCH_PRESETS.keys()))
 
-    def test_cuda_preset_enables_only_cuda(self):
+    def test_cuda_preset_enables_cuda_and_ptx(self):
         preset = ARCH_PRESETS["cuda"]
-        self.assertEqual(preset.families, frozenset({"CUDA"}))
+        self.assertEqual(preset.families, frozenset({"CUDA", "PTX"}))
         self.assertEqual(preset.subs, frozenset())
         self.assertIsNone(preset.arm_arch)
         self.assertEqual(preset.kind, frozenset({"intrinsic", "instruction"}))
@@ -218,10 +219,20 @@ class ArchPresetsTests(unittest.TestCase):
         self.assertEqual(preset.families, frozenset({"RISC-V"}))
         self.assertEqual(preset.kind, frozenset({"intrinsic", "instruction"}))
 
-    def test_default_preset_is_intrinsic_only(self):
+    def test_default_preset_is_x86_only_and_intrinsic_only(self):
         preset = ARCH_PRESETS["default"]
         self.assertEqual(preset.kind, frozenset({"intrinsic"}))
-        self.assertTrue({"SSE", "AVX", "AVX-512", "Arm", "RISC-V"}.issubset(preset.families))
+        self.assertEqual(preset.families, frozenset({"SSE", "AVX", "AVX-512"}))
+        self.assertFalse({"Arm", "RISC-V"} & preset.families)
+
+    def test_chip_families_exclude_preset_only_families(self):
+        spec = FilterSpec()
+        expected = tuple(n for n in spec.family_order if n not in PRESET_ONLY_FAMILIES)
+        self.assertEqual(spec.chip_families, expected)
+        self.assertNotIn("CUDA", spec.chip_families)
+        self.assertNotIn("PTX", spec.chip_families)
+        self.assertIn("CUDA", spec.family_order)
+        self.assertIn("PTX", spec.family_order)
 
     def test_all_preset_enables_instruction_kind(self):
         preset = ARCH_PRESETS["all"]
