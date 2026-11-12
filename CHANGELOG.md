@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The web intrinsic search shard carries an interned `sm` column: each row holds its SM floor or null, so the web filters rows by SM level.
 - TUI parity with the web UI: the ISA label names the enabled families, and the active preset button shows an active style.
 - An empty result list under the SM filter shows one line with the count of hidden rows.
+- The Arm32 and Arm64 presets apply the `arm_arch` facet in the TUI, like the web app. The Arm32 list holds no A64 row, and one rule in `filters.py` decides the facet for the TUI and the CLI.
+- The TUI kind bar adds a Category select, like the web app. It narrows category-carrying rows to one category, and rows without a category stay visible.
+- The TUI kind bar adds perf kind toggles, like the web app. A toggle hides the perf panels of its source kind in the detail.
+- Each TUI result row shows the web badges: arch, ISA and best LAT/CPI. The badges fit 100 columns, and the summary takes the rest of the line.
+- The TUI intrinsic detail shows the web metadata rows: Supported, Section, Arg Prep, Result, and Instr Cat for the linked instruction.
+- Every TUI detail lists its related entries like the web: linked instructions for an intrinsic, linked intrinsics for an instruction. Enter on an entry opens its detail.
+- The TUI annotate toolbar adds the web Arch select: one microarch pins the perf values, and the default choice aggregates across archs.
+- An empty query shows the web start page: the example queries and the catalog counts, not a blank list. Enter on an example runs it.
 
 ### Changed
 
@@ -28,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Source links of PTX rows and of x86 rows (uops.info, felixcloutier) are full URLs. A PTX row showed `https://www.#...` before. One shared url builder gives no url when the base is not a full URL. The fix appears in the next release catalog, after `isa update`.
+- A preset applied at startup (`--preset`, last preset) syncs the ISA and kind chip highlights with the filter state. Before, the chips kept the bootstrap highlights and looked wrong next to the preset result list.
 
 ## [0.0.19], 2026-11-10
 

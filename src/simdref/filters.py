@@ -173,6 +173,63 @@ def record_sm_floor(record: Any) -> str:
     return min(tokens, key=sm_number) if tokens else ""
 
 
+def _record_isa(record: Any) -> list[str]:
+    """The ISA token list of one record, dict or attribute shape."""
+    if isinstance(record, dict):
+        return list(record.get("isa") or [])
+    return list(getattr(record, "isa", None) or [])
+
+
+def record_arm_arch(record: Any) -> str | None:
+    """The A32/A64/BOTH bucket of one record, from its own fields.
+
+    The same derive rule the ``arm_arch`` catalog column and the web
+    export use, so a record with no supported-architectures metadata
+    gets no bucket.
+    """
+    from simdref.storage import derive_arm_arch  # local import avoids cycle
+
+    if isinstance(record, dict):
+        metadata = record.get("metadata") or {}
+    else:
+        metadata = getattr(record, "metadata", None) or {}
+    return derive_arm_arch(_record_isa(record), dict(metadata))
+
+
+def arm_arch_visible(
+    isa: Iterable[str] | None, bucket: str | None, enabled: Iterable[str] | None
+) -> bool:
+    """Whether one row passes the arm_arch facet.
+
+    One rule for the TUI, the CLI and the web export. No choice passes
+    every row. Only Arm rows are filtered, and an Arm row needs a bucket
+    from the chosen set, so a row without a bucket hides while the facet
+    is on. The web app hides the same rows.
+    """
+    if not enabled:
+        return True
+    from simdref.display import isa_family  # local import avoids cycle
+
+    if "Arm" not in {isa_family(v) for v in (isa or [])}:
+        return True
+    return bucket in set(enabled)
+
+
+def arm_archs_from_db(conn: sqlite3.Connection) -> dict[str, str]:
+    """Intrinsic name to A32/A64/BOTH bucket, for the search-side facet.
+
+    Reads the indexed ``arm_arch`` column. A row outside the map carries
+    no bucket and hides while the facet is on.
+    """
+    try:
+        rows = conn.execute(
+            "SELECT name, arm_arch FROM intrinsics_data WHERE arm_arch IS NOT NULL"
+        ).fetchall()
+    except sqlite3.Error:
+        return {}
+    return {row[0]: row[1] for row in rows}
+
+
 def sm_levels(floors: Iterable[str]) -> list[str]:
     """The distinct non-empty floors, sorted by level, suffix kept."""
     return sorted({f for f in floors if f}, key=lambda f: (sm_number(f), f))
@@ -410,21 +467,26 @@ class FilterSpec:
 
 @dataclass
 class FilterState:
-    """The filter choices of one surface: ISA families and the sm level.
+    """The filter choices of one surface: ISA families, the sm level
+    and the arm_arch facet.
 
     ``min_sm`` is an "sm_XX" level from the catalog floor list, or ""
-    for no sm filter.
+    for no sm filter. ``arm_arch`` is a set of A32/A64/BOTH buckets, or
+    ``None`` for no arm_arch filter.
     """
 
     enabled_families: frozenset[str] = frozenset()
     min_sm: str = ""
+    arm_arch: frozenset[str] | None = None
 
     def matches(self, record: Any, spec: FilterSpec | None = None) -> bool:
-        """Whether one record passes the family and the sm filter."""
+        """Whether one record passes the family, sm and arm_arch filters."""
         spec = spec if spec is not None else FilterSpec()
         families = self.enabled_families or None
-        return spec.matches(record, enabled_families=families) and runs_on_sm(
-            record_sm_floor(record), self.min_sm
+        return (
+            spec.matches(record, enabled_families=families)
+            and runs_on_sm(record_sm_floor(record), self.min_sm)
+            and arm_arch_visible(_record_isa(record), record_arm_arch(record), self.arm_arch)
         )
 
 

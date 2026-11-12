@@ -47,6 +47,7 @@ try:
         Label,
         ListItem,
         ListView,
+        OptionList,
         Select,
         Static,
         TextArea,
@@ -100,6 +101,8 @@ except ImportError:  # pragma: no cover - allows non-TUI test environments
     ListView = _TextualStub
     ListView.Selected = _EventStub
     ListView.Highlighted = _EventStub
+    OptionList = _TextualStub
+    OptionList.OptionSelected = _EventStub
     Select = _TextualStub
     Select.Changed = _EventStub
     Static = _TextualStub
@@ -118,6 +121,7 @@ from simdref.display import (
     ISA_FAMILY_ORDER,
     PRESET_ONLY_FAMILIES,
     category_display_text,
+    display_architecture,
     display_isa,
     display_instruction_form,
     display_uarch,
@@ -282,6 +286,9 @@ def _fts_search(
     enabled_kinds: set[str] | None = None,
     min_sm: str = "",
     sm_floors: dict[str, str] | None = None,
+    enabled_arm_arch: set[str] | frozenset[str] | None = None,
+    arm_archs: dict[str, str] | None = None,
+    enabled_category: str = "",
 ) -> list[SearchResult]:
     """Search using SQLite FTS5 with ISA family and sub-ISA filtering."""
     _t_start = time.perf_counter() if _PROFILE else 0.0
@@ -357,6 +364,15 @@ def _fts_search(
 
     seen: set[str] = set()
 
+    def _arm_row_visible(isa_str: str, key: str) -> bool:
+        """The arm_arch facet on one row, keyed like the web export."""
+        if not enabled_arm_arch:
+            return True
+        from simdref.filters import arm_arch_visible
+
+        tokens = [v.strip() for v in isa_str.replace(",", " ").split() if v.strip()]
+        return arm_arch_visible(tokens, (arm_archs or {}).get(key), enabled_arm_arch)
+
     def _target_candidate_count() -> int:
         return offset + limit + max(limit, 20)
 
@@ -385,8 +401,8 @@ def _fts_search(
         return rows
 
     intrinsic_sqls = (
-        f"SELECT name, summary, description, isa FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
-        f"SELECT name, description, isa FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
+        f"SELECT name, summary, description, isa, category FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
+        f"SELECT name, description, isa, category FROM intrinsics_fts WHERE intrinsics_fts MATCH ?{isa_filter_clause} ORDER BY rank LIMIT ?",
     )
     instruction_sql = f"""
         SELECT instructions_data.db_key, instructions_fts.key, instructions_fts.summary, instructions_fts.isa
@@ -408,6 +424,12 @@ def _fts_search(
         for row in rows:
             if row["name"] in seen or not _isa_visible(row["isa"] or ""):
                 continue
+            if not _arm_row_visible(row["isa"] or "", row["name"]):
+                continue
+            # The category facet narrows category-carrying rows only: rows
+            # without a category stay visible, like on the web.
+            if enabled_category and row["category"] and row["category"] != enabled_category:
+                continue
             seen.add(row["name"])
             subtitle = (
                 (row["summary"] if "summary" in row.keys() else "") or row["description"] or ""
@@ -424,6 +446,8 @@ def _fts_search(
         irows = _query_rows(expr, (instruction_sql,), "db_key") if want_instruction else []
         for row in irows:
             if row["db_key"] in seen or not _isa_visible(row["isa"] or ""):
+                continue
+            if not _arm_row_visible(row["isa"] or "", row["db_key"]):
                 continue
             seen.add(row["db_key"])
             result = SearchResult(
@@ -455,6 +479,86 @@ def _fts_search(
             "_fts_search", (time.perf_counter() - _t_start) * 1000, q=repr(query), n=len(results)
         )
     return results
+
+
+# Result rows fit 100 columns: badges first, the summary takes the rest.
+_ROW_SUBTITLE_MAX = 92
+
+# The web start page examples, in its wording.
+_EMPTY_QUERY_EXAMPLES = ("_mm_add_ps", "vaddq_f32", "gather")
+
+
+def _annotate_uarch_pairs() -> list[tuple[str, str]]:
+    """Microarch choices for the annotate Arch select, like the web.
+
+    The web lists the uarch keys its measurement rows carry; every such
+    key is a canonical core id, so the select offers that registry.
+    """
+    from simdref.perf_sources.cores import CANONICAL_CORES
+
+    return [(uid, uid) for uid in sorted({core.canonical_id for core in CANONICAL_CORES})]
+
+
+def _row_subtitle(summary: str, badges: str, perf: str) -> str:
+    """Build one result row subtitle: badges, perf, then the summary.
+
+    The summary takes the leftover width, so the badges never clip at
+    100 columns.
+    """
+    prefix = " | ".join(part for part in (badges, perf) if part)
+    if not prefix:
+        return summary[:_ROW_SUBTITLE_MAX]
+    budget = max(16, _ROW_SUBTITLE_MAX - len(prefix) - 3)
+    return f"{prefix} | {summary[:budget]}"
+
+
+def _attach_row_badges(conn: sqlite3.Connection, results: list[SearchResult]) -> None:
+    """Add the web result row badges: arch, ISA and best lat/cpi.
+
+    Values match the web search entries: ``display_architecture`` and
+    ``display_isa`` badges, and ``variant_perf_summary`` perf values. An
+    intrinsic row takes them from its primary linked instruction, like
+    the web export.
+    """
+    from simdref.perf import record_iclass, variant_perf_summary
+    from simdref.storage import load_intrinsic_from_db, load_instruction_from_db
+
+    cache: dict[str, object] = {}
+    for result in results:
+        if result.kind == "intrinsic":
+            item = load_intrinsic_from_db(conn, result.key)
+            if item is None:
+                continue
+            lat, cpi = "-", "-"
+            for ref in item.instruction_refs:
+                key = ref.get("key", "") if isinstance(ref, dict) else ""
+                if not key:
+                    continue
+                record = cache.get(key)
+                if record is None:
+                    record = load_instruction_from_db(conn, key)
+                    cache[key] = record
+                if record is not None:
+                    lat, cpi = variant_perf_summary(record.arch_details, record_iclass(record))
+                    break
+        else:
+            item = load_instruction_from_db(conn, result.key)
+            if item is None:
+                continue
+            lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
+        arch = display_architecture(item.architecture)
+        isa = display_isa(item.isa)
+        # The web renders the ISA badge only when it differs from the arch.
+        badges = arch if isa in {"", "-"} or isa == arch else f"{arch} {isa}"
+        perf = " ".join(
+            part
+            for part in (
+                f"LAT {lat}" if lat not in {"-", ""} else "",
+                f"CPI {cpi}" if cpi not in {"-", ""} else "",
+            )
+            if part
+        )
+        result.subtitle = _row_subtitle(result.subtitle, badges, perf)
 
 
 # ---------------------------------------------------------------------------
@@ -620,6 +724,48 @@ class KindToggle(_ToggleChip):
         self.kind = kind
 
 
+class PerfKindToggle(_ToggleChip):
+    """Toggle chip for a perf source kind (measured | modeled)."""
+
+    def __init__(self, kind: str, label: str, enabled: bool = True) -> None:
+        super().__init__(label, enabled)
+        self.kind = kind
+
+
+class RelatedList(OptionList):
+    """Selectable list of related entries: Enter opens the entry.
+
+    Each entry is ``(kind, key, label)``: the label is one line with the
+    entry key and its summary, like the web related tables.
+    """
+
+    DEFAULT_CSS = """
+    RelatedList {
+        height: auto;
+        max-height: 24;
+        padding: 0;
+    }
+    """
+
+    class Opened(Message):
+        """Posted when the user opens a related entry."""
+
+        def __init__(self, entry_kind: str, entry_key: str) -> None:
+            super().__init__()
+            self.entry_kind = entry_kind
+            self.entry_key = entry_key
+
+    def __init__(self, entries: list[tuple[str, str, str]]) -> None:
+        super().__init__(*[label for _kind, _key, label in entries])
+        self.entries = entries
+
+    @on(OptionList.OptionSelected)
+    def open_entry(self, event) -> None:
+        """Post the picked entry for the app to open."""
+        kind, key, _label = self.entries[event.option_index]
+        self.post_message(self.Opened(kind, key))
+
+
 class SmChip(Static):
     """Chip that cycles the sm level filter: off, then each catalog floor."""
 
@@ -704,6 +850,14 @@ class ResultItem(ListItem):
             head = f"{head}  [dim italic]{subtitle}[/]"
         head = f"{head}    [dim]{result.kind}[/]"
         super().__init__(Static(head, markup=True))
+
+
+class ExampleItem(ListItem):
+    """Empty-query example row: Enter runs the example query."""
+
+    def __init__(self, example: str) -> None:
+        self.example = example
+        super().__init__(Static(f"  [green]Try:[/] [bold]{example}[/]", markup=True))
 
 
 class _AnnInput(TextArea):
@@ -955,6 +1109,10 @@ class SimdrefApp(App):
         padding: 0 1 0 0;
         text-style: underline;
     }
+    #kind-bar Select {
+        width: 22;
+        margin: 0 1 0 0;
+    }
     #sub-isa-container {
         height: auto;
         max-height: 10;
@@ -1076,6 +1234,13 @@ class SimdrefApp(App):
         # sm filter: the chosen level and the record-key -> floor map.
         self._min_sm: str = ""
         self._sm_floors: dict[str, str] | None = None
+        # arm_arch facet from the active preset, and the name -> bucket map.
+        self._arm_arch: frozenset[str] | None = None
+        self._arm_archs: dict[str, str] | None = None
+        # Category facet: one category name, or "" for no filter.
+        self._active_category: str = ""
+        # Perf source kinds shown in the detail panes (measured | modeled).
+        self._enabled_perf_kinds: set[str] = {"measured", "modeled"}
         # The preset the filter state still matches exactly, or None after a
         # hand toggle. Drives the preset button style and the ISA summary.
         self._active_preset: str | None = None
@@ -1119,6 +1284,20 @@ class SimdrefApp(App):
                         UI_LABELS["kind_instruction"].lower(),
                         enabled="instruction" in self._enabled_kinds,
                     )
+                    yield Static("Perf:", classes="isa-label", id="perf-kind-label")
+                    yield PerfKindToggle("measured", "measured", enabled=True)
+                    yield PerfKindToggle("modeled", "modeled", enabled=True)
+                    yield Static("Category:", classes="isa-label", id="cat-label")
+                    yield Select(
+                        [("all", "")],
+                        value="",
+                        allow_blank=False,
+                        id="cat-select",
+                        tooltip=(
+                            "Narrow intrinsics to one category. "
+                            "Entries without a category stay visible."
+                        ),
+                    )
                 yield ListView(id="results-list")
                 yield VerticalScroll(id="detail-scroll")
             with Vertical(id="view-annotate"):
@@ -1129,6 +1308,17 @@ class SimdrefApp(App):
                         value="x86",
                         allow_blank=False,
                         id="ann-isa",
+                    )
+                    yield Label("Arch")
+                    yield Select(
+                        [("all measured archs", ""), *_annotate_uarch_pairs()],
+                        value="",
+                        allow_blank=False,
+                        id="ann-arch",
+                        tooltip=(
+                            "Pin perf to one microarch, "
+                            "or aggregate across all measured archs for the chosen ISA."
+                        ),
                     )
                     yield Label(UI_LABELS["aggregation"])
                     yield Select(
@@ -1170,9 +1360,11 @@ class SimdrefApp(App):
         self._needs_update = False
         self._conn = open_db()
         self._build_family_subs()
-        from simdref.filters import sm_floors_from_db, sm_levels
+        from simdref.filters import arm_archs_from_db, sm_floors_from_db, sm_levels
 
         self._sm_floors = sm_floors_from_db(self._conn)
+        self._arm_archs = arm_archs_from_db(self._conn)
+        self._populate_category_select()
         self.query_one("#sm-chip", SmChip).levels = sm_levels(self._sm_floors.values())
         if self._initial_preset:
             self._apply_initial_preset(self._initial_preset)
@@ -1188,6 +1380,7 @@ class SimdrefApp(App):
         if self._initial_query:
             self._run_initial_query()
         else:
+            self._do_search("")
             self.query_one("#search-input", Input).focus()
 
     def on_resize(self) -> None:
@@ -1226,6 +1419,20 @@ class SimdrefApp(App):
             )
         self._enabled_sub_isas = _normalize_sub_isa_selection(
             self._enabled_families, self._enabled_sub_isas, self._family_subs
+        )
+
+    def _populate_category_select(self) -> None:
+        """Fill the category select from the FilterSpec category facet.
+
+        One option per distinct category in the facet, sorted, with the
+        web's default "all" row first.
+        """
+        from simdref.filters import load_categories_from_db
+
+        assert self._conn is not None
+        names = sorted({c.category for c in load_categories_from_db(self._conn) if c.category})
+        self.query_one("#cat-select", Select).set_options(
+            [("all", ""), *[(name, name) for name in names]]
         )
 
     def _refresh_sm_chip(self) -> None:
@@ -1379,6 +1586,13 @@ class SimdrefApp(App):
                 self._enabled_kinds.add(toggle.kind)
             else:
                 self._enabled_kinds.discard(toggle.kind)
+        elif isinstance(toggle, PerfKindToggle):
+            if toggle.enabled:
+                self._enabled_perf_kinds.add(toggle.kind)
+            else:
+                self._enabled_perf_kinds.discard(toggle.kind)
+            self._redraw_current_detail()
+            return
         query = self.query_one("#search-input", Input).value.strip()
         if query:
             self._do_search(query)
@@ -1390,6 +1604,36 @@ class SimdrefApp(App):
         query = self.query_one("#search-input", Input).value.strip()
         if query:
             self._do_search(query)
+
+    def _redraw_current_detail(self) -> None:
+        """Re-render the open detail after the perf kind choice changes."""
+        self._render_cache.clear()
+        self._render_cache_order.clear()
+        results_list = self.query_one("#results-list", ListView)
+        index = results_list.index
+        if index is not None and 0 <= index < len(self._current_results):
+            self._show_detail(self._current_results[index])
+
+    @on(Select.Changed, "#cat-select")
+    def on_category_changed(self, event) -> None:
+        """Re-run search when the category filter changes."""
+        self._active_category = "" if event.value is None else str(event.value)
+        query = self.query_one("#search-input", Input).value.strip()
+        if query:
+            self._do_search(query)
+
+    @on(RelatedList.Opened)
+    def on_related_opened(self, event) -> None:
+        """Open the picked related entry in the detail pane."""
+        self._show_detail(
+            SearchResult(
+                kind=event.entry_kind,
+                key=event.entry_key,
+                title=event.entry_key,
+                subtitle="",
+                score=0,
+            )
+        )
 
     @on(ToggleAllLabel.Clicked)
     def on_toggle_all_clicked(self, event: ToggleAllLabel.Clicked) -> None:
@@ -1479,11 +1723,21 @@ class SimdrefApp(App):
                 subs.update(available & preset_subs)
             self._enabled_sub_isas = subs if subs else set()
         self._enabled_kinds = set(preset.kind)
+        # The web applies the preset arm_arch facet the same way.
+        self._arm_arch = frozenset(preset.arm_arch) if preset.arm_arch else None
         self._enabled_sub_isas = _normalize_sub_isa_selection(
             self._enabled_families, self._enabled_sub_isas, self._family_subs
         )
         self._set_active_preset(name)
         self._refresh_isa_summary()
+        # Sync the chip visuals with the new state: a preset applied at
+        # startup lands here without a click, and the chips must not keep
+        # the bootstrap highlights.
+        for t in self.query(IsaToggle):
+            t.set_enabled(t.family in self._enabled_families)
+        for t in self.query(KindToggle):
+            t.set_enabled(t.kind in self._enabled_kinds)
+        self._refresh_sub_isa_bar()
 
     def _apply_initial_preset(self, name: str) -> None:
         """Apply a named preset before first render (used for --preset CLI flag)."""
@@ -1512,13 +1766,6 @@ class SimdrefApp(App):
 
         preset = ARCH_PRESETS.get(event.mode) or ARCH_PRESETS["default"]
         self._apply_preset(event.mode, preset)
-        # Update ISA toggle visuals
-        for t in self.query(IsaToggle):
-            t.set_enabled(t.family in self._enabled_families)
-        # Reflect kind toggle state.
-        for t in self.query(KindToggle):
-            t.set_enabled(t.kind in self._enabled_kinds)
-        self._refresh_sub_isa_bar()
         query = self.query_one("#search-input", Input).value.strip()
         if query:
             self._do_search(query)
@@ -1574,6 +1821,30 @@ class SimdrefApp(App):
         event.prevent_default()
         return True
 
+    def _catalog_counts(self) -> str:
+        """Catalog counts in the web's empty-query wording."""
+        assert self._conn is not None
+        intrinsics = self._conn.execute("SELECT COUNT(*) FROM intrinsics_data").fetchone()[0]
+        instructions = self._conn.execute("SELECT COUNT(*) FROM instructions_data").fetchone()[0]
+        return f"{intrinsics} intrinsics · {instructions} instructions"
+
+    def _show_empty_query_state(self, results_list: ListView) -> None:
+        """The web start page: examples and catalog counts, not a blank list.
+
+        The counts head the list: the docked status label hides under the
+        footer, so the row is what stays visible.
+        """
+        counts = self._catalog_counts()
+        self.query_one("#status-label", Label).update(f"  {counts}")
+        results_list.append(ListItem(Static(f"  [dim]{counts}[/]", classes="empty-note")))
+        for example in _EMPTY_QUERY_EXAMPLES:
+            results_list.append(ExampleItem(example))
+
+    def _run_example(self, example: str) -> None:
+        """Run one example query from the empty-query state."""
+        self.query_one("#search-input", Input).value = example
+        self._do_search(example)
+
     def _do_search(self, query: str) -> None:
         results_list = self.query_one("#results-list", ListView)
         results_list.clear()
@@ -1581,7 +1852,7 @@ class SimdrefApp(App):
         self._current_query = query
         self._has_more_results = False
         if not query:
-            self.query_one("#status-label", Label).update("")
+            self._show_empty_query_state(results_list)
             return
         assert self._conn is not None
         results = _fts_search(
@@ -1594,7 +1865,11 @@ class SimdrefApp(App):
             enabled_kinds=set(self._enabled_kinds) if self._enabled_kinds else None,
             min_sm=self._min_sm,
             sm_floors=self._sm_floors,
+            enabled_arm_arch=self._arm_arch,
+            arm_archs=self._arm_archs,
+            enabled_category=self._active_category,
         )
+        _attach_row_badges(self._conn, results)
         self._current_results = results
         self._has_more_results = len(results) == _INITIAL_RESULT_BATCH
         for i, result in enumerate(results, 1):
@@ -1636,6 +1911,9 @@ class SimdrefApp(App):
             enabled_kinds=set(self._enabled_kinds) if self._enabled_kinds else None,
             min_sm="",
             sm_floors=self._sm_floors,
+            enabled_arm_arch=self._arm_arch,
+            arm_archs=self._arm_archs,
+            enabled_category=self._active_category,
         )
         return f"{len(hidden)} rows hidden by the SM filter" if hidden else ""
 
@@ -1657,10 +1935,14 @@ class SimdrefApp(App):
             enabled_kinds=set(self._enabled_kinds) if self._enabled_kinds else None,
             min_sm=self._min_sm,
             sm_floors=self._sm_floors,
+            enabled_arm_arch=self._arm_arch,
+            arm_archs=self._arm_archs,
+            enabled_category=self._active_category,
         )
         if not more:
             self._has_more_results = False
             return
+        _attach_row_badges(self._conn, more)
         self._current_results.extend(more)
         results_list = self.query_one("#results-list", ListView)
         start = len(self._current_results) - len(more) + 1
@@ -1675,6 +1957,9 @@ class SimdrefApp(App):
     @on(ListView.Selected, "#results-list")
     def on_result_selected(self, event: ListView.Selected) -> None:
         item = event.item
+        if isinstance(item, ExampleItem):
+            self._run_example(item.example)
+            return
         if not isinstance(item, ResultItem):
             return
         self._show_detail(item.result)
@@ -1725,6 +2010,7 @@ class SimdrefApp(App):
             ("static", renderable)
             ("static_markup", text)
             ("collapsible", renderable, title, collapsed)
+            ("related", title, [(kind, key, label), ...])
         Rich renderables (Panel/Table/Syntax) are immutable once built, so
         we can cache the list and rebuild the thin Static/Collapsible
         wrappers cheaply at mount time.
@@ -1740,7 +2026,7 @@ class SimdrefApp(App):
         payload = (
             self._build_intrinsic_payload(record, conn=conn)
             if kind == "intrinsic"
-            else self._build_instruction_payload(record)
+            else self._build_instruction_payload(record, conn=conn)
         )
         self._render_cache[cache_key] = payload
         _lru_order(self._render_cache_order, cache_key)
@@ -1758,6 +2044,9 @@ class SimdrefApp(App):
             elif tag == "collapsible":
                 _, renderable, title, collapsed = section
                 container.mount(Collapsible(Static(renderable), title=title, collapsed=collapsed))
+            elif tag == "related":
+                _, title, entries = section
+                container.mount(Collapsible(RelatedList(entries), title=title, collapsed=False))
 
     def _show_detail(self, result: SearchResult) -> None:
         """Render the detail pane for a search result.
@@ -1876,10 +2165,25 @@ class SimdrefApp(App):
             for key, value in instruction_metadata_rows(linked):
                 if key == "summary":
                     continue
+                if key == "category":
+                    # The web labels the linked instruction's category Instr Cat.
+                    key = "Instr Cat"
                 meta.add_row(key, value)
+        # The detail metadata rows the web shows for an ACLE intrinsic.
+        for label, field in (
+            ("Supported", "supported_architectures"),
+            ("Section", "classification_path"),
+            ("Arg Prep", "argument_preparation"),
+            ("Result", "result"),
+        ):
+            if intrinsic.metadata.get(field):
+                meta.add_row(label, intrinsic.metadata[field])
         payload.append(
             ("static", Panel(meta, title=f"intrinsic: {intrinsic.name}", border_style="cyan"))
         )
+        entries = self._related_instruction_entries(intrinsic, conn or self._conn)
+        if entries:
+            payload.append(("related", "Instructions", entries))
         if linked:
             self._append_operand_section(payload, linked)
             self._append_perf_sections(payload, linked)
@@ -1893,7 +2197,47 @@ class SimdrefApp(App):
             self._append_description_sections(payload, linked.description)
         return payload
 
-    def _build_instruction_payload(self, item: InstructionRecord) -> list[tuple]:
+    def _related_instruction_entries(
+        self, intrinsic: IntrinsicRecord, conn: sqlite3.Connection | None
+    ) -> list[tuple[str, str, str]]:
+        """Related instruction entries for an intrinsic detail, like the web."""
+        if conn is not None:
+            return [
+                ("instruction", record.db_key, f"{record.key}  {record.summary}".strip())
+                for record in linked_instruction_records(None, intrinsic, conn=conn)
+            ]
+        return [
+            ("instruction", ref.get("key", ""), ref.get("display_key") or ref.get("key", ""))
+            for ref in intrinsic.instruction_refs
+            if isinstance(ref, dict) and ref.get("key")
+        ]
+
+    def _related_intrinsic_entries(
+        self, item: InstructionRecord, conn: sqlite3.Connection | None
+    ) -> list[tuple[str, str, str]]:
+        """Related intrinsic entries for an instruction detail, like the web."""
+        names = list(dict.fromkeys(item.linked_intrinsics))
+        rows: dict[str, sqlite3.Row] = {}
+        if conn is not None and names:
+            marks = ",".join("?" for _ in names)
+            rows = {
+                row["name"]: row
+                for row in conn.execute(
+                    f"SELECT name, description FROM intrinsics_data WHERE name IN ({marks})",
+                    names,
+                )
+            }
+        entries = []
+        for name in names:
+            row = rows.get(name)
+            description = row["description"] if row is not None else ""
+            label = f"{name}  {description}".strip()
+            entries.append(("intrinsic", name, label))
+        return entries
+
+    def _build_instruction_payload(
+        self, item: InstructionRecord, conn: sqlite3.Connection | None = None
+    ) -> list[tuple]:
         payload: list[tuple] = []
         meta = Table(show_header=False, box=None)
         meta.add_row("mnemonic", item.mnemonic)
@@ -1916,6 +2260,9 @@ class SimdrefApp(App):
         )
         self._append_operand_section(payload, item)
         self._append_perf_sections(payload, item)
+        entries = self._related_intrinsic_entries(item, conn or self._conn)
+        if entries:
+            payload.append(("related", "Intrinsics", entries))
         if item.description:
             self._append_description_sections(payload, item.description)
         return payload
@@ -1967,6 +2314,8 @@ class SimdrefApp(App):
             "kind": "op",
         }
         for kind, group in split_perf_rows(rows):
+            if kind not in self._enabled_perf_kinds:
+                continue
             columns = [
                 k
                 for k in _MEASUREMENT_PREFERRED_ORDER
@@ -1998,6 +2347,8 @@ class SimdrefApp(App):
         """
         label_map = {"uarch": "microarch", "latency_pairs": "LAT per pair"}
         for kind, group in split_perf_rows(latency_pair_rows(item)):
+            if kind not in self._enabled_perf_kinds:
+                continue
             title = f"latency per operand pair ({kind})"
             border = perf_panel_border(kind)
             table = Table(header_style=f"bold {border}", expand=True)
@@ -2314,7 +2665,7 @@ class SimdrefApp(App):
         return AnnotateOptions(
             performance=_chk("ann-perf", True),
             docs=_chk("ann-docs", True),
-            arch=None,
+            arch=_sel("ann-arch", "") or None,
             agg=_sel("ann-agg", "avg") or "avg",
             include_modeled=_chk("ann-modeled", True),
             block=False,
@@ -2397,7 +2748,7 @@ class SimdrefApp(App):
     def _on_ann_checkbox_changed(self, event) -> None:
         self._schedule_annotate(delay=0.05)
 
-    @on(Select.Changed, "#ann-isa, #ann-agg")
+    @on(Select.Changed, "#ann-isa, #ann-arch, #ann-agg")
     def _on_ann_select_changed(self, event) -> None:
         self._schedule_annotate(delay=0.05)
 
