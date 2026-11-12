@@ -524,14 +524,9 @@ def instruction_markdown(item, conn=None) -> str:
     if not any(key == "url" for key, _ in rows):
         lines.append(link)
     if item.description:
-        shown: set[str] = set()
-        for section in _DESCRIPTION_ORDER:
-            if section in item.description:
-                lines.append(_section_markdown(section, item.description[section]))
-                shown.add(section)
+        # The record keeps the doc page order, the same order the web renders.
         for section, body in item.description.items():
-            if section not in shown:
-                lines.append(_section_markdown(section, body))
+            lines.append(_section_markdown(section, body))
     if item.linked_intrinsics:
         lines.append(
             "## instruction to intrinsic mapping\n\n"
@@ -1108,31 +1103,6 @@ def instruction_metadata_rows(item) -> list[tuple[str, str]]:
     return rows
 
 
-_DESCRIPTION_ORDER = [
-    "Description",
-    "Operation",
-    "Intrinsic Equivalents",
-    "Flags Affected",
-    "FPU Flags Affected",
-    "Exceptions",
-    "SIMD Floating-Point Exceptions",
-    "Floating-Point Exceptions",
-    "x87 FPU and SIMD Floating-Point Exceptions",
-    "Numeric Exceptions",
-    "Other Exceptions",
-    "Other Mode Exceptions",
-    "Protected Mode Exceptions",
-    "Real-Address Mode Exceptions",
-    "Real Address Mode Exceptions",
-    "Virtual-8086 Mode Exceptions",
-    "Virtual-8086 Exceptions",
-    "Virtual 8086 Mode Exceptions",
-    "Compatibility Mode Exceptions",
-    "64-Bit Mode Exceptions",
-    "Opcode & Modes",
-    "Operand Encoding",
-]
-
 # Sections that are always shown expanded.
 _EXPANDED_SECTIONS: set[str] = {"Opcode & Modes", "Operand Encoding"}
 
@@ -1163,16 +1133,9 @@ def print_description_sections(
     """
     if not description:
         return
-    shown: set[str] = set()
-    for key in _DESCRIPTION_ORDER:
-        if key in description:
-            expand = full or key in _EXPANDED_SECTIONS
-            _print_section(key, description[key], expand=expand, math=key in math_fields)
-            shown.add(key)
     for key, value in description.items():
-        if key not in shown:
-            expand = full or key in _EXPANDED_SECTIONS
-            _print_section(key, value, expand=expand, math=key in math_fields)
+        expand = full or key in _EXPANDED_SECTIONS
+        _print_section(key, value, expand=expand, math=key in math_fields)
 
 
 def _print_section(title: str, body: str, expand: bool = True, math: bool = False) -> None:

@@ -111,7 +111,6 @@ except ImportError:  # pragma: no cover - allows non-TUI test environments
 
 from simdref.display import (
     _CODE_SECTION_LANG,
-    _DESCRIPTION_ORDER,
     _EXPANDED_SECTIONS,
     _MEASUREMENT_EXCLUDE_KEYS,
     _MEASUREMENT_PREFERRED_ORDER,
@@ -2365,14 +2364,9 @@ class SimdrefApp(App):
         description: dict[str, str],
         math_fields: set[str] | frozenset[str] = frozenset(),
     ) -> None:
-        shown: set[str] = set()
-        for key in _DESCRIPTION_ORDER:
-            if key in description:
-                self._append_one_section(payload, key, description[key], math=key in math_fields)
-                shown.add(key)
+        # The record keeps the doc page order, the same order the web renders.
         for key, value in description.items():
-            if key not in shown:
-                self._append_one_section(payload, key, value, math=key in math_fields)
+            self._append_one_section(payload, key, value, math=key in math_fields)
 
     def _append_one_section(
         self, payload: list[tuple], title: str, body: str, math: bool = False

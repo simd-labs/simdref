@@ -534,6 +534,16 @@ def _search_meta(
     }
 
 
+def _section_pairs(sections: dict[str, str]) -> list[list[str]]:
+    """Ordered ``[heading, text]`` pairs of a record's doc sections.
+
+    The record keeps the doc page order. A plain dict would lose it to the
+    ``sort_keys=True`` byte determinism in :func:`_write_json`, so the web
+    detail pane reads this pair list instead.
+    """
+    return [[heading, text] for heading, text in sections.items()]
+
+
 def _detail_chunks(catalog: Catalog) -> dict[str, dict]:
     """Group full instruction details by 3-char mnemonic prefix.
 
@@ -550,7 +560,7 @@ def _detail_chunks(catalog: Catalog) -> dict[str, dict]:
             "display_form": display_instruction_form(item.form),
             "display_mnemonic": strip_instruction_decorators(item.mnemonic),
             "summary": item.summary,
-            "description": item.description,
+            "description": _section_pairs(item.description),
             "isa": item.isa,
             "display_isa": display_isa(item.isa),
             "operand_details": [
@@ -603,7 +613,7 @@ def _intrinsic_detail_entry(item) -> dict:
         "instructions": item.instructions,
         "instruction_refs": item.instruction_refs,
         "metadata": item.metadata,
-        "doc_sections": item.doc_sections,
+        "doc_sections": _section_pairs(item.doc_sections),
         "notes": item.notes,
     }
 

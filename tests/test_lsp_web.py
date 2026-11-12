@@ -183,8 +183,9 @@ class LspWebTests(unittest.TestCase):
                         self.assertEqual(metadata["intel-sdm-page-start"], "42")
                         self.assertEqual(metadata["intel-sdm-page-end"], "43")
                     if detail["architecture"] == "riscv" and detail["mnemonic"] == "vsub.vv":
-                        self.assertIn("Description", detail["description"])
-                        self.assertIn("Operation", detail["description"])
+                        headings = [heading for heading, _text in detail["description"]]
+                        self.assertIn("Description", headings)
+                        self.assertIn("Operation", headings)
             self.assertTrue(saw_sdm)
 
             # Filter spec: shared source of truth for ISA + category facets
@@ -215,7 +216,8 @@ class LspWebTests(unittest.TestCase):
             self.assertIsInstance(intr_chunk, dict)
             self.assertTrue(len(intr_chunk) > 0)
             self.assertIn("doc_sections", intr_chunk["vaddq_u8"])
-            self.assertIn("ACLE Documentation", intr_chunk["vaddq_u8"]["doc_sections"])
+            doc_headings = [heading for heading, _text in intr_chunk["vaddq_u8"]["doc_sections"]]
+            self.assertIn("ACLE Documentation", doc_headings)
 
     def test_export_web_preserves_x86_detail_sections_for_rendering(self):
         catalog = build_fixture_catalog()
@@ -235,10 +237,14 @@ class LspWebTests(unittest.TestCase):
             chunk = json.loads((Path(tmpdir) / "detail-chunks" / "VPE.json").read_text())
             detail = chunk[x86_instruction.db_key]
             self.assertIn("description", detail)
-            self.assertIn("Description", detail["description"])
-            self.assertIn("Operation", detail["description"])
-            self.assertIn("Exceptions", detail["description"])
-            self.assertIn("Intrinsic Equivalents", detail["description"])
+            # The export keeps the record order in [heading, text] pairs: the
+            # web renders the pairs as they come.
+            headings = [heading for heading, _text in detail["description"]]
+            self.assertEqual(headings, list(x86_instruction.description))
+            self.assertIn("Description", headings)
+            self.assertIn("Operation", headings)
+            self.assertIn("Exceptions", headings)
+            self.assertIn("Intrinsic Equivalents", headings)
             self.assertTrue(detail["measurements"])
 
 
