@@ -39,6 +39,8 @@ ld.global.nc{.vec}.type                                          d, [a]{, cache_
 
 <section id="integer-arithmetic-instructions-add">
 <h3>Integer Arithmetic Instructions: add</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">add</span></code></p>
+<p>Add integer values.</p>
 <p class="rubric">Syntax</p>
 <div class="highlight-text notranslate">
 <div class="highlight"><pre><span></span>add.type1        d, a, b;
@@ -48,10 +50,14 @@ add{.sat}.type2  d, a, b;
 .type2 = { .u32, .u16x2, .u8x4, .s32, .s16x2, .s8x4 };
 </pre></div>
 </div>
+<p class="rubric">Description</p>
+<p>Performs integer addition.</p>
 </section>
 
 <section id="floating-point-instructions-add">
 <h3>Floating Point Instructions: add</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">add</span></code></p>
+<p>Add floating-point values.</p>
 <p class="rubric">Syntax</p>
 <div class="highlight-text notranslate">
 <div class="highlight"><pre><span></span>add{.rnd}{.ftz}{.sat}.f32  d, a, b;
@@ -60,6 +66,8 @@ add{.rnd}{.ftz}.f32x2      d, a, b;
 .rnd = { .rn, .rz };
 </pre></div>
 </div>
+<p class="rubric">Description</p>
+<p>Performs floating-point addition with rounding.</p>
 </section>
 
 <section id="mixed-precision-floating-point-instructions-add">

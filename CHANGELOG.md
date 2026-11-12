@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- PTX instruction rows carry the full documentation of their PTX ISA section: each sub-section (Description, Semantics, Notes, PTX ISA Notes, Target ISA Notes, Examples) in page order, and the Syntax lines. The summary is the first sentence of the Description plus the ISA and sm facts. The content appears in the next release catalog, after `isa update`.
 - CUDA intrinsic rows carry NVIDIA documentation: signature, description, parameters, return value and accuracy, with a Source link per name. The rows appear in the next release catalog, after `isa update`.
 - PTX instruction links of the CUDA rows resolve through one spelling rule against the parsed PTX qualifier sets.
 - `min_sm` and `min_ptx` floors per CUDA row, from the NVVM `.td` call graph, the header guards and the linked PTX rows.

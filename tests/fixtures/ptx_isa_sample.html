@@ -84,6 +84,39 @@ frob.relaxed.scope.type d, [a];
 <p>Reserved for a future revision. No syntax is defined.</p>
 </section>
 
+<section id="widget-instructions-floss">
+<span id="id106"></span><h3>
+<span class="section-number">9.1.4. </span><a class="reference internal" href="#widget-instructions-floss">Widget Instructions: <code class="docutils literal notranslate"><span class="pre">floss</span></code></a>
+</h3>
+<p class="rubric"><code class="docutils literal notranslate"><span class="pre">floss</span></code></p>
+<p>Floss one widget against another.</p>
+<p class="rubric">Syntax</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>floss.sync.mode.type d, [a], membermask;
+
+.mode =  { .cta, .cluster };
+.type =  { .u32 };
+</pre></div>
+</div>
+<p class="rubric">Description</p>
+<p>Supports e.g. Rounding and saturation modes. The second sentence is not the summary.</p>
+<p>A second paragraph stays a separate line.</p>
+<p class="rubric">Semantics</p>
+<p>Writes <code class="docutils literal notranslate"><span class="pre">d</span></code> with the flossed widget value.</p>
+<p class="rubric">Notes</p>
+<p>Only the first sentence of Description sets the summary.</p>
+<p class="rubric">PTX ISA Notes</p>
+<p>floss introduced in PTX ISA version 7.0.</p>
+<p class="rubric">Target ISA Notes</p>
+<p>floss requires sm_80 or higher.</p>
+<p class="rubric">Examples</p>
+<div class="highlight-text notranslate">
+<div class="highlight"><pre><span></span>floss.sync.cta.u32 %d, [%a], %m;
+floss.sync.cluster.u32 %d, [%a], %m;
+</pre></div>
+</div>
+</section>
+
 </section>
 
 <section id="matrix-instructions">

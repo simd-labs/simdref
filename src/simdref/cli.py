@@ -1177,14 +1177,18 @@ def _print_non_interactive_summary(
             typer.echo(f"  {tag}: lat={lat_text}c cpi={_fmt_num(cpi)} ports={ports_str}")
         else:
             summary = aggregate_perf(rec, mode="avg", include_modeled=False)
-            ports = collect_ports(rec, arch=None, archs_used=summary.archs_used)
-            ports_str = ",".join(ports) if ports else "-"
-            typer.echo(
-                f"  avg over {summary.n_archs} arch(s) [{summary.source_kind}]: "
-                f"lat={_fmt_num(summary.latency)}c cpi={_fmt_num(summary.cpi)} ports={ports_str}"
-            )
-            if summary.archs_used:
-                typer.echo(f"  archs: {', '.join(summary.archs_used)}")
+            if summary.n_archs == 0:
+                # The TUI wording (tui._NO_DATA): no arch holds perf data.
+                typer.echo("  performance: no data")
+            else:
+                ports = collect_ports(rec, arch=None, archs_used=summary.archs_used)
+                ports_str = ",".join(ports) if ports else "-"
+                typer.echo(
+                    f"  avg over {summary.n_archs} arch(s) [{summary.source_kind}]: "
+                    f"lat={_fmt_num(summary.latency)}c cpi={_fmt_num(summary.cpi)} ports={ports_str}"
+                )
+                if summary.archs_used:
+                    typer.echo(f"  archs: {', '.join(summary.archs_used)}")
     return 0
 
 

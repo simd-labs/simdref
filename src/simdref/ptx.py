@@ -1,9 +1,11 @@
 """NVIDIA PTX ISA Sphinx HTML parsing and derived instruction rows.
 
 The PTX ISA reference is one Sphinx page. An instruction section holds a
-"Title: op" heading, a Syntax block with template lines and qualifier
-sets, and notes blocks with PTX ISA version and sm floors. Rows carry
-grammar and version facts only; the doc prose stays out of the catalog.
+"Title: op" heading, a title line ("name: brief"), a Syntax block with
+template lines and qualifier sets, and notes blocks with PTX ISA version
+and sm floors. Each rubric sub-section (Description, Semantics, Notes,
+Examples, ...) becomes one entry of the row's description dict, in page
+order, Syntax kept. The title line leads the row's summary instead.
 """
 
 from __future__ import annotations
@@ -297,6 +299,199 @@ def _notes_prose(body: str, marker: str) -> str:
     return _plain(body[start:stop])
 
 
+_PROSE_BLOCKS = (
+    ("close", ("p",), "\n"),
+    ("close", ("li",), "\n"),
+    ("close", ("tr",), "\n"),
+    ("close", ("dd",), "\n"),
+    ("close", ("dt",), "\n"),
+    ("br", (), "\n"),
+)
+
+
+def _prose(fragment: str) -> str:
+    """Plain text of one prose fragment: one line per block element.
+
+    Source line wraps inside a paragraph carry no meaning, so newlines
+    flatten before the tag strip. A tag never separates words: the
+    strip keeps the text runs as the page renders them.
+    """
+    flat = fragment.replace("\n", " ")
+    text = strip_html(flat, _PROSE_BLOCKS, generic="")
+    lines = (" ".join(line.split()) for line in text.split("\n"))
+    return "\n".join(line for line in lines if line)
+
+
+def _code(fragment: str) -> str:
+    """Verbatim text of one code block: line breaks kept."""
+    text = html.unescape(strip_html(fragment, (), generic=""))
+    return "\n".join(line.rstrip() for line in text.split("\n")).strip("\n")
+
+
+def _region_text(body: str) -> str:
+    """Text of one sub-section region: prose lines and verbatim code blocks."""
+    parts: list[str] = []
+    pos = 0
+    while True:
+        open_pre = body.find("<pre", pos)
+        if open_pre < 0:
+            parts.append(_prose(body[pos:]))
+            break
+        parts.append(_prose(body[pos:open_pre]))
+        tag_end = body.find(">", open_pre)
+        close_pre = body.find("</pre>", tag_end) if tag_end >= 0 else -1
+        if close_pre < 0:
+            break
+        parts.append(_code(body[tag_end + 1 : close_pre]))
+        pos = close_pre + len("</pre>")
+    return "\n".join(part for part in parts if part)
+
+
+def _code_texts(fragment: str) -> list[str]:
+    """Plain text inside each <code> element of the fragment, in order."""
+    out: list[str] = []
+    probe = 0
+    while True:
+        start = fragment.find("<code", probe)
+        if start < 0:
+            return out
+        open_end = fragment.find(">", start)
+        close = fragment.find("</code>", open_end) if open_end >= 0 else -1
+        if close < 0:
+            return out
+        text = _plain(fragment[open_end + 1 : close])
+        if text:
+            out.append(text)
+        probe = close + len("</code>")
+
+
+def _title_names(inner: str) -> list[str] | None:
+    """Names of a title-line rubric, else None.
+
+    The instruction section's title line is "name: brief": its rubric
+    heading holds the names as code elements and nothing precedes the
+    first one. A rubric such as "Examples of <code>.f64</code> ..." also
+    carries code, but its first element is not a code element.
+    """
+    hit = tag_at(inner, 0)
+    if hit is None:
+        return None
+    start, _end, tag = hit
+    name = tag.casefold().split(" ")[0].rstrip("/")
+    if inner[:start].strip() or name != "code":
+        return None
+    names = _code_texts(inner)
+    return names or None
+
+
+def _sub_sections(body: str, lead_names: list[str]) -> list[tuple[list[str], str, str, bool]]:
+    """(names, heading, text, is_lead) of each sub-section, in page order.
+
+    A rubric <p> opens a sub-section and its region runs to the next
+    rubric. The lead region before the first rubric and each title-line
+    rubric carry the names of their title line: the code texts of the
+    rubric, or the section's op names for the lead. A nested section
+    never belongs to the parent's sub-sections.
+    """
+    outer_end = body.find('">')
+    nested = body.find("<section", outer_end + 2 if outer_end >= 0 else 0)
+    own = body[:nested] if nested >= 0 else body
+    stop = own.find("</section>")
+    if stop >= 0:
+        own = own[:stop]
+    content_start = 0
+    probe = 0
+    while True:
+        hit = tag_at(own, probe)
+        if hit is None:
+            break
+        start, end, inner = hit
+        if len(inner) >= 2 and inner[0] == "h" and inner[1] in "12345678":
+            close = own.find(f"</h{inner[1]}>", end)
+            if close >= 0:
+                content_start = own.find(">", close) + 1
+            break
+        probe = start + 1
+    spans: list[tuple[list[str], str, int]] = []
+    opens: list[int] = []
+    probe = content_start
+    while True:
+        start = own.find(_RUBRIC_OPEN, probe)
+        if start < 0:
+            break
+        close = own.find("</p>", start)
+        if close < 0:
+            break
+        opens.append(start)
+        inner = own[start + len(_RUBRIC_OPEN) : close]
+        spans.append((_title_names(inner) or [], _plain(inner), close + 4))
+        probe = close + 4
+    out: list[tuple[list[str], str, str, bool]] = []
+    lead = _region_text(own[content_start : opens[0] if opens else len(own)])
+    if lead:
+        out.append((list(lead_names), "", lead, True))
+    for index, (names, heading, region_start) in enumerate(spans):
+        region_end = opens[index + 1] if index + 1 < len(opens) else len(own)
+        out.append((names, heading, _region_text(own[region_start:region_end]), False))
+    return out
+
+
+def _brief_for(subs: list[tuple[list[str], str, str, bool]], mnemonic: str) -> tuple[str, bool]:
+    """(text, is_lead) of the title line that claims the row's mnemonic.
+
+    A name whose whole dot-segment list prefixes the mnemonic, or the
+    reverse, claims the row; the longest claim wins and a rubric title
+    line beats the lead at equal length. A section with one title line
+    gives its text to every row.
+    """
+    titles = [entry for entry in subs if entry[0]]
+    if not titles:
+        return "", False
+    if len(titles) == 1:
+        return titles[0][2], titles[0][3]
+    segments = [seg for seg in mnemonic.split(".") if seg]
+    best_score = (-1, 0)
+    best: tuple[str, bool] = ("", False)
+    for names, heading, text, is_lead in titles:
+        for name in names:
+            named = [seg for seg in name.split(".") if seg]
+            shared = 0
+            while (
+                shared < len(named) and shared < len(segments) and named[shared] == segments[shared]
+            ):
+                shared += 1
+            if shared == 0 or (shared != len(named) and shared != len(segments)):
+                continue
+            score = (shared, 0 if heading else -1)
+            if score > best_score:
+                best_score = score
+                best = (text, is_lead)
+    return best
+
+
+def _first_sentence(text: str) -> str:
+    """First sentence of the text: the lead up to its closing period.
+
+    A period inside an abbreviation ("e.g.") is not a sentence end. A
+    newline after the period ends the sentence even at lowercase.
+    """
+    index = 0
+    while True:
+        dot = text.find(".", index)
+        if dot < 0:
+            return text.strip()
+        if dot >= 2 and text[dot - 2] == "." and text[dot - 1].isalpha():
+            index = dot + 1
+            continue
+        cursor = dot + 1
+        while cursor < len(text) and text[cursor] in " \t\n":
+            cursor += 1
+        gap = text[dot + 1 : cursor]
+        if cursor >= len(text) or "\n" in gap or text[cursor].isupper():
+            return text[: dot + 1].strip()
+        index = dot + 1
+
+
 def _ptx_versions(prose: str) -> list[str]:
     """Version numbers stated after "PTX ISA version", in order."""
     versions: list[str] = []
@@ -355,6 +550,7 @@ def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
     set_names = frozenset(qualifiers)
     versions = _ptx_versions(_notes_prose(body, _RUBRIC_PTX_NOTES))
     floors = _sm_floors(_notes_prose(body, _RUBRIC_TARGET_NOTES))
+    subs = _sub_sections(body, ops)
     url = resolve_url(PTX_ISA_DOC_URL, "#" + section_id)
     rows: list[dict[str, Any]] = []
     for template in templates:
@@ -362,12 +558,28 @@ def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
         if parsed is None:
             continue
         mnemonic, form = parsed
+        # Every row of the section shares the sub-section text; only the
+        # Syntax entry names the row's own template line. The title line
+        # (name: brief) leads the summary and is not a sub-section.
+        description: dict[str, str] = {}
+        for names, heading, text, _is_lead in subs:
+            if names:
+                continue
+            value = template if heading == "Syntax" else text
+            if not value:
+                continue
+            prior = description.get(heading)
+            description[heading] = f"{prior}\n{value}" if prior else value
+        brief, brief_lead = _brief_for(subs, mnemonic)
         rows.append(
             {
                 "mnemonic": mnemonic,
                 "form": form,
                 "category": category,
                 "syntax": template,
+                "brief": brief,
+                "brief_lead": brief_lead,
+                "description": description,
                 "qualifiers": dict(qualifiers),
                 "ptx_isa": list(versions),
                 "sm": list(floors),
@@ -396,6 +608,7 @@ def _merge_key_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             entry = dict(row)
             entry["syntax"] = [row["syntax"]] if row.get("syntax") else []
             entry["urls"] = [str(row.get("url") or "")] if row.get("syntax") else []
+            entry["description"] = dict(row.get("description") or {})
             categories = str(row.get("category", ""))
             entry["category"] = [categories] if categories else []
             merged[key] = entry
@@ -408,6 +621,23 @@ def _merge_key_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         category = str(row.get("category", ""))
         if category and category not in entry["category"]:
             entry["category"].append(category)
+        brief = str(row.get("brief") or "")
+        prior_brief = str(entry.get("brief") or "")
+        if brief and brief not in prior_brief:
+            if prior_brief and not row.get("brief_lead") and entry.get("brief_lead"):
+                # A rubric title line's brief leads the merged summary.
+                entry["brief"] = f"{brief}\n{prior_brief}"
+                entry["brief_lead"] = False
+            else:
+                entry["brief"] = f"{prior_brief}\n{brief}" if prior_brief else brief
+        for heading, text in (row.get("description") or {}).items():
+            if heading == "Syntax":
+                continue  # synced from the merged syntax lines below
+            prior = entry["description"].get(heading)
+            if prior is None:
+                entry["description"][heading] = text
+            elif text and text not in prior:
+                entry["description"][heading] = f"{prior}\n{text}"
         for name, tokens in (row.get("qualifiers") or {}).items():
             known = entry["qualifiers"].setdefault(name, [])
             for token in tokens:
@@ -422,6 +652,8 @@ def _merge_key_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         entry = merged[key]
         entry["syntax"] = "\n".join(entry["syntax"])
         entry["category"] = ", ".join(entry["category"])
+        if entry["syntax"]:
+            entry["description"]["Syntax"] = entry["syntax"]
         out.append(entry)
     return out
 
@@ -447,20 +679,36 @@ def derive_rows(html: str) -> list[dict[str, Any]]:
 
 
 def _generate_summary(row: dict[str, Any]) -> str:
-    """One generated line from the row's own facts. No doc prose."""
-    mnemonic = str(row.get("mnemonic", ""))
-    category = str(row.get("category", ""))
-    parts = [f"{mnemonic} instruction in {category}."] if category else [f"{mnemonic} instruction."]
-    names = [name for name, tokens in row.get("qualifiers", {}).items() if tokens]
-    if names:
-        parts.append("Qualifier sets: " + ", ".join(names) + ".")
+    """The title brief's first sentence plus the version facts.
+
+    The section's title line (name: brief) leads the summary. A row
+    without a title brief keeps the first sentence of its Description
+    section. A row with neither keeps the generated line of its own
+    facts. No doc prose otherwise.
+    """
+    facts: list[str] = []
     versions = row.get("ptx_isa") or []
     if versions:
-        parts.append(f"Introduced in PTX ISA {versions[0]}.")
+        facts.append(f"Introduced in PTX ISA {versions[0]}.")
     floors = row.get("sm") or []
     if floors:
-        parts.append(f"Requires {floors[0]} or higher.")
-    return " ".join(parts)
+        facts.append(f"Requires {floors[0]} or higher.")
+    description = row.get("description") or {}
+    lead = _first_sentence(str(row.get("brief") or ""))
+    if not lead:
+        lead = _first_sentence(str(description.get("Description") or ""))
+    if not lead:
+        mnemonic = str(row.get("mnemonic", ""))
+        category = str(row.get("category", ""))
+        parts = (
+            [f"{mnemonic} instruction in {category}."] if category else [f"{mnemonic} instruction."]
+        )
+        names = [name for name, tokens in row.get("qualifiers", {}).items() if tokens]
+        if names:
+            parts.append("Qualifier sets: " + ", ".join(names) + ".")
+        parts.extend(facts)
+        return " ".join(parts)
+    return " ".join([lead, *facts])
 
 
 def _row_list(payload: Any) -> list[dict[str, Any]]:
@@ -512,10 +760,21 @@ def parse_ptx_instructions_payload(text: str) -> list[InstructionRecord]:
             )
         if qualifiers:
             metadata["qualifiers"] = json.dumps(qualifiers, sort_keys=True)
+        raw_description = row.get("description")
+        description: dict[str, str] = {}
+        if isinstance(raw_description, dict):
+            for name, text in raw_description.items():
+                cleaned = str(text).strip()
+                if cleaned:
+                    description[str(name)] = cleaned
+        if syntax and "Syntax" not in description:
+            # An old bundle carries no sub-sections: Syntax alone.
+            description = {"Syntax": syntax, **description}
         full = dict(row)
         full["qualifiers"] = qualifiers
         full["ptx_isa"] = versions
         full["sm"] = floors
+        full["description"] = description
         records.append(
             InstructionRecord(
                 mnemonic=mnemonic,
@@ -524,7 +783,7 @@ def parse_ptx_instructions_payload(text: str) -> list[InstructionRecord]:
                 architecture="ptx",
                 isa=_normalize_isa(["PTX"]),
                 metadata=metadata,
-                description={"Syntax": syntax} if syntax else {},
+                description=description,
                 source="ptx-isa",
             )
         )

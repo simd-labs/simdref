@@ -38,7 +38,7 @@ def records(rows: list[dict]):
 
 
 def test_row_count(rows):
-    assert len(rows) == 7
+    assert len(rows) == 8
 
 
 def test_frob_row_fields(rows):
@@ -55,6 +55,158 @@ def test_frob_row_fields(rows):
     assert row["ptx_isa"] == ["2.0", "3.1"]
     assert row["sm"] == ["sm_75", "sm_80"]
     assert row["url"] == PTX + "#widget-instructions-frob"
+
+
+def test_description_holds_each_sub_section_in_page_order(rows):
+    # Each rubric sub-section becomes one entry under its own heading,
+    # in page order, and code blocks keep their line breaks. The title
+    # line (name: brief) is not a sub-section.
+    row = next(r for r in rows if r["mnemonic"] == "floss.sync")
+    description = row["description"]
+    assert list(description) == [
+        "Syntax",
+        "Description",
+        "Semantics",
+        "Notes",
+        "PTX ISA Notes",
+        "Target ISA Notes",
+        "Examples",
+    ]
+    assert row["brief"] == "Floss one widget against another."
+    assert description["Syntax"] == "floss.sync.mode.type d, [a], membermask;"
+    assert description["Description"] == (
+        "Supports e.g. Rounding and saturation modes. The second sentence is not the summary.\n"
+        "A second paragraph stays a separate line."
+    )
+    assert description["Semantics"] == "Writes d with the flossed widget value."
+    assert description["Notes"] == "Only the first sentence of Description sets the summary."
+    assert description["PTX ISA Notes"] == "floss introduced in PTX ISA version 7.0."
+    assert description["Target ISA Notes"] == "floss requires sm_80 or higher."
+    assert description["Examples"] == (
+        "floss.sync.cta.u32 %d, [%a], %m;\nfloss.sync.cluster.u32 %d, [%a], %m;"
+    )
+
+
+def test_summary_is_the_title_brief_first_sentence(records):
+    record = next(r for r in records if r.mnemonic == "floss.sync")
+    assert record.summary == (
+        "Floss one widget against another. Introduced in PTX ISA 7.0. Requires sm_80 or higher."
+    )
+
+
+def test_title_brief_is_not_a_description_section():
+    # The instruction section's title line (name: brief) is not a
+    # description section: its brief leads the summary before the ISA
+    # and sm facts, and the Description section keeps its own text.
+    fragment = (
+        '<section id="widget-instructions-gret">'
+        "<h2>Widget Instructions: gret</h2>"
+        '<p class="rubric"><code class="docutils literal notranslate">'
+        '<span class="pre">gret</span></code></p>'
+        "<p>Greets one widget against another.</p>"
+        '<p class="rubric">Syntax</p>'
+        '<div class="highlight-text notranslate"><div class="highlight"><pre>'
+        "<span></span>gret.b32 d, [a];\n</pre></div></div>"
+        '<p class="rubric">Description</p>'
+        "<p>Greets the widget operand in full.</p>"
+        '<p class="rubric">PTX ISA Notes</p>'
+        "<p>gret introduced in PTX ISA version 7.0.</p>"
+        '<p class="rubric">Target ISA Notes</p>'
+        "<p>gret requires sm_80 or higher.</p>"
+        "</section>"
+    )
+    rows = derive_rows(fragment)
+    records = parse_ptx_instructions_payload(
+        json.dumps({"format": BUNDLE_FORMAT, "instructions": rows})
+    )
+    record = records[0]
+    assert "gret" not in record.description
+    assert list(record.description) == [
+        "Syntax",
+        "Description",
+        "PTX ISA Notes",
+        "Target ISA Notes",
+    ]
+    assert record.description["Description"] == "Greets the widget operand in full."
+    assert record.summary == (
+        "Greets one widget against another. Introduced in PTX ISA 7.0. Requires sm_80 or higher."
+    )
+
+
+def test_summary_stays_generated_without_description():
+    # A section with no Description sub-section keeps the generated line.
+    fragment = (
+        '<section id="widget-instructions-groq">'
+        "<h2>Widget Instructions: groq</h2>"
+        '<p class="rubric">Syntax</p>'
+        '<div class="highlight-text notranslate"><div class="highlight"><pre>'
+        "<span></span>groq d;\n</pre></div></div>"
+        '<p class="rubric">PTX ISA Notes</p>'
+        "<p>groq introduced in PTX ISA version 8.0.</p>"
+        "</section>"
+    )
+    rows = derive_rows(fragment)
+    records = parse_ptx_instructions_payload(
+        json.dumps({"format": BUNDLE_FORMAT, "instructions": rows})
+    )
+    record = records[0]
+    assert list(record.description) == ["Syntax", "PTX ISA Notes"]
+    assert record.summary == ("groq instruction in Widget Instructions. Introduced in PTX ISA 8.0.")
+
+
+def test_nested_sections_stay_out_of_the_parent_description():
+    # A family overview section holds its lead-in prose and its syntax
+    # block in a nested instruction section. The parent's description
+    # keeps its own text only.
+    fragment = (
+        '<section id="family-instructions-grok">'
+        "<h2>Family Instructions: grok</h2>"
+        "<p>Overview of the grok family.</p>"
+        '<section id="family-instructions-grok-init">'
+        "<h3>Family Instructions: grok.init</h3>"
+        '<p class="rubric">Syntax</p>'
+        '<div class="highlight-text notranslate"><div class="highlight"><pre>'
+        "<span></span>grok.init.b64 [a], count;\n"
+        "grok.try.b64 [a];\n"
+        "</pre></div></div>"
+        '<p class="rubric">Description</p>'
+        "<p>Initializes a grok object.</p>"
+        "</section>"
+        "</section>"
+    )
+    rows = derive_rows(fragment)
+    parent = next(r for r in rows if r["url"].endswith("#family-instructions-grok"))
+    assert "grok" not in parent["description"]
+    assert parent["brief"] == "Overview of the grok family."
+    assert "Initializes" not in parent["brief"]
+    assert parent["description"]["Syntax"] == "grok.init.b64 [a], count;"
+
+
+def test_merged_brief_prefers_the_name_line_over_the_lead():
+    # A family section's lead-in steals the first nested section's syntax
+    # rows; when the rows merge, the name line's brief leads the summary.
+    fragment = (
+        '<section id="family-instructions-grok">'
+        "<h2>Family Instructions: grok</h2>"
+        "<p>Overview of the grok family.</p>"
+        '<section id="family-instructions-grok-init">'
+        "<h3>Family Instructions: grok.init</h3>"
+        '<p class="rubric"><code class="docutils literal notranslate">'
+        '<span class="pre">grok.init</span></code></p>'
+        "<p>Initializes a grok object.</p>"
+        '<p class="rubric">Syntax</p>'
+        '<div class="highlight-text notranslate"><div class="highlight"><pre>'
+        "<span></span>grok.init.b64 [a], count;\n</pre></div></div>"
+        '<p class="rubric">Description</p>'
+        "<p>Creates the grok state.</p>"
+        "</section>"
+        "</section>"
+    )
+    rows = derive_rows(fragment)
+    records = parse_ptx_instructions_payload(
+        json.dumps({"format": BUNDLE_FORMAT, "instructions": rows})
+    )
+    assert records[0].summary == "Initializes a grok object."
 
 
 def test_chain_drops_set_name_segments(rows):
@@ -80,7 +232,8 @@ def test_section_without_syntax_yields_no_rows(rows):
 
 def test_colliding_template_lines_merge_by_key():
     # Two template lines with one (mnemonic, form) share one catalog key:
-    # the row lists both lines and unions the qualifier sets.
+    # the row lists both lines, unions the qualifier sets and shares one
+    # description.
     fragment = (
         '<section id="widget-instructions-grob">'
         "<h2>Widget Instructions: grob</h2>"
@@ -92,6 +245,8 @@ def test_colliding_template_lines_merge_by_key():
         ".type2 =    { .u8 };\n"
         ".sat =    { .false };\n"
         "</pre></div></div>"
+        '<p class="rubric">Description</p>'
+        "<p>Grobs a widget.</p>"
         "</section>"
     )
     rows = derive_rows(fragment)
@@ -99,6 +254,10 @@ def test_colliding_template_lines_merge_by_key():
     assert rows[0]["mnemonic"] == "grob"
     assert rows[0]["syntax"] == "grob.type1 d, [a];\ngrob{.sat}.type2 d, [a];"
     assert rows[0]["qualifiers"]["sat"] == [".false"]
+    assert rows[0]["description"] == {
+        "Syntax": "grob.type1 d, [a];\ngrob{.sat}.type2 d, [a];",
+        "Description": "Grobs a widget.",
+    }
 
 
 def test_double_colon_set_lines_are_not_rows():
@@ -145,19 +304,23 @@ def test_bundle_round_trip(rows, records):
     assert record.isa == ["PTX"]
     assert record.source == "ptx-isa"
     assert record.description["Syntax"] == "frob{.fast}.vec.type d, [a];"
+    assert record.description["Description"] == (
+        "Read the widget operand and write the destination register."
+    )
     assert record.metadata["url"] == PTX + "#widget-instructions-frob"
     assert record.metadata["ptx_isa"] == "2.0, 3.1"
     assert record.metadata["sm"] == "sm_75, sm_80"
     summary = record.summary
-    assert "frob instruction in Widget Instructions." in summary
-    assert "Qualifier sets: vec, type, scope." in summary
-    assert "Introduced in PTX ISA 2.0." in summary
-    assert "Requires sm_75 or higher." in summary
+    assert summary == (
+        "Copy a widget from one register file to another."
+        " Introduced in PTX ISA 2.0."
+        " Requires sm_75 or higher."
+    )
 
 
 def test_raw_html_payload(fixture_html):
     records = parse_ptx_instructions_payload(fixture_html)
-    assert len(records) == 7
+    assert len(records) == 8
     assert records[0].mnemonic == "frob"
 
 
@@ -217,6 +380,19 @@ def test_merged_rows_name_the_section_of_each_syntax_line(match_records):
         PTX + "#floating-point-instructions-add",
         PTX + "#floating-point-instructions-add",
     ]
+
+
+def test_merged_rows_carry_every_sections_description(match_records):
+    # Rows of one section share its text; a key merged across sections
+    # concatenates the texts in page order. The title briefs merge the
+    # same way and lead the summary.
+    add = next(r for r in match_records if r.mnemonic == "add" and r.form == "d, a, b")
+    assert "add" not in add.description
+    assert add.description["Description"] == (
+        "Performs integer addition.\nPerforms floating-point addition with rounding."
+    )
+    assert add.summary == "Add integer values."
+    assert len(add.description["Syntax"].split("\n")) == 4
 
 
 def test_pick_spelling_resolves_concrete_spellings(match_records):
