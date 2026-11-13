@@ -8,6 +8,7 @@ delegate to these functions for all Rich-based output.
 
 from __future__ import annotations
 
+import json
 import urllib.parse
 from typing import TYPE_CHECKING
 
@@ -1119,6 +1120,263 @@ def doc_math_fields(item) -> set[str]:
     return {name for name, text in item.doc_sections.items() if "\\(" in text}
 
 
+# C.1 doc_sources label and heading helpers (design D).
+
+_NOTE_KIND_LABELS = {
+    "note": "Note",
+    "seealso": "See also",
+    "hint": "Hint",
+    "warning": "Warning",
+}
+
+# Inline run styles and code lexers for the C.1 block shape.
+_RUN_STYLES = {"code": "bold cyan", "em": "italic", "strong": "bold"}
+_CODE_LEXERS = {"cuda": "cpp", "c++": "cpp", "bash": "bash"}
+
+
+def record_doc_sources(record) -> list[dict]:
+    """The ordered C.1 ``doc_sources`` list of one record.
+
+    Reads the ``doc_sources`` field first and falls back to the metadata
+    payload, which can carry the list as JSON text.
+    """
+    sources = getattr(record, "doc_sources", None)
+    if not sources:
+        sources = (getattr(record, "metadata", None) or {}).get("doc_sources") or []
+    if isinstance(sources, str):
+        try:
+            sources = json.loads(sources)
+        except ValueError:
+            return []
+    return list(sources or [])
+
+
+def doc_source_display(entry: dict) -> str:
+    """Label of one doc_sources entry: the page title, else the source."""
+    return str(entry.get("title") or entry.get("source", ""))
+
+
+def doc_source_links(doc_sources: list[dict]) -> list[tuple[str, str]]:
+    """Header source links: one per distinct URL, label first seen wins."""
+    links: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for entry in doc_sources:
+        url = str(entry.get("url", ""))
+        if url in seen:
+            continue
+        seen.add(url)
+        links.append((doc_source_display(entry), url))
+    return links
+
+
+def metadata_and_link_rows(item, doc_sources: list[dict]) -> list[tuple[str, str]]:
+    """Header metadata rows plus link rows: each distinct URL shows once.
+
+    The doc-source link row wins against a plain ``url`` metadata row of
+    the same URL, so the kept row carries the source title label.
+    """
+    links = doc_source_links(doc_sources)
+    linked = {canonical_url(url) for _, url in links}
+    rows = [
+        (key, value)
+        for key, value in instruction_metadata_rows(item)
+        if not (key == "url" and value in linked)
+    ]
+    rows.extend(links)
+    return rows
+
+
+def doc_group_title(entry: dict) -> str:
+    """Group heading: the entry heading plus the page title, family mark."""
+    label = doc_source_display(entry)
+    heading = str(entry.get("heading", ""))
+    title = f"{heading} ({label})" if heading else label
+    return title + (" [family]" if entry.get("shared") else "")
+
+
+def doc_section_title(entry: dict, section: dict) -> str:
+    """Section heading inside a group. An empty heading reuses the group."""
+    heading = section.get("heading", "")
+    if not heading:
+        return doc_group_title(entry)
+    return heading + (" [family]" if section.get("shared") else "")
+
+
+def doc_runs_text(text, runs=None):
+    """One text field as Rich spans: the runs when present, else the text.
+
+    A link run keeps its href in the span and shows the URL after the
+    link text, because a terminal link is invisible without it.
+    """
+    from rich.style import Style
+    from rich.text import Text
+
+    out = Text()
+    if not runs:
+        out.append(str(text or ""))
+        return out
+    for run in runs:
+        kind = str(run[0]) if run else "text"
+        body = str(run[1]) if len(run) > 1 else ""
+        if kind == "link":
+            href = str(run[2]) if len(run) > 2 else ""
+            out.append(body, style=Style(color="bright_blue", underline=True, link=href))
+            if href:
+                out.append(f" ({href})", style="dim")
+        elif kind == "math":
+            out.append(body)
+        else:
+            out.append(body, style=_RUN_STYLES.get(kind, ""))
+    return out
+
+
+def doc_list_parts(block: dict, lang: str, depth: int = 0) -> list:
+    """Renderables of one list block: one line per item, nested blocks below.
+
+    An item is a string or a dict with ``text``, ``runs`` and nested
+    ``blocks``. Ordered lists number their items; every nested block
+    indents one level more than its item. The item body sits in a
+    two-column grid behind its marker, so a wrapped line keeps the
+    marker's hanging indent.
+    """
+    from rich.padding import Padding
+    from rich.table import Table
+    from rich.text import Text
+
+    def item_row(marker, body):
+        grid = Table.grid(padding=0)
+        grid.add_column(no_wrap=True)
+        grid.add_column()
+        grid.add_row(marker, body)
+        return grid
+
+    parts: list = []
+    for index, item in enumerate(block.get("items") or []):
+        if isinstance(item, dict):
+            item_text, runs = item.get("text", ""), item.get("runs")
+            nested = item.get("blocks") or []
+        else:
+            item_text, runs, nested = str(item), None, []
+        marker = (
+            f"{'  ' * (depth + 1)}{index + 1}. "
+            if block.get("ordered")
+            else f"{'  ' * (depth + 1)}- "
+        )
+        parts.append(item_row(Text(marker), doc_runs_text(item_text, runs)))
+        for sub in nested:
+            if sub.get("kind") == "list":
+                parts.extend(doc_list_parts(sub, lang, depth + 1))
+            else:
+                parts.append(Padding(doc_block_renderable(sub, lang), (0, 0, 0, 2 * (depth + 2))))
+    return parts
+
+
+def doc_code_renderable(block: dict, lang: str):
+    """One code block: the caption line above, then the code."""
+    from rich.syntax import Syntax
+    from rich.text import Text
+
+    code = str(block.get("text", ""))
+    block_lang = str(block.get("lang") or lang or "")
+    if block_lang == "text":
+        body = Text(code)
+    elif block_lang == "ptx":
+        # pygments is a transitive dep with no version floor here, and
+        # older builds lack the PTX lexer, so look it up by name and fall
+        # back to plain text when it is missing.
+        from pygments.lexers import get_lexer_by_name
+        from pygments.util import ClassNotFound
+
+        try:
+            get_lexer_by_name("ptx")
+            body = Syntax(code, "ptx", theme="monokai", word_wrap=True)
+        except ClassNotFound:
+            body = Text(code)
+    else:
+        body = Syntax(
+            code,
+            _CODE_LEXERS.get(block_lang, block_lang),
+            theme="monokai",
+            word_wrap=True,
+        )
+    caption = block.get("caption")
+    if not caption:
+        return body
+    from rich.console import Group
+
+    return Group(Text(str(caption), style="bold"), body)
+
+
+def doc_block_renderable(block: dict, lang: str = "c"):
+    """One C.1 block as a Rich renderable (design D block rendering)."""
+    from rich.console import Group
+    from rich.text import Text
+
+    kind = block.get("kind", "")
+    if kind == "list":
+        return Group(*doc_list_parts(block, lang))
+    if kind == "code":
+        return doc_code_renderable(block, lang)
+    if kind == "table":
+        # Text cells keep bracketed doc text out of Rich markup. The
+        # header carries rows of cells like the web renderer accepts.
+        header = list(block.get("header") or [])
+        rows = [list(row) for row in block.get("rows") or []]
+        if header and isinstance(header[0], list):
+            header, extra = header[0], header[1:]
+            rows = [[Text(str(cell), style="bold") for cell in row] for row in extra] + rows
+        table = Table(header_style="bold blue", caption=block.get("caption", ""))
+        for cell in header:
+            table.add_column(Text(str(cell)))
+        for row in rows:
+            table.add_row(*[cell if isinstance(cell, Text) else Text(str(cell)) for cell in row])
+        return table
+    if kind == "note":
+        label = _NOTE_KIND_LABELS.get(block.get("note", ""), "Note")
+        runs = [list(run) for run in block.get("runs") or []]
+        if runs:
+            # The raw parse of an indented note block leaves blank space on
+            # the edge runs; the text must sit on the line behind the label.
+            runs[0][1] = str(runs[0][1]).lstrip()
+            runs[-1][1] = str(runs[-1][1]).rstrip()
+        out = Text()
+        out.append(label, style="bold")
+        out.append(": ")
+        out.append_text(doc_runs_text(block.get("text", ""), runs or None))
+        return out
+    if kind == "deflist":
+        out = Text()
+        for index, item in enumerate(block.get("items") or []):
+            if index:
+                out.append("\n")
+            out.append(str(item.get("name", "")), style="bold")
+            out.append(": ")
+            out.append_text(doc_runs_text(item.get("text", ""), item.get("runs")))
+        return out
+    if kind == "math":
+        return Text(block.get("text", "") or block.get("tex", ""))
+    return doc_runs_text(block.get("text", ""), block.get("runs"))
+
+
+def print_doc_sources(doc_sources: list[dict]) -> None:
+    """Render the ordered C.1 doc groups, one heading per source entry.
+
+    Groups render in list order and never sort. A linked PTX entry comes
+    last because the record appends it last. Headings are Text objects so
+    bracketed doc text stays out of Rich markup.
+    """
+    from rich.text import Text
+
+    for entry in doc_sources:
+        lang = "asm" if entry.get("source") == "ptx-isa" else "c"
+        console.print(Rule(Text(doc_group_title(entry))))
+        for section in entry.get("sections") or []:
+            if section.get("heading"):
+                console.print(Text(doc_section_title(entry, section), style="bold"))
+            for block in section.get("blocks") or []:
+                console.print(doc_block_renderable(block, lang))
+
+
 def print_description_sections(
     description: dict[str, str],
     full: bool = False,
@@ -1166,7 +1424,11 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
     table = Table(show_header=False, box=None)
     table.add_row("signature", item.signature or "-")
     table.add_row("header", item.header or "-")
-    if item.url:
+    sources = record_doc_sources(item)
+    if sources:
+        for label, url in doc_source_links(sources):
+            table.add_row(label, url)
+    elif item.url:
         table.add_row("source", item.url)
     table.add_row("architecture", display_architecture(item.architecture))
     table.add_row("isa", ", ".join(item.isa) or "-")
@@ -1177,7 +1439,6 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
     for key in (
         "reference_url",
         "argument_preparation",
-        "result",
         "supported_architectures",
         "classification_path",
         "masking",
@@ -1196,10 +1457,15 @@ def render_intrinsic(catalog, item, conn=None, short: bool = False, full: bool =
                 continue
             table.add_row(key, value)
     console.print(Panel(table, title=f"intrinsic: {item.name}", border_style="cyan"))
-    if not short and item.doc_sections:
-        print_description_sections(item.doc_sections, full=full, math_fields=doc_math_fields(item))
-    if not short and primary and primary.description:
-        print_description_sections(primary.description, full=full)
+    if not short and sources:
+        print_doc_sources(sources)
+    elif not short:
+        if item.doc_sections:
+            print_description_sections(
+                item.doc_sections, full=full, math_fields=doc_math_fields(item)
+            )
+        if primary and primary.description:
+            print_description_sections(primary.description, full=full)
     if linked:
         console.print(Rule("intrinsic to instruction mapping", style="cyan"))
         print_mapping("instruction", catalog, item, conn=conn)
@@ -1215,13 +1481,14 @@ def render_instruction_sections(
     catalog, item, include_title: bool = True, conn=None, short: bool = False, full: bool = False
 ) -> None:
     """Render instruction detail with optional title panel."""
+    sources = record_doc_sources(item)
     if include_title:
         table = Table(show_header=False, box=None)
         table.add_row("mnemonic", item.mnemonic)
         table.add_row("form", display_instruction_form(item.form))
         table.add_row("architecture", display_architecture(item.architecture))
         table.add_row("isa", display_isa(item.isa))
-        for key, value in instruction_metadata_rows(item):
+        for key, value in metadata_and_link_rows(item, sources):
             if key != "isa":
                 table.add_row(key, value)
         console.print(
@@ -1233,7 +1500,9 @@ def render_instruction_sections(
         )
     else:
         print_instruction_metadata(item)
-    if not short and item.description:
+    if not short and sources:
+        print_doc_sources(sources)
+    elif not short and item.description:
         print_description_sections(item.description, full=full)
     console.print(Rule("instruction to intrinsic mapping", style="cyan"))
     print_mapping("intrinsic", catalog, item, conn=conn)

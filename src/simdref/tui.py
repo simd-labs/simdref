@@ -25,9 +25,11 @@ def _profile_log(tag: str, elapsed_ms: float, **extras: object) -> None:
     sys.stderr.write(f"[simdref-profile] {tag} {elapsed_ms:.1f}ms {extras_str}\n")
 
 
+from rich.console import Group
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
+from rich.text import Text
 
 try:
     from textual import events, on, work
@@ -123,22 +125,28 @@ from simdref.display import (
     display_architecture,
     display_isa,
     display_instruction_form,
+    display_instruction_title,
     display_uarch,
+    doc_block_renderable,
+    doc_group_title,
     doc_math_fields,
+    doc_section_title,
+    doc_source_links,
     isa_family,
     operand_flags_text,
     perf_panel_border,
     perf_panel_title,
     provenance_lines,
+    record_doc_sources,
     split_perf_rows,
     isa_to_sub_isa,
     instruction_metadata_rows,
+    metadata_and_link_rows,
     latency_pair_rows,
     normalize_isa_token,
     measurement_rows,
     uarch_sort_key,
 )
-from simdref.perf import record_iclass, variant_perf_summary
 from simdref.queries import linked_instruction_records
 from simdref.search import SearchResult, _classify_query
 from simdref.storage import (
@@ -157,11 +165,6 @@ _RESULT_PREFETCH_THRESHOLD = 5
 # Count cap for the hidden-rows note. The candidate fetch starts at 2*limit
 # rows and stops at 5000, so 2500 is the largest count that fetches at all.
 _SM_HIDDEN_POOL = 2500
-
-
-def _NO_DATA(text: str) -> tuple[str, str]:
-    """Detail line that marks a section with no data, instead of omitting it."""
-    return ("static_markup", f"  [dim]{text}[/]")
 
 
 _ISA_FAMILIES: list[str] = [
@@ -2147,6 +2150,7 @@ class SimdrefApp(App):
         self, intrinsic: IntrinsicRecord, conn: sqlite3.Connection | None = None
     ) -> list[tuple]:
         payload: list[tuple] = []
+        sources = record_doc_sources(intrinsic)
         meta = Table(show_header=False, box=None)
         meta.add_row("signature", intrinsic.signature or "-")
         meta.add_row("header", intrinsic.header or "-")
@@ -2173,27 +2177,30 @@ class SimdrefApp(App):
             ("Supported", "supported_architectures"),
             ("Section", "classification_path"),
             ("Arg Prep", "argument_preparation"),
-            ("Result", "result"),
         ):
             if intrinsic.metadata.get(field):
                 meta.add_row(label, intrinsic.metadata[field])
+        # Header source links: one per distinct URL (design D).
+        for label, url in doc_source_links(sources):
+            meta.add_row(label, url)
         payload.append(
             ("static", Panel(meta, title=f"intrinsic: {intrinsic.name}", border_style="cyan"))
         )
         entries = self._related_instruction_entries(intrinsic, conn or self._conn)
         if entries:
             payload.append(("related", "Instructions", entries))
+        if sources:
+            self._append_doc_sources(payload, sources)
         if linked:
             self._append_operand_section(payload, linked)
             self._append_perf_sections(payload, linked)
-        else:
-            payload.append(_NO_DATA("no linked instruction: no operands or performance data"))
-        if intrinsic.doc_sections:
-            self._append_description_sections(
-                payload, intrinsic.doc_sections, doc_math_fields(intrinsic)
-            )
-        if linked and linked.description:
-            self._append_description_sections(payload, linked.description)
+        if not sources:
+            if intrinsic.doc_sections:
+                self._append_description_sections(
+                    payload, intrinsic.doc_sections, doc_math_fields(intrinsic)
+                )
+            if linked and linked.description:
+                self._append_description_sections(payload, linked.description)
         return payload
 
     def _related_instruction_entries(
@@ -2238,12 +2245,13 @@ class SimdrefApp(App):
         self, item: InstructionRecord, conn: sqlite3.Connection | None = None
     ) -> list[tuple]:
         payload: list[tuple] = []
+        sources = record_doc_sources(item)
         meta = Table(show_header=False, box=None)
         meta.add_row("mnemonic", item.mnemonic)
         meta.add_row("form", display_instruction_form(item.form))
         meta.add_row("isa", display_isa(item.isa))
         meta.add_row("summary", item.summary or "-")
-        for key, value in instruction_metadata_rows(item):
+        for key, value in metadata_and_link_rows(item, sources):
             if key in {"isa", "summary"}:
                 continue
             meta.add_row(key, value)
@@ -2252,23 +2260,25 @@ class SimdrefApp(App):
                 "static",
                 Panel(
                     meta,
-                    title=f"instruction: {display_instruction_form(item.form) or item.mnemonic}",
+                    title=f"instruction: {display_instruction_title(item)}",
                     border_style="magenta",
                 ),
             )
         )
+        if sources:
+            self._append_doc_sources(payload, sources)
         self._append_operand_section(payload, item)
         self._append_perf_sections(payload, item)
         entries = self._related_intrinsic_entries(item, conn or self._conn)
         if entries:
             payload.append(("related", "Intrinsics", entries))
-        if item.description:
+        if not sources and item.description:
             self._append_description_sections(payload, item.description)
         return payload
 
     def _append_operand_section(self, payload: list[tuple], item: InstructionRecord) -> None:
+        # Design D: the operands entry renders only when the row has data.
         if not item.operand_details:
-            payload.append(_NO_DATA("operands: no data"))
             return
         table = Table(header_style="bold blue")
         table.add_column("idx", width=4)
@@ -2292,15 +2302,9 @@ class SimdrefApp(App):
         payload.append(("static", Panel(table, title="operands", border_style="blue")))
 
     def _append_perf_sections(self, payload: list[tuple], item: InstructionRecord) -> None:
+        # Design D: the perf entries render only when measurements exist.
         rows = measurement_rows(item)
         if not rows:
-            lat, cpi = variant_perf_summary(item.arch_details, record_iclass(item))
-            if lat != "-" or cpi != "-":
-                payload.append(
-                    ("static_markup", f"  [green]latency:[/] {lat}  [green]CPI:[/] {cpi}")
-                )
-            else:
-                payload.append(_NO_DATA("performance: no data"))
             return
         label_map = {
             "uarch": "microarch",
@@ -2357,6 +2361,26 @@ class SimdrefApp(App):
                 table.add_row(display_uarch(str(row["uarch"])), row["latency_pairs"])
             panel = Panel(table, title=title, border_style=border)
             payload.append(("collapsible", panel, title, False))
+
+    def _append_doc_sources(self, payload: list[tuple], doc_sources: list[dict]) -> None:
+        """Render the ordered C.1 doc groups in the design D order.
+
+        One group per entry, in list order. Blocks inside a section render
+        in list order too; nothing sorts them.
+        """
+        for entry in doc_sources:
+            lang = "asm" if entry.get("source") == "ptx-isa" else "c"
+            payload.append(("static", Text(doc_group_title(entry), style="bold")))
+            for section in entry.get("sections") or []:
+                renderable = Group(
+                    *(doc_block_renderable(block, lang) for block in section.get("blocks") or [])
+                )
+                if section.get("heading"):
+                    payload.append(
+                        ("collapsible", renderable, doc_section_title(entry, section), False)
+                    )
+                else:
+                    payload.append(("static", renderable))
 
     def _append_description_sections(
         self,

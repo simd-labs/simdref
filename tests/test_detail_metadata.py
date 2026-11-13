@@ -70,11 +70,12 @@ class DetailMetadataTests(unittest.TestCase):
             ("Supported", "v7/A32/A64"),
             ("Section", "Vector arithmetic / Add / Addition"),
             ("Arg Prep", "a -> register Vn.4S;b -> register Vm.4S"),
-            ("Result", "Vd.4S -> result"),
             ("Instr Cat", "Arithmetic"),
         ):
             self.assertIn(label, text)
             self.assertIn(value, text)
+        # The Result metadata row is gone; doc blocks carry Returns.
+        self.assertNotIn("Result", text)
 
     def test_rows_stay_out_when_the_record_has_no_value(self):
         from simdref.tui import SimdrefApp
