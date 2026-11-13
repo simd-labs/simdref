@@ -55,6 +55,44 @@ class TestAttributeGroupsInDeclarations:
         assert "__ballot_sync" in names
 
     def test_drop_attribute_groups_is_structural(self):
-        tool = _load_tool()
+        from simdref.cuda_docs import drop_attribute_groups
+
         s = "static __attribute__((a, b(c))) void __attribute__((d(1))) f"
-        assert tool.drop_attribute_groups(s) == "static  void  f"
+        assert drop_attribute_groups(s) == "static  void  f"
+
+
+NORMALIZE_HEADER = """
+#define __ZYX_DEVICE__ static __device__ __forceinline__
+
+static inline __device__ float __zyx_norm_v1(float x) { return x; }
+__device__ static inline float __zyx_norm_v1(float x) { return x; }
+inline __device__ static float __zyx_norm_v1(float x) { return x; }
+__ZYX_DEVICE__ float __zyx_norm_v1(float x) { return x; }
+"""
+
+
+class TestNormalizeDeclaration:
+    """One normal form per declaration, whatever the qualifier order."""
+
+    def test_three_orders_and_a_macro_qualifier_agree(self):
+        from simdref.cuda_docs import declaration_qualifiers, normalize_declaration
+
+        qualifiers = declaration_qualifiers(NORMALIZE_HEADER)
+        want = (["float"], "__zyx_norm_v1", "float x")
+        lines = [line for line in NORMALIZE_HEADER.splitlines() if "__zyx_norm_v1" in line]
+        assert len(lines) == 4
+        for line in lines:
+            assert normalize_declaration(line, qualifiers) == want
+
+    def test_no_return_type_is_not_a_declaration(self):
+        from simdref.cuda_docs import declaration_qualifiers, normalize_declaration
+
+        qualifiers = declaration_qualifiers(NORMALIZE_HEADER)
+        assert normalize_declaration("__zyx_norm_v1(x)", qualifiers) == ([], "__zyx_norm_v1", "x")
+
+    def test_statement_shapes_declare_nothing(self):
+        from simdref.cuda_docs import declaration_qualifiers, normalize_declaration
+
+        qualifiers = declaration_qualifiers(NORMALIZE_HEADER)
+        for line in ("if (x) {", "return f(x);", "block.sync();", "x = f(a);"):
+            assert normalize_declaration(line, qualifiers) is None, line

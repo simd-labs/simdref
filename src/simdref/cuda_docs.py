@@ -22,6 +22,7 @@ import hashlib
 import json
 import unicodedata
 from html.parser import HTMLParser
+from typing import Any
 
 from simdref.urls import resolve_url
 
@@ -447,8 +448,7 @@ class _FunctionEntryParser(HTMLParser):
         self._in_admonition = False
         name = self._func_name or ""
         # libdevice pages mark names with the LLVM "@" prefix.
-        if name.startswith("@"):
-            name = name[1:]
+        name = name.removeprefix("@")
         accuracy = []
         for text in self._admonitions:
             low = text.lower()
@@ -485,16 +485,24 @@ def parse_math_api_page(html: str) -> dict[str, dict[str, str]]:
 
     The page holds ``dl cpp function`` entries. The returned mapping
     holds one entry per function name. A name with several entries
-    keeps the first one in document order.
+    keeps the first one in document order. Each entry carries the C.1
+    blocks of its dd, in page order, plus the page heading.
     """
     parser = _FunctionEntryParser()
     parser.feed(html)
     parser.close()
+    from simdref.docblocks import build_tree, math_entry_views, page_title
+
+    root = build_tree(html)
+    views = math_entry_views(root)["entries"]
+    title = page_title(root)
     out = {}
-    for e in parser.entries:
+    for index, e in enumerate(parser.entries):
         name = e["name"]
         if not name or name in out:
             continue
+        view = views[index] if index < len(views) else {}
+        blocks = view.get("blocks") or []
         out[name] = {
             "anchor": e["anchor"],
             "signature": e["signature"],
@@ -504,7 +512,18 @@ def parse_math_api_page(html: str) -> dict[str, dict[str, str]]:
             "parameters": e["parameters"],
             "accuracy": e["accuracy"],
             "math": list(e["math"]),
+            "title": title,
+            "heading": name,
+            "sections": [
+                {
+                    "heading": "",
+                    "shared": False,
+                    "blocks": [{**block, "owner": name} for block in blocks],
+                }
+            ],
         }
+        if "signature_runs" in view:
+            out[name]["signature_runs"] = view["signature_runs"]
     return out
 
 
@@ -699,28 +718,146 @@ def _anchor_for(events: list, index: int, chain: tuple) -> str:
     return best
 
 
-def declares_name(text: str, name: str) -> bool:
-    """The text declares the name: a type word precedes its call.
+def _skip_paren_group(text: str, start: int) -> int:
+    """Return the index just past the balanced ``( ... )`` group at *start*."""
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return len(text)
 
-    A declaration has a type word before the name. An example call has
-    nothing or a member dot before it, such as ``block.sync()``. The
-    doc join uses this to tell a function entry from an example line.
+
+def drop_attribute_groups(text: str) -> str:
+    """Remove every ``__attribute__(( ... ))`` group from the text."""
+    out = []
+    i = 0
+    while True:
+        a = text.find("__attribute__(", i)
+        if a < 0:
+            return "".join(out) + text[i:]
+        out.append(text[i:a])
+        i = _skip_paren_group(text, a + len("__attribute__"))
+
+
+_CXX_DECL_QUALIFIERS = frozenset(("static", "inline", "extern", "constexpr"))
+_STATEMENT_KEYWORDS = frozenset(
+    (
+        "if",
+        "else",
+        "for",
+        "while",
+        "switch",
+        "return",
+        "do",
+        "goto",
+        "break",
+        "continue",
+        "case",
+        "default",
+        "sizeof",
+        "try",
+        "catch",
+        "throw",
+    )
+)
+
+
+def declaration_qualifiers(text: str) -> set[str]:
+    """The qualifier tokens of one C source text.
+
+    The C++ declaration qualifiers plus every token a qualifier macro
+    of the text expands to. A macro qualifies when its expansion holds
+    only C++ qualifiers and ``__``-prefixed tokens: the ``__DEVICE__``
+    pattern. No hand list of CUDA macros. The text must have its
+    comments stripped.
     """
-    idx = text.find(name)
-    while idx != -1:
-        j = idx + len(name)
-        while j < len(text) and text[j] == " ":
-            j += 1
-        if j < len(text) and text[j] == "(":
-            break
-        idx = text.find(name, idx + 1)
-    if idx <= 0:
-        return False
-    before = text[:idx].rstrip()
-    if not before:
-        return False
-    prev = before[-1]
-    return prev.isalnum() or prev in ">_:"
+    out: set[str] = set(_CXX_DECL_QUALIFIERS)
+    buf = ""
+    pending = text.split("\n") + [""]
+    for raw in pending:
+        line = raw.rstrip()
+        buf = buf + " " + line.strip() if buf else line
+        if line.endswith("\\") and not line.endswith("\\\\"):
+            buf = buf[:-1]
+            continue
+        define = buf.strip()
+        buf = ""
+        if not define.startswith("#define "):
+            continue
+        tokens = drop_attribute_groups(define[len("#define ") :]).split()
+        if tokens and all(
+            _is_identifier(token) and (token in _CXX_DECL_QUALIFIERS or token.startswith("__"))
+            for token in tokens
+        ):
+            out.update(tokens)
+    return out
+
+
+def _call_params(text: str, start: int) -> str | None:
+    """Parameter text of the call group that opens at *start*, else None."""
+    depth = 0
+    for i in range(start, len(text)):
+        c = text[i]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1 : i]
+    return None
+
+
+def normalize_declaration(chunk: str, qualifiers: set[str]) -> tuple[list[str], str, str] | None:
+    """One declaration normalized: (return type tokens, name, params).
+
+    Joins the line breaks, splits on whitespace, drops the attribute
+    groups and the leading qualifier tokens, then reads the return
+    type, the name before the call parens and the parameter text. A
+    leading ``__``-prefixed token is a qualifier when a type follows it,
+    so a macro qualifier needs no name list. None when the text declares
+    nothing: no call parens, a statement keyword shape, or a return
+    type that is not a type.
+    """
+    text = drop_attribute_groups(" ".join(chunk.split()))
+    open_at = text.find("(")
+    if open_at < 0:
+        return None
+    params = _call_params(text, open_at)
+    if params is None:
+        return None
+    lead = text[:open_at].rstrip()
+    stop = len(lead)
+    while stop > 0 and (lead[stop - 1].isalnum() or lead[stop - 1] == "_"):
+        stop -= 1
+    name = lead[stop:]
+    if not name or name[0].isdigit() or name in _STATEMENT_KEYWORDS:
+        return None
+    tokens = lead[:stop].split()
+    cut = 0
+    while cut < len(tokens) - 1 and (tokens[cut] in qualifiers or tokens[cut].startswith("__")):
+        cut += 1
+    type_tokens = tokens[cut:]
+    for token in type_tokens:
+        if token in _STATEMENT_KEYWORDS:
+            return None
+        if any(not (c.isalnum() or c == "_" or c in "*&<>:") for c in token):
+            return None
+    return type_tokens, name, " ".join(params.split())
+
+
+def declares_name(text: str, name: str) -> bool:
+    """The text declares the name: a return type precedes its call.
+
+    Routed through the normalizer. A declaration has a return type
+    before the name. An example call has nothing before it. The doc
+    join uses this to tell a function entry from an example line.
+    """
+    normalized = normalize_declaration(text, declaration_qualifiers(text))
+    return normalized is not None and normalized[1] == name and bool(normalized[0])
 
 
 def parse_guide_page(html: str) -> dict[str, dict[str, str]]:
@@ -741,16 +878,13 @@ def parse_guide_page(html: str) -> dict[str, dict[str, str]]:
     events = parser.events
 
     def _pick_signature(lines, name):
-        fallback = ""
         for line in lines:
             if not _has_token(line, name):
                 continue
             clean_line = _clean(line)
             if declares_name(clean_line, name):
                 return clean_line
-            if not fallback:
-                fallback = clean_line
-        return fallback
+        return ""
 
     out = {}
     for require_decl in (True, False):
@@ -797,6 +931,7 @@ def parse_guide_page(html: str) -> dict[str, dict[str, str]]:
                     "math": ["description"]
                     if any(k in parser.math_events for k in desc_idx)
                     else [],
+                    "section": chain[-1] if chain else "",
                 }
     for i, (kind, ids, text) in enumerate(events):
         if kind != "p" or not ids or not text.strip():
@@ -811,6 +946,33 @@ def parse_guide_page(html: str) -> dict[str, dict[str, str]]:
                 "signature": "",
                 "description": _clean(text),
                 "math": ["description"] if i in parser.math_events else [],
+                "section": chain[-1] if chain else "",
+            }
+    from simdref.docblocks import build_tree, cut_runs, guide_views, page_title
+
+    root = build_tree(html)
+    views = guide_views(root)
+    title = page_title(root)
+    for name, entry in list(out.items()):
+        section = entry.pop("section", "")
+        view = views.get(section) or {}
+        entry["title"] = title
+        entry["heading"] = str(view.get("heading") or "")
+        entry["summary"] = str((view.get("briefs") or {}).get(name) or "")
+        entry["sections"] = cut_runs(view.get("runs") or [], name)
+    for section, view in views.items():
+        for name, brief in (view.get("briefs") or {}).items():
+            if name in out:
+                continue
+            out[name] = {
+                "anchor": section,
+                "signature": "",
+                "description": "",
+                "math": [],
+                "title": title,
+                "heading": str(view.get("heading") or ""),
+                "summary": str(brief or ""),
+                "sections": cut_runs(view.get("runs") or [], name),
             }
     return out
 
@@ -882,7 +1044,7 @@ class _UlpTableParser(HTMLParser):
             self._cell.append(data)
 
 
-def parse_ulp_tables(html: str) -> dict[str, dict[str, str]]:
+def parse_ulp_tables(html: str) -> dict[str, dict[str, Any]]:
     """Parse the ULP tables of a page into a name token to entry map.
 
     Each ``table`` with a ``caption`` takes part. The header row names
@@ -890,11 +1052,16 @@ def parse_ulp_tables(html: str) -> dict[str, dict[str, str]]:
     every whole identifier token of its function cell to the text of
     the accuracy cell and the table caption. A row without an accuracy
     cell is skipped. A name token in several rows keeps the first row.
+    The entry keeps the page title, the header row and every matching
+    data row, for the C.1 table block.
     """
     parser = _UlpTableParser()
     parser.feed(html)
     parser.close()
-    out = {}
+    from simdref.docblocks import build_tree, page_title
+
+    title = page_title(build_tree(html))
+    out: dict[str, dict[str, Any]] = {}
     for table in parser.tables:
         if table["caption"] is None:
             continue
@@ -902,11 +1069,17 @@ def parse_ulp_tables(html: str) -> dict[str, dict[str, str]]:
         func_col = 0
         acc_col = None
         saw_header = False
+        header_cells: list[str] = []
         for row in table["rows"]:
-            cells = [text for _, text, _ in row]
+            raw_cells = [text for _, text, _ in row]
+            # The block cells read math as unicode, the way inline runs
+            # render it. The accuracy field keeps the raw TeX, so the
+            # math block can render it again.
+            cells = [_clean(tex_to_text(text)) if math else text for _, text, math in row]
             is_header = any(is_th for is_th, _, _ in row)
             if is_header and not saw_header:
                 saw_header = True
+                header_cells = cells
                 for idx, (is_th, text, _) in enumerate(row):
                     low = text.lower()
                     if is_th and "function" in low:
@@ -920,16 +1093,16 @@ def parse_ulp_tables(html: str) -> dict[str, dict[str, str]]:
                 continue
             if is_header or not cells:
                 continue
-            fidx = func_col if func_col < len(cells) else 0
+            fidx = func_col if func_col < len(raw_cells) else 0
             acc = None
             acc_math = False
-            if acc_col is not None and acc_col < len(cells) and acc_col != fidx:
-                acc = cells[acc_col]
+            if acc_col is not None and acc_col < len(raw_cells) and acc_col != fidx:
+                acc = raw_cells[acc_col]
                 acc_math = row[acc_col][2]
             else:
                 # No accuracy column in the header. Take the first row
                 # cell that names an accuracy or a ULP bound.
-                for idx, text in enumerate(cells):
+                for idx, text in enumerate(raw_cells):
                     if idx == fidx:
                         continue
                     low = text.lower()
@@ -939,13 +1112,18 @@ def parse_ulp_tables(html: str) -> dict[str, dict[str, str]]:
                         break
             if acc is None:
                 continue
-            for token in _identifier_tokens(cells[fidx]):
+            for token in _identifier_tokens(raw_cells[fidx]):
                 if token not in out:
                     out[token] = {
                         "accuracy": acc,
                         "caption": caption,
                         "math": ["accuracy"] if acc_math else [],
+                        "title": title,
+                        "header": header_cells,
+                        "rows": [cells],
                     }
+                elif out[token]["caption"] == caption:
+                    out[token]["rows"].append(cells)
     return out
 
 

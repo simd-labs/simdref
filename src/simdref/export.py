@@ -561,6 +561,7 @@ def _detail_chunks(catalog: Catalog) -> dict[str, dict]:
             "display_mnemonic": strip_instruction_decorators(item.mnemonic),
             "summary": item.summary,
             "description": _section_pairs(item.description),
+            "doc_sources": item.doc_sources,
             "isa": item.isa,
             "display_isa": display_isa(item.isa),
             "operand_details": [
@@ -614,6 +615,7 @@ def _intrinsic_detail_entry(item) -> dict:
         "instruction_refs": item.instruction_refs,
         "metadata": item.metadata,
         "doc_sections": _section_pairs(item.doc_sections),
+        "doc_sources": item.doc_sources,
         "notes": item.notes,
     }
 

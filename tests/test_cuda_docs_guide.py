@@ -73,9 +73,18 @@ class TestGuideParse:
         assert out["__zyx_dup_v1"]["anchor"] == "zyx-warp-vote"
         assert out["__zyx_dup_v1"]["signature"] == "int __zyx_dup_v1(int lane);"
 
-    def test_entry_has_four_fields(self) -> None:
+    def test_entry_fields_are_the_agreed_shape(self) -> None:
         for entry in _parse().values():
-            assert sorted(entry) == ["anchor", "description", "math", "signature"]
+            assert sorted(entry) == [
+                "anchor",
+                "description",
+                "heading",
+                "math",
+                "sections",
+                "signature",
+                "summary",
+                "title",
+            ]
 
 
 class TestDeclarationPreference:
@@ -94,11 +103,24 @@ class TestDeclarationPreference:
         assert out["call_zyx_v1"]["signature"] == "int call_zyx_v1(int *p, int v);"
         assert out["call_zyx_v1"]["anchor"] == "zyx-func"
 
-    def test_example_line_is_kept_without_a_declaration(self) -> None:
+    def test_example_name_keeps_its_entry_without_a_declaration(self) -> None:
         html = '<section id="zyx-example"><pre>call_zyx_v1(p, 1);</pre></section>'
         out = parse_guide_page(html)
-        assert out["call_zyx_v1"]["signature"] == "call_zyx_v1(p, 1);"
         assert out["call_zyx_v1"]["anchor"] == "zyx-example"
+
+    def test_example_only_name_has_no_signature(self) -> None:
+        # A row signature comes from a declaration, never from an
+        # example call or a sibling's declaration: atomicAdd_system
+        # displayed `atomicAdd_system(addr, 10);`, picked from the
+        # example code block of the legacy atomics section. The entry
+        # stays; the example line is not a signature.
+        html = (
+            '<section id="zyx-legacy">'
+            "<pre>__global__ void zyk_kernel(int* addr) {\n    call_zyx_v1(addr, 10);\n}</pre>"
+            "</section>"
+        )
+        out = parse_guide_page(html)
+        assert out["call_zyx_v1"]["signature"] == ""
 
 
 class TestCalloutAndExampleCuts:

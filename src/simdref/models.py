@@ -45,6 +45,7 @@ class IntrinsicRecord:
     instruction_refs: list[dict[str, str]] = field(default_factory=list)
     metadata: dict[str, str] = field(default_factory=dict)
     doc_sections: dict[str, str] = field(default_factory=dict)
+    doc_sources: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     source: str = "intel"
@@ -86,6 +87,7 @@ class IntrinsicRecord:
             "instruction_refs": self.instruction_refs,
             "metadata": self.metadata,
             "doc_sections": self.doc_sections,
+            "doc_sources": self.doc_sources,
             "notes": self.notes,
             "aliases": self.aliases,
             "source": self.source,
@@ -105,6 +107,7 @@ class InstructionRecord:
     linked_intrinsics: list[str] = field(default_factory=list)
     aliases: list[str] = field(default_factory=list)
     description: dict[str, str] = field(default_factory=dict)
+    doc_sources: list[dict[str, Any]] = field(default_factory=list)
     pdf_refs: list[dict[str, str]] = field(default_factory=list)
     source: str = "uops.info"
     # Byte-identity encoding key (spec K2/K3): fixed bits of the upstream
@@ -193,6 +196,7 @@ class InstructionRecord:
             "linked_intrinsics": self.linked_intrinsics,
             "aliases": self.aliases,
             "description": self.description,
+            "doc_sources": self.doc_sources,
             "pdf_refs": self.pdf_refs,
             "source": self.source,
             "enc_bits": self.enc_bits,

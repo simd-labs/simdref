@@ -22,6 +22,7 @@ from simdref.catkey import (
     substitute_placeholders,
 )
 from simdref.cuda import (
+    append_linked_ptx_docs,
     apply_cuda_docs,
     parse_cuda_calls,
     parse_cuda_intrinsics_payload,
@@ -1742,6 +1743,7 @@ def build_catalog(
     emit("Linking intrinsics to instructions")
     link_records(intrinsics, instructions)
     emit("Linked intrinsics and instructions")
+    append_linked_ptx_docs(intrinsics, instructions)
     _backfill_amx_tile_summaries(intrinsics, instructions)
     _attach_intel_guide_notes(intrinsics)
 

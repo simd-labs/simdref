@@ -30,6 +30,12 @@ from collections import defaultdict
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from simdref.cuda_docs import (
+    declaration_qualifiers,
+    normalize_declaration,
+)
+
 DEFAULT_OUT_DIR = REPO_ROOT / "vendor" / "cuda"
 LLVM_ORG_REF = "llvmorg-23.1.4"
 RAW_BASE = f"https://raw.githubusercontent.com/llvm/llvm-project/{LLVM_ORG_REF}"
@@ -147,26 +153,37 @@ def _skip_paren_group(text: str, start: int) -> int:
     return len(text)
 
 
-def drop_attribute_groups(text: str) -> str:
-    """Remove every ``__attribute__(( ... ))`` group from the text."""
-    out = []
-    i = 0
-    while True:
-        a = text.find("__attribute__(", i)
-        if a < 0:
-            return "".join(out) + text[i:]
-        out.append(text[i:a])
-        i = _skip_paren_group(text, a + len("__attribute__"))
+def _declaration_span(text: str, start: int) -> tuple[str, int] | None:
+    """The declaration chunk at start: to the close of its call group.
 
-
-def name_of(fn_head: str) -> tuple[str, str]:
-    s = fn_head.strip()
-    i = len(s)
-    while i > 0 and (s[i - 1].isalnum() or s[i - 1] == "_"):
-        i -= 1
-    name = s[i:]
-    rest = s[:i].strip()
-    return name, rest
+    Joins the continuation lines: the scan crosses line breaks until the
+    call parens close. A statement end before the call parens stops it.
+    None when the text holds no call group.
+    """
+    depth = 0
+    open_at = -1
+    i = start
+    while i < len(text):
+        c = text[i]
+        if text.startswith("__attribute__(", i):
+            i = _skip_paren_group(text, i + len("__attribute__"))
+            continue
+        if c == ";" and depth == 0:
+            return None
+        if c == "{" and depth == 0 and open_at == -1:
+            return None
+        if c == "(":
+            if depth == 0 and open_at == -1:
+                open_at = i
+            depth += 1
+        elif c == ")":
+            if depth == 0:
+                return None
+            depth -= 1
+            if depth == 0 and open_at >= 0:
+                return text[start : i + 1], i + 1
+        i += 1
+    return None
 
 
 # ----------------------------------------------------------------
@@ -177,72 +194,60 @@ def name_of(fn_head: str) -> tuple[str, str]:
 def parse_functions_from_text(text: str, header: str) -> list[dict]:
     text = strip_comments(text)
     lls = logical_lines(text)
+    qualifiers = declaration_qualifiers(text)
     joined = "\n".join(lls)
-    prefix_tokens = (
-        "__DEVICE__",
-        "inline __device__",
-        "__inline__ __device__",
-        "static __device__",
-        "static inline __attribute__((always_inline))",
-    )
     functions: list[dict] = []
-    i = 0
-    while True:
-        best = None
-        raw = None
-        for tok in prefix_tokens:
-            j = joined.find(tok + " ", i)
-            if j == -1:
-                j = joined.find(tok + "{", i)
-            if j >= 0 and (raw is None or j < raw):
-                raw = j
-            if j >= 0 and (best is None or j < best[0]):
-                if j == 0 or joined[j - 1] == "\n":
-                    best = (j, tok)
-        if best is None:
-            if raw is None:
+    seen: set[tuple[str, str]] = set()
+    pos = 0
+    while pos < len(joined):
+        line_end = joined.find("\n", pos)
+        if line_end == -1:
+            line_end = len(joined)
+        if joined[pos:line_end].lstrip().startswith("#"):
+            pos = line_end + 1
+            continue
+        span = _declaration_span(joined, pos)
+        pos = line_end + 1
+        if span is None:
+            continue
+        chunk, end = span
+        normalized = normalize_declaration(chunk, qualifiers)
+        if normalized is None:
+            continue
+        type_tokens, name, params = normalized
+        if not type_tokens:
+            continue
+        # The definition brace follows the call parens, with optional
+        # attribute groups between. A ";" there marks a prototype.
+        k = end
+        while True:
+            while k < len(joined) and joined[k] in " \t\n":
+                k += 1
+            if not joined[k:].startswith("__attribute__("):
                 break
-            i = raw + 1
+            k = _skip_paren_group(joined, k + len("__attribute__"))
+        if k >= len(joined) or joined[k] != "{":
             continue
-        j, tok = best
-        line_start = joined.rfind("\n", 0, j) + 1
-        if joined[line_start:j].strip().startswith("#"):
-            i = j + len(tok)
-            continue
-        br = joined.find("{", j + len(tok))
-        sc = joined.find(";", j + len(tok))
-        if br < 0 or (sc >= 0 and sc < br):
-            i = j + len(tok)
-            continue
-        # Drop every __attribute__(( ... )) group, wherever it sits in the
-        # declaration, before the name is taken: an attribute before or
-        # inside the declarator otherwise parses as the name "__attribute__".
-        head = drop_attribute_groups(joined[j + len(tok) : br])
-        p = head.find("(")
-        if p < 0:
-            i = br + 1
-            continue
-        name, _ = name_of(head[:p])
-        body = find_body(joined, br)
+        body = find_body(joined, k)
         if body is None:
-            i = br + 1
             continue
-        decl = joined[j + len(tok) : br].strip()
-        if name and name[0] not in "0123456789":
-            functions.append(
-                {
-                    "name": name,
-                    "signature": decl,
-                    "header": header,
-                    "body": body[1:-1].strip(),
-                }
-            )
-        i = br + len(body)
+        if (name, params) in seen:
+            continue
+        seen.add((name, params))
+        functions.append(
+            {
+                "name": name,
+                "signature": " ".join(type_tokens + [name]) + "(" + params + ")",
+                "header": header,
+                "body": body[1:-1].strip(),
+            }
+        )
     return functions
 
 
 def parse_macro_shuffles(text: str, header: str) -> list[dict]:
     lls = logical_lines(text)
+    quals = declaration_qualifiers(text)
     macrogen = {}
     for k, ln in enumerate(lls):
         s = ln.strip()
@@ -269,36 +274,23 @@ def parse_macro_shuffles(text: str, header: str) -> list[dict]:
     invocations: list[dict] = []
     i = 0
     while i < len(lls):
-        ln = lls[i]
-        s = ln.strip()
-        if s.startswith("__MAKE_SHUFFLES(") or s.startswith("__MAKE_SYNC_SHUFFLES("):
-            # Merge continuation lines for multi-line macro invocations
-            full_line = s
-            j = i + 1
-            depth = s.count("(") - s.count(")")
-            while depth > 0 and j < len(lls):
-                next_line = lls[j].strip()
-                full_line += " " + next_line
-                depth += next_line.count("(") - next_line.count(")")
-                j += 1
+        s = lls[i].strip()
+        # Merge continuation lines for multi-line macro invocations
+        full_line = s
+        j = i + 1
+        depth = s.count("(") - s.count(")")
+        while depth > 0 and j < len(lls):
+            next_line = lls[j].strip()
+            full_line += " " + next_line
+            depth += next_line.count("(") - next_line.count(")")
+            j += 1
+        normalized = normalize_declaration(full_line, quals)
+        mn = normalized[1] if normalized else ""
+        if normalized is not None and mn in ("__MAKE_SHUFFLES", "__MAKE_SYNC_SHUFFLES"):
             i = j - 1
 
             # Parse the complete invocation
-            mn = "__MAKE_SYNC_SHUFFLES" if "SYNC" in s else "__MAKE_SHUFFLES"
-            argstr = full_line[full_line.find("(") + 1 :]
-            if argstr.rstrip().endswith(");"):
-                argstr = argstr[:-2].rstrip()
-            depth = 0
-            out = ""
-            for c in argstr:
-                if c == "(":
-                    depth += 1
-                elif c == ")":
-                    if depth == 0:
-                        break
-                    depth -= 1
-                out += c
-            args = [a.strip() for a in out.split(",") if a.strip()]
+            args = [a.strip() for a in normalized[2].split(",") if a.strip()]
             body = macrogen.get(mn, "")
             ints = [a for a in args if a.startswith("__nvvm_")]
             invocations.append(
@@ -316,15 +308,15 @@ def parse_macro_shuffles(text: str, header: str) -> list[dict]:
 
 def parse_builtin_vars(text: str) -> list[dict]:
     llv = logical_lines(text)
+    quals = declaration_qualifiers(text)
     accessors: list[dict] = []
     for ln in llv:
-        s = ln.strip()
-        if s.startswith("__CUDA_DEVICE_BUILTIN("):
-            argstr = s[s.find("(") + 1 :]
-            argstr = argstr[: argstr.rfind(")")]
-            args = [a.strip() for a in argstr.split(",")]
-            if len(args) == 2:
-                accessors.append({"field": args[0], "call": args[1]})
+        normalized = normalize_declaration(ln.strip(), quals)
+        if normalized is None or normalized[1] != "__CUDA_DEVICE_BUILTIN":
+            continue
+        args = [a.strip() for a in normalized[2].split(",")]
+        if len(args) == 2:
+            accessors.append({"field": args[0], "call": args[1]})
     return accessors
 
 

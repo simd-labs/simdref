@@ -324,6 +324,38 @@ def test_raw_html_payload(fixture_html):
     assert records[0].mnemonic == "frob"
 
 
+def test_doc_syntax_block_keeps_every_pre_line():
+    # The Syntax code block of the doc entry keeps every line of the
+    # pre element: the template lines and the qualifier set lines. A
+    # one-line truncation drops the `.mode = { ... };` line of the SHF
+    # and SHFL rows.
+    fragment = (
+        '<section id="data-movement-and-conversion-instructions-shfl-sync">'
+        "<h4>Data Movement and Conversion Instructions: shfl.sync</h4>"
+        '<p class="rubric">Syntax</p>'
+        '<div class="highlight-text notranslate"><div class="highlight"><pre>'
+        "<span></span>shfl.sync.mode.b32  d[|p], a, b, c, membermask;\n"
+        ".mode = { .up, .down, .bfly, .idx };\n"
+        "</pre></div></div>"
+        '<p class="rubric">Description</p>'
+        "<p>Exchanges data between threads.</p>"
+        "</section>"
+    )
+    rows = derive_rows(fragment)
+    assert len(rows) == 1
+    row = rows[0]
+    syntax = next(
+        section
+        for entry in row["doc_sources"]
+        for section in entry["sections"]
+        if section["heading"] == "Syntax"
+    )
+    code = next(block for block in syntax["blocks"] if block["kind"] == "code")
+    assert code["text"] == (
+        "shfl.sync.mode.b32  d[|p], a, b, c, membermask;\n.mode = { .up, .down, .bfly, .idx };"
+    )
+
+
 def test_op_chain():
     assert op_chain("ld.global.v4.f32") == ("ld", ("global", "v4", "f32"))
     assert op_chain("frob") == ("frob", ())

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<!-- Synthetic fixture. Same element shape as a guide appendix crop. -->
+<html>
+<body>
+<section id="zyx-warp-shuffle-ext">
+<h2>Warp shuffle functions</h2>
+<p>These zyx shuffle calls move values inside a warp.</p>
+<p>They take a zyx mask argument.</p>
+<div class="highlight"><pre>int __zyx_shfl_v1(int var, int srcLane);
+int __zyx_shfl_up_v2(int var, unsigned delta);
+int __zyx_shfl_down_v3(int var, unsigned delta);
+int __zyx_shfl_xor_v4(int var, int laneMask);</pre></div>
+<dl class="cpp function">
+<dt>__zyx_shfl_v1(): Copy var from lane srcLane.</dt>
+<dd><p>The copy reads the zyx source lane.</p></dd>
+<dt>__zyx_shfl_up_v2(): Copy var from lane id minus delta.</dt>
+<dd><p>The up shift reads a lower zyx lane.</p></dd>
+<dt>__zyx_shfl_down_v3(): Copy var from lane id plus delta.</dt>
+<dd><p>The down shift reads a higher zyx lane.</p></dd>
+<dt>__zyx_shfl_xor_v4(): Copy var from lane id xor laneMask.</dt>
+<dd><p>The xor flip reads a zyx flipped lane.</p></dd>
+</dl>
+</section>
+</body>
+</html>

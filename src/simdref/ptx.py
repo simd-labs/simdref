@@ -18,6 +18,7 @@ from typing import Any
 from simdref.asmline import split_operands
 from simdref.catkey import build_key as _build_key
 from simdref.catkey import normalize_isa as _normalize_isa
+from simdref.docblocks import merge_doc_entries
 from simdref.htmltext import strip_html, tag_at
 from simdref.models import InstructionRecord
 from simdref.urls import resolve_url
@@ -347,6 +348,18 @@ def _region_text(body: str) -> str:
     return "\n".join(part for part in parts if part)
 
 
+def _region_blocks(body: str) -> list[dict[str, Any]]:
+    """C.1 blocks of one sub-section region, in page order.
+
+    Prose becomes paragraphs, lists and definition lists; each ``pre``
+    becomes a code block with the language the page class names ('ptx'
+    inside the PTX ISA source).
+    """
+    from simdref.docblocks import blocks_of, build_tree
+
+    return blocks_of(build_tree(body), "ptx")
+
+
 def _code_texts(fragment: str) -> list[str]:
     """Plain text inside each <code> element of the fragment, in order."""
     out: list[str] = []
@@ -384,8 +397,10 @@ def _title_names(inner: str) -> list[str] | None:
     return names or None
 
 
-def _sub_sections(body: str, lead_names: list[str]) -> list[tuple[list[str], str, str, bool]]:
-    """(names, heading, text, is_lead) of each sub-section, in page order.
+def _sub_sections(
+    body: str, lead_names: list[str]
+) -> list[tuple[list[str], str, str, bool, list[dict[str, Any]]]]:
+    """(names, heading, text, is_lead, blocks) of each sub-section.
 
     A rubric <p> opens a sub-section and its region runs to the next
     rubric. The lead region before the first rubric and each title-line
@@ -426,17 +441,21 @@ def _sub_sections(body: str, lead_names: list[str]) -> list[tuple[list[str], str
         inner = own[start + len(_RUBRIC_OPEN) : close]
         spans.append((_title_names(inner) or [], _plain(inner), close + 4))
         probe = close + 4
-    out: list[tuple[list[str], str, str, bool]] = []
-    lead = _region_text(own[content_start : opens[0] if opens else len(own)])
+    out: list[tuple[list[str], str, str, bool, list[dict[str, Any]]]] = []
+    lead_region = own[content_start : opens[0] if opens else len(own)]
+    lead = _region_text(lead_region)
     if lead:
-        out.append((list(lead_names), "", lead, True))
+        out.append((list(lead_names), "", lead, True, _region_blocks(lead_region)))
     for index, (names, heading, region_start) in enumerate(spans):
         region_end = opens[index + 1] if index + 1 < len(opens) else len(own)
-        out.append((names, heading, _region_text(own[region_start:region_end]), False))
+        region = own[region_start:region_end]
+        out.append((names, heading, _region_text(region), False, _region_blocks(region)))
     return out
 
 
-def _brief_for(subs: list[tuple[list[str], str, str, bool]], mnemonic: str) -> tuple[str, bool]:
+def _brief_for(
+    subs: list[tuple[list[str], str, str, bool, list[dict[str, Any]]]], mnemonic: str
+) -> tuple[str, bool]:
     """(text, is_lead) of the title line that claims the row's mnemonic.
 
     A name whose whole dot-segment list prefixes the mnemonic, or the
@@ -452,7 +471,7 @@ def _brief_for(subs: list[tuple[list[str], str, str, bool]], mnemonic: str) -> t
     segments = [seg for seg in mnemonic.split(".") if seg]
     best_score = (-1, 0)
     best: tuple[str, bool] = ("", False)
-    for names, heading, text, is_lead in titles:
+    for names, heading, text, is_lead, _blocks in titles:
         for name in names:
             named = [seg for seg in name.split(".") if seg]
             shared = 0
@@ -536,7 +555,7 @@ def _sm_floors(prose: str) -> list[str]:
         index = end
 
 
-def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
+def _section_rows(body: str, section_id: str, title: str = "") -> list[dict[str, Any]]:
     parts = _heading_parts(_heading(body))
     if parts is None:
         return []
@@ -552,17 +571,24 @@ def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
     floors = _sm_floors(_notes_prose(body, _RUBRIC_TARGET_NOTES))
     subs = _sub_sections(body, ops)
     url = resolve_url(PTX_ISA_DOC_URL, "#" + section_id)
+    from simdref.docblocks import build_tree, heading_of
+
+    doc_heading = heading_of(build_tree(body))
     rows: list[dict[str, Any]] = []
     for template in templates:
         parsed = _template_parts(template, set_names)
         if parsed is None:
             continue
         mnemonic, form = parsed
-        # Every row of the section shares the sub-section text; only the
-        # Syntax entry names the row's own template line. The title line
-        # (name: brief) leads the summary and is not a sub-section.
+        # Every row of the section shares the sub-section blocks; the
+        # description dict alone names the row's own Syntax line. The
+        # blocks keep every line of the page's pre element: a code
+        # block truncated to the template line drops the qualifier
+        # set lines. The title line (name: brief) leads the summary
+        # and is not a sub-section.
         description: dict[str, str] = {}
-        for names, heading, text, _is_lead in subs:
+        doc_sections: list[dict[str, Any]] = []
+        for names, heading, text, _is_lead, blocks in subs:
             if names:
                 continue
             value = template if heading == "Syntax" else text
@@ -570,6 +596,8 @@ def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
                 continue
             prior = description.get(heading)
             description[heading] = f"{prior}\n{value}" if prior else value
+            if blocks:
+                doc_sections.append({"heading": heading, "shared": False, "blocks": blocks})
         brief, brief_lead = _brief_for(subs, mnemonic)
         rows.append(
             {
@@ -584,6 +612,17 @@ def _section_rows(body: str, section_id: str) -> list[dict[str, Any]]:
                 "ptx_isa": list(versions),
                 "sm": list(floors),
                 "url": url,
+                "doc_sources": [
+                    {
+                        "source": "ptx-isa",
+                        "url": url,
+                        "page": PTX_ISA_DOC_URL,
+                        "title": title,
+                        "heading": doc_heading,
+                        "shared": False,
+                        "sections": doc_sections,
+                    }
+                ],
             }
         )
     return rows
@@ -609,6 +648,7 @@ def _merge_key_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             entry["syntax"] = [row["syntax"]] if row.get("syntax") else []
             entry["urls"] = [str(row.get("url") or "")] if row.get("syntax") else []
             entry["description"] = dict(row.get("description") or {})
+            entry["doc_sources"] = list(row.get("doc_sources") or [])
             categories = str(row.get("category", ""))
             entry["category"] = [categories] if categories else []
             merged[key] = entry
@@ -647,6 +687,8 @@ def _merge_key_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for value in row.get(field) or []:
                 if value not in entry[field]:
                     entry[field].append(value)
+        for doc_entry in row.get("doc_sources") or []:
+            merge_doc_entries(entry["doc_sources"], doc_entry)
     out: list[dict[str, Any]] = []
     for key in order:
         entry = merged[key]
@@ -664,6 +706,9 @@ def derive_rows(html: str) -> list[dict[str, Any]]:
     One row per catalog key. A section without a Syntax block yields no
     rows. A section that fails to parse is skipped; the walk continues.
     """
+    from simdref.docblocks import build_tree, page_title
+
+    title = page_title(build_tree(html))
     rows: list[dict[str, Any]] = []
     pos = 0
     while True:
@@ -673,7 +718,7 @@ def derive_rows(html: str) -> list[dict[str, Any]]:
         start, end, section_id = section
         pos = start + 1
         try:
-            rows.extend(_section_rows(html[start:end], section_id))
+            rows.extend(_section_rows(html[start:end], section_id, title))
         except Exception:
             continue
 
@@ -784,6 +829,7 @@ def parse_ptx_instructions_payload(text: str) -> list[InstructionRecord]:
                 isa=_normalize_isa(["PTX"]),
                 metadata=metadata,
                 description=description,
+                doc_sources=list(row.get("doc_sources") or []),
                 source="ptx-isa",
             )
         )

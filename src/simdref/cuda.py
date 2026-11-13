@@ -13,6 +13,7 @@ import json
 from typing import Any
 
 from simdref.cuda_docs import declares_name, tex_to_text
+from simdref.docblocks import merge_doc_entries
 from simdref.models import IntrinsicRecord
 from simdref.urls import resolve_url
 
@@ -218,6 +219,20 @@ def _starts_at_word(token: str, name: str) -> bool:
     return False
 
 
+def _first_paragraph_text(entry: dict[str, Any]) -> str:
+    """Text of the first paragraph block of the entry, else "".
+
+    The summary is a paragraph, never list text: the flat description
+    string of a guide entry merges a lead-in paragraph with the list
+    items that follow it (the atomicAdd steps).
+    """
+    for section in entry.get("sections") or []:
+        for block in section.get("blocks") or []:
+            if block.get("kind") == "paragraph" and str(block.get("text") or "").strip():
+                return str(block["text"])
+    return ""
+
+
 def apply_cuda_docs(
     rows: list[IntrinsicRecord], calls: dict[str, list[str]], docs: dict[str, Any]
 ) -> None:
@@ -259,11 +274,15 @@ def apply_cuda_docs(
         anchor = str(entry.get("anchor") or "")
         page = str(entry.get("page") or "")
         row.url = resolve_url(page, "#" + anchor) if anchor else resolve_url(page)
-        if entry.get("signature"):
-            row.signature = str(entry["signature"])
+        signature = str(entry.get("signature") or "")
+        # A row shows a declaration of its own name, never an example
+        # call or a sibling's declaration: the header signature stays
+        # when the doc entry declares another name.
+        if signature and declares_name(signature, name):
+            row.signature = signature
         description = str(entry.get("description") or "")
         summary = str(entry.get("summary") or "")
-        row.description = _first_sentence(summary or description)
+        row.description = _first_sentence(summary or _first_paragraph_text(entry) or description)
         sections: dict[str, str] = {}
         if description:
             sections["Description"] = description
@@ -285,10 +304,82 @@ def apply_cuda_docs(
             if readable != accuracy:
                 row.metadata["doc_math"] = accuracy
         row.doc_sections = sections
-        if entry.get("accuracy"):
-            row.notes = [str(entry["accuracy"])]
         row.metadata["doc_source"] = source
         if via:
             row.metadata["doc_via"] = via
-        if entry.get("return_value"):
-            row.metadata["result"] = str(entry["return_value"])
+        row.doc_sources = _doc_sources(entry, source, row.url, via, page)
+        ulp_blocks = _ulp_doc_entry(ulp_entry)
+        if ulp_blocks is not None:
+            row.doc_sources.append(ulp_blocks)
+
+
+def _doc_sources(
+    entry: dict[str, Any], source: str, url: str, via: str, page: str
+) -> list[dict[str, Any]]:
+    """The row's own C.1 entry for the page that documents it."""
+    sections = entry.get("sections") or []
+    block_entry: dict[str, Any] = {
+        "source": source,
+        "url": url,
+        "page": resolve_url(page),
+        "title": str(entry.get("title") or ""),
+        "heading": str(entry.get("heading") or ""),
+        "shared": bool(via) or any(bool(item.get("shared")) for item in sections),
+        "sections": sections,
+    }
+    if entry.get("signature"):
+        block_entry["signature"] = str(entry["signature"])
+    if entry.get("signature_runs"):
+        block_entry["signature_runs"] = entry["signature_runs"]
+    if via:
+        block_entry["via"] = via
+    return [block_entry]
+
+
+def _ulp_doc_entry(ulp_entry: dict[str, Any]) -> dict[str, Any] | None:
+    """The ULP table of the name as one C.1 table entry, else None."""
+    rows = [list(cells) for cells in (ulp_entry.get("rows") or [])]
+    if not rows:
+        return None
+    caption = str(ulp_entry.get("caption") or "")
+    blocks: list[dict[str, Any]] = [
+        {
+            "kind": "table",
+            "caption": caption,
+            # The entry keeps the header as one flat list of cell
+            # strings; the table block carries rows of cells. Wrapping
+            # once keeps the cells as strings: iterating the flat list
+            # would split each cell into its letters.
+            "header": [list(ulp_entry.get("header") or [])],
+            "rows": rows,
+        }
+    ]
+    accuracy = str(ulp_entry.get("accuracy") or "")
+    if ulp_entry.get("math") and accuracy:
+        blocks.append({"kind": "math", "text": tex_to_text(accuracy), "tex": accuracy})
+    return {
+        "source": "ulp",
+        "url": str(ulp_entry.get("page") or ""),
+        "page": str(ulp_entry.get("page") or ""),
+        "title": str(ulp_entry.get("title") or ""),
+        "heading": caption,
+        "shared": False,
+        "sections": [{"heading": "", "shared": False, "blocks": blocks}],
+    }
+
+
+def append_linked_ptx_docs(rows: list[IntrinsicRecord], instructions: list[Any]) -> None:
+    """Append the linked PTX entries to the CUDA rows (design C.3).
+
+    One entry per PTX page. Instruction order first, then document
+    order. A row with no linked instruction keeps no PTX entry.
+    """
+    by_name = {item.mnemonic: item for item in instructions if item.architecture == "ptx"}
+    for row in rows:
+        for ref in row.instruction_refs:
+            target = str(ref.get("name") or "") if isinstance(ref, dict) else str(ref or "")
+            linked = by_name.get(target)
+            if linked is None:
+                continue
+            for doc_entry in linked.doc_sources:
+                merge_doc_entries(row.doc_sources, doc_entry)

@@ -51,7 +51,8 @@ class TestMathApiParse:
 
     def test_sin_entry_fields(self) -> None:
         out = parse_math_api_page(_load("cuda_docs_math_page.html"))
-        assert out["__zyx_sin_v2"] == {
+        entry = out["__zyx_sin_v2"]
+        assert {k: v for k, v in entry.items() if k != "sections"} == {
             "anchor": "zyx_target_sin_v2",
             "signature": "__device__ float __zyx_sin_v2(float x)",
             "summary": "Compute the zyx sine of the input value.",
@@ -60,7 +61,53 @@ class TestMathApiParse:
             "parameters": "The zyx input value.",
             "accuracy": "Accuracy data: the error stays below 2 ULP.",
             "math": [],
+            "heading": "__zyx_sin_v2",
+            "title": "",
         }
+        assert entry["sections"] == [
+            {
+                "heading": "",
+                "shared": False,
+                "blocks": [
+                    {
+                        "kind": "paragraph",
+                        "owner": "__zyx_sin_v2",
+                        "text": "Compute the zyx sine of the input value.",
+                    },
+                    {
+                        "kind": "paragraph",
+                        "owner": "__zyx_sin_v2",
+                        "text": "The input is a value in zyx units.",
+                    },
+                    {
+                        "kind": "note",
+                        "note": "note",
+                        "owner": "__zyx_sin_v2",
+                        "text": "Accuracy data: the error stays below 2 ULP.",
+                    },
+                    {
+                        "kind": "note",
+                        "note": "note",
+                        "owner": "__zyx_sin_v2",
+                        "text": "Inputs in the zyx range are flushed to zero.",
+                    },
+                    {
+                        "kind": "note",
+                        "note": "seealso",
+                        "owner": "__zyx_sin_v2",
+                        "text": "The zyx phase table lists the domain.",
+                    },
+                    {
+                        "kind": "deflist",
+                        "owner": "__zyx_sin_v2",
+                        "items": [
+                            {"name": "Returns", "text": "Returns the zyx sine."},
+                            {"name": "Parameters", "text": "The zyx input value."},
+                        ],
+                    },
+                ],
+            }
+        ]
 
     def test_anchor_falls_back_to_dt_id(self) -> None:
         out = parse_math_api_page(_load("cuda_docs_math_page.html"))
@@ -149,13 +196,26 @@ class TestUlpMathMarking:
         assert out["__zyx_abs_v6"]["accuracy"] == "0 ULP"
         assert out["__zyx_abs_v6"]["math"] == []
 
+    def test_table_cells_read_math_as_unicode(self) -> None:
+        # The table block carries the readable text of a math cell, the
+        # same text inline runs produce for a paragraph. The accuracy
+        # field itself keeps the raw TeX for the math block.
+        out = parse_ulp_tables(_load("cuda_docs_ulp_math_table.html"))
+        entry = out["__zyx_tan_v5"]
+        row = entry["rows"][0]
+        assert "\\(" not in "".join(row)
+        assert row[0] == "__zyx_tan_v5(x)"
+        assert row[1] == "\\tan(x)"
+        assert row[2] == "▪ 2⁻²¹·⁴¹ abs error for x ∈ [−π, π] ▪ larger otherwise"
+
 
 class TestLibdeviceParse:
     """libdevice pages share the Sphinx shape and the output contract."""
 
     def test_same_contract(self) -> None:
         out = parse_libdevice_page(_load("cuda_docs_libdevice_page.html"))
-        assert out["__zyx_free_v7"] == {
+        entry = out["__zyx_free_v7"]
+        assert {k: v for k, v in entry.items() if k != "sections"} == {
             "anchor": "zyx_target_free_v7",
             "signature": "__device__ float @__zyx_free_v7(float x)",
             "summary": "Free the zyx value of the input.",
@@ -164,7 +224,27 @@ class TestLibdeviceParse:
             "parameters": "",
             "accuracy": "",
             "math": [],
+            "heading": "__zyx_free_v7",
+            "title": "",
         }
+        assert entry["sections"] == [
+            {
+                "heading": "",
+                "shared": False,
+                "blocks": [
+                    {
+                        "kind": "paragraph",
+                        "owner": "__zyx_free_v7",
+                        "text": "Free the zyx value of the input.",
+                    },
+                    {
+                        "kind": "deflist",
+                        "owner": "__zyx_free_v7",
+                        "items": [{"name": "Returns", "text": "Returns the freed zyx value."}],
+                    },
+                ],
+            }
+        ]
 
     def test_at_prefix_is_not_part_of_the_name(self) -> None:
         out = parse_libdevice_page(_load("cuda_docs_libdevice_page.html"))
@@ -314,17 +394,14 @@ class TestBundleRoundTrip:
 
     def test_math_entries(self) -> None:
         out = self._parsed()
-        assert out["math"]["__zyx_sin_v2"] == {
-            "anchor": "zyx_target_sin_v2",
-            "signature": "__device__ float __zyx_sin_v2(float x)",
-            "summary": "Compute the zyx sine of the input value.",
-            "description": "The input is a value in zyx units.",
-            "return_value": "Returns the zyx sine.",
-            "parameters": "The zyx input value.",
-            "accuracy": "Accuracy data: the error stays below 2 ULP.",
-            "math": [],
+        entry = out["math"]["__zyx_sin_v2"]
+        direct = parse_math_api_page(_load("cuda_docs_math_page.html"))["__zyx_sin_v2"]
+        assert {k: v for k, v in entry.items() if k != "sections"} == {
+            **{k: v for k, v in direct.items() if k != "sections"},
             "page": FAKE1_URL,
         }
+        # The round trip keeps the C.1 blocks byte-for-byte.
+        assert entry["sections"] == direct["sections"]
 
     def test_guide_entries(self) -> None:
         out = self._parsed()
@@ -342,6 +419,9 @@ class TestBundleRoundTrip:
             "caption": "Table 9 Zyx Functions Mapping and Accuracy (Maximum ULP)",
             "math": [],
             "page": ULP_URL,
+            "title": "",
+            "header": ["Function", "Meaning", "Maximum ULP Error"],
+            "rows": [["__zyx_rsqrt_v1(x)", "zyx inverse root", "0 ULP"]],
         }
 
     def test_libdevice_index_entries(self) -> None:
