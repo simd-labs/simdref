@@ -5,15 +5,22 @@ All notable changes to `simdref` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.21], 2026-11-13
 
-### Fixed
+### Added
 
-- The site export writes the doc sections as `[heading, text]` pairs. The web detail pane shows the sections in doc page order now.
+- GPU documentation rows carry their text as ordered `doc_sources` blocks: code with a language, lists, notes, tables, math and inline runs. The web detail pane, the TUI and the CLI render each block the same way.
+- PTX code blocks have syntax coloring.
+- Documentation for `atomicAdd`. It joins its CUDA programming guide entry. The rows appear in the next release catalog, after `isa update`.
 
 ### Changed
 
-- The TUI and the CLI show the doc sections in the record order, like the web detail pane.
+- The CUDA catalog has 627 rows, up from 585. The 42 new rows lose none of the old rows. Ingest normalizes the CUDA declarations. The rows appear in the next release catalog, after `isa update`.
+- The web detail pane, the TUI and the CLI show the doc sections in the source order. The site export writes the sections as `[heading, text]` pairs.
+
+### Known limits
+
+- Some cells of the `__sinf` family accuracy tables show `\sin(x)` as TeX text.
 
 ## [0.0.20], 2026-11-12
 
